@@ -1,0 +1,22 @@
+# Overrides on top of detekt's defaults (`buildUponDefaultConfig = true`); only deviations live here.
+
+style:
+  # ktlint (through Spotless) owns formatting and its official style allows 140 columns; two
+  # formatters disagreeing about the same line would make one of them unsatisfiable.
+  MaxLineLength:
+    maxLineLength: 140
+  ReturnCount:
+    # `?: return` / `if (...) return` at the top of a function is the clearest way to say
+    # "not applicable", and the toolchain resolver contract is built on early `Optional.empty()`.
+    excludeGuardClauses: true
+  MagicNumber:
+    excludes: ['**/test/**', '**/functionalTest/**']
+
+naming:
+  FunctionNaming:
+    # Backtick test names are a sentence describing the behaviour under test.
+    excludes: ['**/test/**', '**/functionalTest/**']
+
+performance:
+  SpreadOperator:
+    excludes: ['**/test/**', '**/functionalTest/**']

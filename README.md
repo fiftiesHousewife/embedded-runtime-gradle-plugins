@@ -71,6 +71,7 @@ service built and run as a container image when Docker is available.
 | [Building for Linux, Mac and Windows](docs/targets.md) | Several targets from one build, and which ones are tested |
 | [Java: modules, hardening and JDKs](docs/java.md) | jdeps and jlink, certificates and security policy, choosing a JDK distribution |
 | [Packaging and deploying](docs/packaging.md) | tar.gz, tar, zip, RPM and container images; Gradle distributions and launchers |
+| [Performance tuning](docs/performance.md) | Java Flight Recorder on the embedded runtime, heap, GC and startup |
 | [Publishing](docs/publishing.md) | Maven repositories, signing, smoke-testing a published app |
 | [Behind a corporate binary repository](docs/binary-repository.md) | One setting per machine; the repositories to create |
 | [Reference](docs/reference.md) | Every setting, task and Gradle property |
@@ -79,8 +80,8 @@ service built and run as a container image when Docker is available.
 
 ### AI assistant skills
 
-Skills that adopt the plugins in a project, find the JDK modules for jlink, and upgrade dependencies
-and runtimes, plus a hook that checks the build still configures after the agent edits a build file:
+Skills that adopt the plugins in a project, find the JDK modules for jlink, upgrade dependencies and
+runtimes, and tune performance with Java Flight Recorder, plus a hook that checks the build still configures after the agent edits a build file:
 
 - **GitHub Copilot** (agent mode in VS Code, Visual Studio and JetBrains IDEs, the Copilot app and
   CLI, the cloud agent) **and Devin**: `./gradlew aiSkills` writes them into your project.

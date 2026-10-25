@@ -1,6 +1,6 @@
 # Working on this repository
 
-Notes for anyone (human or agent) changing the plugins. The [README](README.md) and [`docs/`](docs)
+Notes for anyone (human or agent) changing the plugins. What is planned is in [ROADMAP.md](ROADMAP.md). The [README](README.md) and [`docs/`](docs)
 are for people *using* them and must stay free of anything below. Keep the README a short overview
 that links into `docs/`.
 
@@ -16,6 +16,8 @@ build-src/                  the plugin build, included by the root build
 deploy/                     install.sh (servers without root), curate-runtimes.sh (Artifactory)
 docs/                       user documentation, linked from the README; article.md is the article's home
 .github/scripts/            verify-rpm.sh: CI installs the sample's RPM in a Rocky Linux container
+.claude-plugin/, claude-plugin/   Claude Code marketplace and the embedded-runtime plugin's skills; keep the
+                            skills in step with the tasks and properties they name
 gradle/init.d/              init script for machines behind Artifactory
 gradle/libs.versions.toml   the one version catalogue, shared by every build here
 samples/                    a Java and a Node service, built in CI end to end

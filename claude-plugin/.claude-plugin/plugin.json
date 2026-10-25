@@ -1,0 +1,8 @@
+{
+  "name": "embedded-runtime",
+  "version": "1.0.0",
+  "description": "Skills for the embedded runtime Gradle plugins: adopt them, find the JDK modules for jlink, upgrade dependencies and runtimes",
+  "author": { "name": "fiftiesHousewife" },
+  "homepage": "https://github.com/fiftiesHousewife/embedded-runtime-gradle-plugins",
+  "license": "Apache-2.0"
+}

@@ -101,6 +101,48 @@ Open-source developers already have good answers to "get me a JDK". [SDKMAN!](ht
 
 None of this is a criticism of either project; they solve a different problem. The plugins described here borrow their good ideas, toolchains resolved by the build and a choice of vendors, and keep the decisions inside the organisation: an exact pinned build, fetched through the organisation's own repository, customised, and recorded in the archive it ships in.
 
+## Versions without a standard
+
+Java has a standard for *comparing* versions and none for what they *promise*. Maven's [version order specification](https://maven.apache.org/pom.html) says that `1.10` is newer than `1.9` and that `1.4.2-SNAPSHOT` comes before `1.4.2`. That precision is what makes upgrade tooling possible:
+
+- the [Versions Maven Plugin](https://www.mojohaus.org/versions/versions-maven-plugin/) and Gradle's [versions plugin](https://github.com/ben-manes/gradle-versions-plugin) list every dependency with a newer release, and the Maven one rewrites the POM to the latest;
+- [Renovate](https://docs.renovatebot.com/noise-reduction/) and [Dependabot](https://docs.github.com/en/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file) open a pull request for each one, and read Gradle version catalogues as well as POMs.
+
+What the order cannot say is whether the new version still works. [Semantic versioning](https://semver.org/) is a convention many libraries follow and nothing enforces. A POM cannot declare which Java releases a library needs, so a library compiled for Java 21 lands in a Java 17 app and fails at runtime with `UnsupportedClassVersionError`. Some versions only work in sets: a framework, its plugins and its test libraries move together, and the last release of a library that supports your JDK is a ceiling, not a suggestion.
+
+The tools each cover part of this:
+
+| Need | Where it is handled today |
+|---|---|
+| Move related libraries together | A BOM or Gradle [platform](https://docs.gradle.org/current/userguide/platforms.html); Renovate `groupName` rules; Dependabot `groups` |
+| Hold a library below a version | Renovate `allowedVersions`; Gradle [rich versions](https://docs.gradle.org/current/userguide/rich_versions.html) (`strictly`, `reject`) |
+| Refuse a library built for a newer JVM | Gradle Module Metadata's [`org.gradle.jvm.version`](https://docs.gradle.org/current/userguide/variant_attributes.html) attribute, checked at resolution. Maven has no equivalent |
+| Change code for a major version | [OpenRewrite](https://docs.openrewrite.org/) recipes, such as migrating to Java 21 or a new framework major |
+| Upgrade the JDK itself | Nothing standard: a toolchain line, a base image tag, a package on a server, each bumped separately |
+
+The last row is the gap these plugins close.
+
+**One coordinate for the runtime set.** A plugin release pins an exact JDK for every vendor and Java release, the Node.js version and the container base image. All of them come from one version catalogue and are tested together on every target. To Renovate or Dependabot that is one version in `settings.gradle.kts`, so a quarterly Java security update arrives as a single pull request, and nobody hunts down a toolchain line, a Dockerfile and a server package.
+
+**The compatibility check uses the real JDK.** The compile toolchain is the exact JDK that will be embedded, so Gradle's `org.gradle.jvm.version` check compares a library against the Java release the app will really run on, not whatever JDK the build agent has.
+
+**Every upgrade pull request is proven.** An automated pull request usually shows only that the code compiles and the unit tests pass. Here `build` also links the runtime, packages the archive, starts it and waits for its health check. A library that needs a JDK module the runtime lacks, or a JDK patch that breaks TLS for the app, fails the pull request instead of production.
+
+**Overrides stay visible.** A team that needs a JDK patch before the next plugin release sets one line, `javaApp.jdk.21=…`. A Renovate [regex manager](https://docs.renovatebot.com/modules/manager/regex/) can track that line using the [java-version datasource](https://docs.renovatebot.com/modules/datasource/java-version/). Once the plugin release catches up, the override is deleted.
+
+Renovate can group the rest so related versions move together, for example:
+
+```json
+{
+  "packageRules": [
+    { "matchPackageNames": ["io.github.fiftieshousewife.java-app.settings"], "groupName": "embedded runtime" },
+    { "matchPackageNames": ["/^org\\.springframework\\.boot/"], "groupName": "spring boot" }
+  ]
+}
+```
+
+There is still no ecosystem-wide standard for "this set of versions works together, upgrade it as one". A plugin that owns the runtime can at least make the most important set, the JDK and everything that depends on its exact build, behave like one, and prove each step before it ships.
+
 ## At a glance
 
 ```mermaid

@@ -74,6 +74,16 @@ read `APP_PORT` and answer `--healthcheck`; see [What your app needs to do](docs
 | [Packaging standards](docs/packaging-standards.md) | The conventions each format follows, and the formats not built |
 | [Ship the runtime with the app](docs/article.md) | The article: why runtimes belong in the release, and how these plugins do it |
 
+### Claude Code skills
+
+Skills that adopt the plugins in a project, find the JDK modules for jlink, and upgrade
+dependencies and runtimes (`/embedded-runtime:adopt`, `/embedded-runtime:jlink-modules`,
+`/embedded-runtime:upgrade`):
+
+```
+/plugin install embedded-runtime --marketplace fiftiesHousewife/embedded-runtime-gradle-plugins
+```
+
 Working on the plugins themselves: [AGENTS.md](AGENTS.md).
 
 ## Licence

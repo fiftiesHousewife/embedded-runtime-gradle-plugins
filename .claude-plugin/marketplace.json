@@ -1,0 +1,14 @@
+{
+  "name": "embedded-runtime-gradle-plugins",
+  "description": "Claude Code skills for the embedded runtime Gradle plugins",
+  "owner": {
+    "name": "fiftiesHousewife"
+  },
+  "plugins": [
+    {
+      "name": "embedded-runtime",
+      "source": "./claude-plugin",
+      "description": "Skills for the embedded runtime Gradle plugins: adopt them, find the JDK modules for jlink, upgrade dependencies and runtimes"
+    }
+  ]
+}

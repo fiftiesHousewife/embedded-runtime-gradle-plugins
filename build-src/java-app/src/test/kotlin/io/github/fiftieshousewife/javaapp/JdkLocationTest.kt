@@ -5,9 +5,13 @@ import io.github.fiftieshousewife.appcore.Target
 import org.junit.jupiter.api.Assertions.assertAll
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.io.TempDir
 import java.io.File
 
 class JdkLocationTest {
+    @TempDir
+    lateinit var shared: File
+
     private val artifactory =
         Artifactory(
             baseUrl = "https://artifactory.example.com/artifactory",
@@ -74,9 +78,9 @@ class JdkLocationTest {
 
     @Test
     fun `a shared local directory is read in the curated layout, with underscores for plus`() {
-        val local = JdkSources(JdkDistribution.TEMURIN, JdkLocation.local(File("/shared/jdks")))
+        val local = JdkSources(JdkDistribution.TEMURIN, JdkLocation.local(shared))
         assertEquals(
-            "file:/shared/jdks/temurin/jdk/21.0.12.1_1/jdk-21.0.12.1_1-linux-x64.tar.gz",
+            shared.toURI().resolve("temurin/jdk/21.0.12.1_1/jdk-21.0.12.1_1-linux-x64.tar.gz").toString(),
             uri(local, "21.0.12.1+1"),
         )
     }

@@ -44,6 +44,7 @@ internal class HostTasks(private val project: Project, private val wiring: AppWi
     init {
         val settings = extension.install
         settings.applyConventions(project, wiring.ecosystem.property("installDir"))
+        settings.requiredPolicy.from(wiring.runtimePolicy)
         install = Installation.register(project, settings, wiring.ecosystem.extensionName)
     }
 

@@ -1,6 +1,8 @@
 package io.github.fiftieshousewife.appcore.tasks
 
 import io.github.fiftieshousewife.appcore.InstallLayout
+import io.github.fiftieshousewife.appcore.RuntimePolicyCheck
+import io.github.fiftieshousewife.appcore.RuntimePolicySource
 import io.github.fiftieshousewife.appcore.Target
 import io.github.fiftieshousewife.appcore.archiveTree
 import org.gradle.api.DefaultTask
@@ -49,6 +51,11 @@ constructor(
 
     @get:Input abstract val healthTimeout: Property<Duration>
 
+    /** The organisation's runtime policy: a release that breaks it is refused, whoever built it. */
+    @get:InputFiles
+    @get:PathSensitive(PathSensitivity.RELATIVE)
+    abstract val requiredPolicy: ConfigurableFileCollection
+
     @TaskAction
     fun install() {
         val layout = InstallLayout(installDir.get().asFile)
@@ -57,6 +64,7 @@ constructor(
             logger.lifecycle("${release.name} is already installed and current in ${layout.root}")
             return
         }
+        requirePolicy(release)
         layout.seedConfig(release).forEach { logger.lifecycle("Seeded conf/$it") }
         verify(layout, release)
         layout.switchTo(release)
@@ -84,6 +92,20 @@ constructor(
         }
         staging.deleteRecursively()
         return release
+    }
+
+    private fun requirePolicy(release: File) {
+        val policy = RuntimePolicySource.load(requiredPolicy.files, fs, archives, temporaryDir.resolve("policy"))
+            ?: return
+        val violations = RuntimePolicyCheck.violations(policy, release)
+        if (violations.isNotEmpty()) {
+            release.deleteRecursively()
+            throw GradleException(
+                "${release.name} breaks runtime policy ${policy.label}; it was not installed:\n" +
+                    violations.joinToString("\n") { "  - $it" },
+            )
+        }
+        logger.lifecycle("${release.name} complies with runtime policy ${policy.label}")
     }
 
     private fun forThisMachine(manifest: AppManifest, archive: File): AppManifest {

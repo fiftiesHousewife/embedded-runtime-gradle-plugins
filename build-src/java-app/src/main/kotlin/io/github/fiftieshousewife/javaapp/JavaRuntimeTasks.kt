@@ -57,6 +57,7 @@ internal class JavaRuntimeTasks(
             appendToLists.put("jdk.jar.disabledAlgorithms", security.disabledJarAlgorithms)
             lockProperties.set(security.lockProperties)
             forbiddenModules.set(security.forbiddenModules)
+            policy.from(wiring.runtimePolicy)
             overlay.set(extension.runtimeOverlay)
             outputDir.set(wiring.workDir.map { it.dir("runtime/${target.id}") })
         }

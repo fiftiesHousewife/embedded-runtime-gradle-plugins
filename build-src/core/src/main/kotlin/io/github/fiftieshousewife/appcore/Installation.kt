@@ -23,6 +23,7 @@ internal object Installation {
             keep.set(settings.keep)
             restartCommand.set(settings.restartCommand)
             healthTimeout.set(settings.healthTimeout)
+            requiredPolicy.from(settings.requiredPolicy)
         }
     }
 }

@@ -26,10 +26,15 @@ abstract class AppDeployPlugin : Plugin<Project> {
             project.configurations.dependencyScope("app") {
                 description = "The published app to install on this machine (one coordinate)"
             }
-        val settings = project.extensions.create("appDeploy", InstallSettings::class.java)
-        settings.applyConventions(project, "appDeploy.installDir")
-        Installation.register(project, settings, "appDeploy").configure {
+        val settings = project.extensions.create(BLOCK, InstallSettings::class.java)
+        settings.applyConventions(project, "$BLOCK.installDir")
+        settings.requiredPolicy.from(RuntimePolicySource.files(project, BLOCK))
+        Installation.register(project, settings, BLOCK).configure {
             archiveFiles.from(MachineArchives.resolvable(project, "appArchives", declared))
         }
+    }
+
+    private companion object {
+        const val BLOCK = "appDeploy"
     }
 }

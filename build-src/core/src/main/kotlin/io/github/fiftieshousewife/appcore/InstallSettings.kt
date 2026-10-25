@@ -1,6 +1,7 @@
 package io.github.fiftieshousewife.appcore
 
 import org.gradle.api.Project
+import org.gradle.api.file.ConfigurableFileCollection
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.provider.ListProperty
 import org.gradle.api.provider.Property
@@ -25,6 +26,12 @@ abstract class InstallSettings {
 
     /** How long the new release has to turn healthy before it is switched to. Default 60 s. */
     abstract val healthTimeout: Property<Duration>
+
+    /**
+     * The runtime policy every installed release must comply with. Defaults to
+     * `-P<block>.securityPolicy` / `-P<block>.securityPolicyArtifact`; see [RuntimePolicySource].
+     */
+    abstract val requiredPolicy: ConfigurableFileCollection
 
     fun restartCommand(vararg command: String) = restartCommand.set(command.toList())
 

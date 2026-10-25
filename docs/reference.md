@@ -62,6 +62,7 @@ nodeApp {
 | `appPublishRpm` | Uploads the RPMs to `rpm.repositoryUrl`; part of `publish` when that is set |
 | `appSmokeTest` | Starts this machine's archive and waits for its health check; part of `check` |
 | `runApp` | Runs this machine's packaged app; pass arguments with `-Pargs="…"` |
+| `appVerifyPolicyLinuxX64`, … | Checks an assembled app against the runtime policy; every archive depends on it |
 | `appInstall` | Installs this machine's archive into `install.dir`, switching to it only after it starts healthy; see [Packaging and deploying](packaging.md#installing-with-gradle) |
 | `appRollback` | Points the install back at its previous release |
 | `appDockerfile` | Writes the Dockerfile: the project's own (`Dockerfile`, `src/deploy/docker/Dockerfile` or `dockerfile`) if there is one, else a generated one |
@@ -88,6 +89,8 @@ Gradle properties, set in `gradle.properties`, `~/.gradle/gradle.properties` or 
 | `nodeApp.npm.registry` | registry.npmjs.org | npm registry when not using Artifactory |
 | `nodeApp.npm.caFile` | | PEM file of corporate CAs for npm |
 | `javaApp.targets`, `nodeApp.targets` | this machine | Comma-separated targets to build |
+| `javaApp.securityPolicy`, `javaApp.securityPolicyArtifact` | | The organisation's runtime policy: a directory or zip, or its `group:name:version` |
+| `appDeploy.securityPolicy`, `appDeploy.securityPolicyArtifact` | | The policy `appInstall` requires of every release |
 | `javaApp.archiveFormat`, `nodeApp.archiveFormat` | `tar.gz` | `tar.gz`, `tar` or `zip` |
 | `javaApp.rpm`, `nodeApp.rpm` | `false` | Also build an RPM per Linux target |
 | `javaApp.installDir`, `nodeApp.installDir`, `appDeploy.installDir` | `build/install` | Where `appInstall` installs |

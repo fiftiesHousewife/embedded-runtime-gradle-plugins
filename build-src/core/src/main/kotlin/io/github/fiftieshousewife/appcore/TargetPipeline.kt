@@ -3,6 +3,7 @@ package io.github.fiftieshousewife.appcore
 import io.github.fiftieshousewife.appcore.tasks.GenerateAppManifest
 import io.github.fiftieshousewife.appcore.tasks.GenerateLaunchers
 import io.github.fiftieshousewife.appcore.tasks.GenerateSbom
+import io.github.fiftieshousewife.appcore.tasks.VerifyRuntimePolicy
 import org.gradle.api.Project
 import org.gradle.api.file.DuplicatesStrategy
 import org.gradle.api.provider.Provider
@@ -32,7 +33,9 @@ internal class TargetPipeline(private val project: Project, private val wiring: 
     fun register(target: Target, spec: EcosystemSpec): TargetTasks {
         val parts = Parts(registerLaunchers(target, spec), registerManifest(target, spec), registerSbom(target, spec))
         val assemble = registerAssemble(target, spec, parts)
-        return TargetTasks(target, assemble, registerArchive(target, assemble), parts.sbom)
+        val verified = registerPolicyCheck(target, assemble)
+        val archive = registerArchive(target, assemble).apply { configure { dependsOn(verified) } }
+        return TargetTasks(target, assemble, archive, parts.sbom)
     }
 
     /** The generated pieces every target's directory holds besides the ecosystem's own content. */
@@ -80,6 +83,16 @@ internal class TargetPipeline(private val project: Project, private val wiring: 
             AppCopySpecs.executableBits(this)
         }
     }
+
+    /** No archive breaking the organisation's runtime policy is built. */
+    private fun registerPolicyCheck(target: Target, assemble: TaskProvider<Sync>) =
+        tasks.register("appVerifyPolicy${target.taskSuffix}", VerifyRuntimePolicy::class.java) {
+            group = AppWiring.VERIFICATION_GROUP
+            description = "Checks the ${target.id} app against the organisation's runtime policy, if one is set"
+            appDirectory.set(layout.dir(assemble.map { it.destinationDir }))
+            policy.from(wiring.runtimePolicy)
+            resultFile.set(workDir.map { it.file("policy/${target.id}.txt") })
+        }
 
     private fun registerLaunchers(target: Target, spec: EcosystemSpec) =
         tasks.register("appLaunchers${target.taskSuffix}", GenerateLaunchers::class.java) {

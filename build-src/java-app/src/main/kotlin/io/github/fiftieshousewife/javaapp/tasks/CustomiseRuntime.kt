@@ -1,8 +1,11 @@
 package io.github.fiftieshousewife.javaapp.tasks
 
 import io.github.fiftieshousewife.appcore.AppCopySpecs
+import io.github.fiftieshousewife.appcore.RuntimePolicy
+import io.github.fiftieshousewife.appcore.RuntimePolicySource
 import org.gradle.api.DefaultTask
 import org.gradle.api.GradleException
+import org.gradle.api.file.ArchiveOperations
 import org.gradle.api.file.ConfigurableFileCollection
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.file.FileSystemOperations
@@ -36,7 +39,10 @@ import javax.inject.Inject
 @CacheableTask
 abstract class CustomiseRuntime
 @Inject
-constructor(private val fs: FileSystemOperations) : DefaultTask() {
+constructor(
+    private val fs: FileSystemOperations,
+    private val archives: ArchiveOperations,
+) : DefaultTask() {
     @get:InputDirectory
     @get:PathSensitive(PathSensitivity.RELATIVE)
     abstract val runtime: DirectoryProperty
@@ -66,6 +72,11 @@ constructor(private val fs: FileSystemOperations) : DefaultTask() {
     @get:PathSensitive(PathSensitivity.RELATIVE)
     abstract val overlay: DirectoryProperty
 
+    /** The organisation's runtime policy, applied last so a project can only add to it. */
+    @get:InputFiles
+    @get:PathSensitive(PathSensitivity.RELATIVE)
+    abstract val policy: ConfigurableFileCollection
+
     @get:OutputDirectory abstract val outputDir: DirectoryProperty
 
     @TaskAction
@@ -84,7 +95,7 @@ constructor(private val fs: FileSystemOperations) : DefaultTask() {
             forbiddenModules.get(),
         )
         if (present.isNotEmpty()) throw GradleException(ForbiddenModules.message(present))
-        val record = listOf(HEADER) + trust(out) + applySecurityProperties(out) + copyOverlay(out)
+        val record = listOf(HEADER) + trust(out) + applySecurityProperties(out) + copyOverlay(out) + applyPolicy(out)
         Files.writeString(out.resolve(RECORD).toPath(), record.joinToString("\n") + "\n")
     }
 
@@ -126,6 +137,27 @@ constructor(private val fs: FileSystemOperations) : DefaultTask() {
             into(out)
         }
         return listOf("", "overlay: copied ${dir.walk().count { it.isFile }} files from ${dir.name}/")
+    }
+
+    /** After everything the project did, so the policy has the last word on every value it sets. */
+    private fun applyPolicy(out: File): List<String> {
+        val policy = RuntimePolicySource.load(policy.files, fs, archives, temporaryDir.resolve("policy"))
+            ?: return emptyList()
+        val trusted = trustPolicyCertificates(out, policy)
+        val file = out.resolve("conf/security/java.security").toPath()
+        val rules = SecurityPolicy(emptyList(), policy.set, policy.append, policy.lockProperties)
+        val changes = rules.changes(load(file.toFile()))
+        if (changes.isNotEmpty()) {
+            Files.writeString(file, SecurityPolicy.block(changes, RECORD_NAME), StandardOpenOption.APPEND)
+        }
+        return listOf("", "runtime policy ${policy.id} ${policy.version}, sha256 ${policy.digest}:") +
+            trusted.map { "  trusts $it" } + changes.map { (k, v) -> "  $k=$v" }
+    }
+
+    private fun trustPolicyCertificates(out: File, policy: RuntimePolicy): List<String> {
+        val certificates = TrustedCertificates.certificateFiles(policy.certificates.toSet())
+        if (certificates.isEmpty()) return emptyList()
+        return TrustedCertificates.install(out.resolve("lib/security/cacerts"), certificates, replace = false)
     }
 
     private fun load(file: File) = Properties().apply { Files.newInputStream(file.toPath()).use(::load) }

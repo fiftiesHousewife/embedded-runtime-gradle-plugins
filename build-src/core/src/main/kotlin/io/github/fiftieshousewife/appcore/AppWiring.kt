@@ -15,6 +15,7 @@ import org.gradle.api.component.SoftwareComponentFactory
 import org.gradle.api.file.ArchiveOperations
 import org.gradle.api.file.Directory
 import org.gradle.api.file.DuplicatesStrategy
+import org.gradle.api.file.FileCollection
 import org.gradle.api.provider.Provider
 import org.gradle.api.tasks.Sync
 import org.gradle.api.tasks.TaskProvider
@@ -125,6 +126,9 @@ class AppWiring(
     private val appName: Provider<String> get() = extension.appName
 
     private val rpmPackages by lazy { RpmPackages(project, this) }
+
+    /** The organisation's runtime policy, if one is configured; see [RuntimePolicySource]. */
+    val runtimePolicy: FileCollection = RuntimePolicySource.files(project, ecosystem.extensionName)
 
     fun applyConventions() {
         AppSettings.requireApplied(project, ecosystem.settingsPluginId)

@@ -67,6 +67,61 @@ a shared directory, or a versioned artifact in Artifactory. Anything not modelle
 Each runtime records what was changed, with every certificate's SHA-256 fingerprint, in
 `runtime/conf/security/java-app-customisations.txt`.
 
+## An organisation-wide runtime policy
+
+`security {}` is the project's to set, so a project can also weaken it. To take that out of every
+project's hands, publish a **runtime policy** once and point every build machine and CI agent at it:
+
+```properties
+# ~/.gradle/gradle.properties on each machine, or ORG_GRADLE_PROJECT_... on CI. A property here
+# overrides the same property in a project, so a project cannot unset it.
+javaApp.securityPolicyArtifact=com.acme.platform:java-runtime-policy:7      # a zip in your binary repository
+# or javaApp.securityPolicy=/shared/policy                                  # a directory or zip on disk
+```
+
+The policy is a directory (or a zip of one) with `runtime-policy.properties` and, optionally,
+`certificates/`:
+
+```properties
+id=acme-java-runtime
+version=7
+lockProperties=true                                  # security.overridePropertiesFile=false
+runtimeOptions=locked                                # see "Runtime options" below
+forbiddenModules=jdk.jdwp.agent,jdk.management.agent
+forbiddenJvmArgs=-javaagent,-agentlib,-agentpath,-Djava.security.properties,-Djdk.tls.
+forbiddenLibraries=pkg:maven/org.bouncycastle/bctls  # package URL prefixes, matched against the SBOM
+set.networkaddress.cache.ttl=30                      # a security property, exactly this value
+append.jdk.tls.disabledAlgorithms=TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA384
+```
+
+It is enforced three times:
+
+1. **Applied last.** `customiseRuntime` applies the policy after the project's own settings and
+   overlay, so its certificates are trusted and its values win.
+2. **Checked before any archive exists.** `appVerifyPolicy<Target>` reads the assembled app's real
+   `java.security`, `cacerts`, module list, launcher and SBOM, and fails the build on any shortfall:
+   a project that hasn't locked its runtime options, passes a forbidden JVM option or ships a
+   forbidden library gets no archive.
+3. **Checked again at install.** `appInstall`, from the app's build or the `app-deploy` plugin,
+   refuses a release that breaks the policy, whoever built it, when the installing machine sets
+   `appDeploy.securityPolicy` or `appDeploy.securityPolicyArtifact`.
+
+Each runtime records the policy's id, version and SHA-256 in
+`runtime/conf/security/java-app-customisations.txt`.
+
+What it cannot do is stop the application's own code: code can call `Security.setProperty`, bring
+its own TLS provider or trust manager, or open sockets. `forbiddenLibraries` closes the commonest of
+those doors; the rest belongs at the network boundary. See the article's section on corporate
+control.
+
+## Runtime options
+
+`runtimeOptions("locked")` (or `-PjavaApp.runtimeOptions=locked`) makes the launcher refuse to start
+while anything would add JVM options the build did not fix: `APP_JAVA_OPTS`, `JAVA_TOOL_OPTIONS`,
+`JDK_JAVA_OPTIONS`, `_JAVA_OPTIONS`, or a `jvm.options` file in the configuration directory. The
+default, `open`, adds `$APP_CONF_DIR/jvm.options` (a JVM argument file) and then `$APP_JAVA_OPTS`
+after the build's `jvmArgs`.
+
 ## Choosing a JDK
 
 ```properties

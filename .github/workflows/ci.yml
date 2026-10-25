@@ -32,7 +32,7 @@ jobs:
           node-version: "24"
       - uses: gradle/actions/setup-gradle@v6
       - run: ./gradlew check
-      - if: failure()
+      - if: success() || failure()
         run: python3 .github/scripts/annotate-test-failures.py
       - run: ./gradlew -p samples/java-service build
       # The sample's RPM, installed with dnf in a clean Rocky Linux 9 container, started and removed.

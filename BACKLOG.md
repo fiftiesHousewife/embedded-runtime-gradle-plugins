@@ -16,14 +16,12 @@ installs this machine's app with its runtime, and the custom installer is gone.
 
 | Item | Notes |
 |---|---|
-| **Spring Boot sample** | A real Spring Boot service packaged by java-app. Measure and document the effect on package size: fat jar + full JDK vs jlinked runtime + libraries, compressed and unpacked, per target. Feed the numbers into the article |
 | **Java with Docker sample** | Builds the image from `appDockerContext` and runs it. Runs only when Docker is reachable (skipped, not failed, otherwise); locally colima can be started for it |
 
 ## Article
 
 | Item | Notes |
 |---|---|
-| Package-size effect | From the Spring Boot sample; measured numbers only |
 | Revisit after the Gradle rework | The launcher and archive sections should describe `startScripts` templates and per-target distributions |
 
 ## AI tooling
@@ -37,6 +35,12 @@ a tested build-check hook, and `./gradlew aiSkills` to install them in a project
 | **`.claude/settings.json`** | Sandbox blocks writing it; the snippet that auto-suggests the marketplace to collaborators is in the conversation of 2026-10-25. Owner to add |
 | **Copilot and Devin hooks** | Not added: neither documents a repository hook format that could be verified |
 | **Performance tuning skill** | Skill plus a docs section on tuning an embedded-runtime app, built around Java Flight Recorder (`-XX:StartFlightRecording`, `jfr print`, JDK Mission Control), GC choice and heap sizing in containers; needs `jdk.jfr` in the runtime |
+
+## Features
+
+| Item | Notes |
+|---|---|
+| **Replaceable SBOM generator** | Let a project use its own SBOM tool (e.g. the CycloneDX Gradle plugin, Syft) instead of the built-in generator, with the archive still carrying `META-INF/sbom.cdx.json` and publishing it |
 
 ## Code quality
 

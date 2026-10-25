@@ -16,6 +16,9 @@ commons-compress = "1.28.0"
 xz = "1.12"
 bouncycastle = "1.86"
 
+# Used by samples/spring-boot-service only.
+spring-boot = "4.1.2"
+
 # The build's own tools.
 jacoco = "0.8.15"
 # Bytecode level of the plugins: Gradle 9 runs on Java 17 or newer.
@@ -86,6 +89,7 @@ node = "24.18.1"
 ubi-minimal = "9.6"
 
 [libraries]
+spring-boot-dependencies = { module = "org.springframework.boot:spring-boot-dependencies", version.ref = "spring-boot" }
 cyclonedx-core = { module = "org.cyclonedx:cyclonedx-core-java", version.ref = "cyclonedx" }
 packageurl = { module = "com.github.package-url:packageurl-java", version.ref = "packageurl" }
 # Redline writes RPMs in plain Java; its own dependencies are old, so the build pins current ones.

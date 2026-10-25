@@ -39,6 +39,7 @@ jobs:
       - if: runner.os == 'Linux'
         run: .github/scripts/verify-rpm.sh samples/java-service/build/distributions/java-service-1.0.0-1.x86_64.rpm
       - run: ./gradlew -p samples/node-service build
+      - run: ./gradlew -p samples/spring-boot-service build
       # The Claude Code plugin's hook, called as Claude Code calls it.
       - if: runner.os == 'Linux'
         run: .github/scripts/test-claude-hook.sh

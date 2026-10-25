@@ -214,6 +214,27 @@ javaApp { additionalModules.addAll("jdk.httpserver") }
 
 The class-to-module map comes from the JDK itself, via `jimage list`, so it is always right for the exact build being linked. The loop finds what fails at startup or on the health check; a code path neither reaches still needs a test of its own.
 
+## What it does to a Spring Boot service
+
+The plain HTTP sample is small because it needs almost nothing. A realistic service is a better test,
+so the repository also packages a Spring Boot 4.1 web service with Actuator. Its build names no JDK
+modules: jdeps found all thirteen the service needs (`java.base`, `java.compiler`, `java.desktop`,
+`java.instrument`, `java.management`, `java.naming`, `java.net.http`, `java.prefs`, `java.scripting`,
+`java.security.jgss`, `java.sql`, `jdk.jfr`, `jdk.unsupported`), and the smoke test passed on the
+first build. Measured for linux-x64 against Temurin 21.0.12.1+1, on 25 October 2026:
+
+| What ships | Compressed | Unpacked |
+|---|---|---|
+| Full Temurin 21 JDK | 207.5 MB | 353 MB |
+| Temurin 21 JRE alone | 52.1 MB | not measured |
+| The service's libraries (50 jars) | | 21 MB |
+| **The archive: trimmed runtime plus the service** | **58.9 MB** | **84 MB** (63 MB runtime, 21 MB libraries) |
+
+The whole archive, application included, is about the size of the vendor's JRE download on its own,
+and under a third of the JDK. Spring needs more of the JDK than the plain sample: `java.desktop`,
+pulled in by `java.beans`, is the largest of its modules, which is why the runtime is 63 MB here
+rather than 31 MB.
+
 ## Hardening every runtime
 
 The organisation's changes to the vendor's JDK are configuration in the build, applied to every target's runtime after jlink and before packaging:

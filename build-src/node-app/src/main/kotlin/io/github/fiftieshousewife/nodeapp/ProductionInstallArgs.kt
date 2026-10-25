@@ -3,8 +3,9 @@ package io.github.fiftieshousewife.nodeapp
 import io.github.fiftieshousewife.appcore.Os
 import io.github.fiftieshousewife.appcore.Target
 
-/** npm's extra arguments for a production install of [target]'s dependencies on [host]. */
+/** npm's extra arguments for a production install of one target's dependencies. */
 internal object ProductionInstallArgs {
+    /** The arguments for installing [target]'s dependencies on [host]. */
     fun of(ignoreScripts: Boolean, target: Target, host: Target): List<String> =
         listOfNotNull("--ignore-scripts".takeIf { ignoreScripts }) + crossTarget(target, host)
 

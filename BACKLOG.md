@@ -29,7 +29,6 @@ and `./gradlew aiSkills` to install them in a project. Prompt files were dropped
 
 | Item | Notes |
 |---|---|
-| **GitHub Pages for the API docs** | `.github/workflows/api-docs.yml` builds them and deploys them once the owner sets Pages to "GitHub Actions" in the repository settings; until then the deploy job is skipped with a notice, not failed |
 | **Build speed** | Measured 2026-10-25: Java's functional tests were 95% of test time (830 s summed, against 45 s for everything else). Half of it was the fixture gzipping a copy of the test JDK for every target of every test; it now builds one archive per test JVM and hard-links it (830 s to 400 s; the full `check` takes about 2 minutes here). `--profile` on the fixture builds puts what is left in `jlink` (about 5 s a build), JDK extraction (about 3 s) and the smoke test. Next, if needed: a shared build cache for the fixture builds, at the cost of tests that assert tasks really ran |
 
 ## Verification and CI
@@ -44,7 +43,11 @@ and `./gradlew aiSkills` to install them in a project. Prompt files were dropped
 
 - The company's RPM-packaged JDK: real file name, install path, and whether it ships `jmods/`
   (naming described as `jdk<major>_<patch>-64_linux.x86_64.rpm`).
-- Publishing to Maven Central and the Gradle Plugin Portal (needs the owner's credentials).
+- Publishing to Maven Central and the Gradle Plugin Portal. Checked 2026-10-25: all three modules
+  build their plugin, sources and javadoc jars, and `publishPlugins --validate-only` stops only at
+  "Missing publishing keys". Needs the owner's Portal account (GitHub login as fiftiesHousewife, for
+  the `io.github.fiftieshousewife` namespace) and its key and secret; for Central, a Sonatype
+  account with the namespace verified and a PGP key. The Portal approves a new plugin by hand.
 - Proposals awaiting a decision: Jib (the roadmap recommends leaving it out), SLSA provenance
   (roadmap: High), CDS/AOT cache opt-in (roadmap: Medium).
 - Article: the "HUFs" anecdote is unsourced; "Try it" uses version 1.0.0, which is not published.

@@ -56,7 +56,10 @@ constructor(
     @get:PathSensitive(PathSensitivity.NAME_ONLY)
     abstract val trustedCertificates: ConfigurableFileCollection
 
-    /** URI → pinned SHA-256 of approved CA certificates to fetch; see [JavaRuntimeSecurity.trustedCertificateUris]. */
+    /**
+     * URI → pinned SHA-256 of approved CA certificates to fetch; see
+     * [io.github.fiftieshousewife.javaapp.JavaRuntimeSecurity.trustedCertificate].
+     */
     @get:Input abstract val trustedCertificateUris: MapProperty<String, String>
 
     @get:Input abstract val replaceDefaultTrust: Property<Boolean>

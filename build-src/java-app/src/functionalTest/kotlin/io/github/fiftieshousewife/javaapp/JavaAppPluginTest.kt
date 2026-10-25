@@ -1,6 +1,5 @@
 package io.github.fiftieshousewife.javaapp
 
-import io.github.fiftieshousewife.appcore.InstallLayout
 import io.github.fiftieshousewife.appcore.Target
 import io.github.fiftieshousewife.appcore.TestProject
 import io.github.fiftieshousewife.appcore.checks
@@ -85,28 +84,6 @@ class JavaAppPluginTest {
             { assertEquals(TaskOutcome.SUCCESS, again.task(":extractJdk$suffix")?.outcome) },
             { assertTrue(readOnly.canWrite()) },
             { assertTrue(java.canExecute(), "$java lost its exec bit") },
-        )
-    }
-
-    @Test
-    fun `appInstall switches to a release only after it starts healthy, keeps configuration, and rolls back`() {
-        val project = javaService(tmp)
-        val srv = tmp.resolve("srv")
-        val dir = "-PjavaApp.installDir=${srv.absolutePath}"
-        project.build("appInstall", dir)
-        srv.resolve("conf/app.properties").writeText("key=edited\n")
-        project.build("appInstall", dir, "-PappVersion=2.1.0")
-        val upgraded = InstallLayout(srv).current?.name to InstallLayout(srv).previous?.name
-        srv.resolve("conf/jvm.options").writeText("-XX:+NoSuchOptionAnywhere\n")
-        val broken = project.buildAndFail("appInstall", dir, "-PappVersion=2.2.0")
-        srv.resolve("conf/jvm.options").delete()
-        project.build("appRollback", dir)
-        assertAll(
-            { assertEquals("svc-2.1.0" to "svc-2.0.0", upgraded) },
-            { assertEquals("key=edited\n", srv.resolve("conf/app.properties").readText()) },
-            { assertTrue(broken.output.contains("it was not installed and current is unchanged"), broken.output) },
-            { assertFalse(srv.resolve("releases/svc-2.2.0").exists()) },
-            { assertEquals("svc-2.0.0", InstallLayout(srv).current?.name) },
         )
     }
 

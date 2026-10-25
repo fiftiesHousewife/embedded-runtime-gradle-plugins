@@ -15,7 +15,8 @@ import java.time.Duration
  *
  * `appSmokeTest` resolves the archive built for this machine's OS and CPU, using the attributes the
  * java-app and node-app publications carry in their Gradle Module Metadata, then starts it exactly
- * as the producing build's own smoke test does.
+ * as the producing build's own smoke test does. With `-PappSmokeTest.securityPolicy` (or
+ * `…securityPolicyArtifact`) it first checks the archive against the organisation's runtime policy.
  */
 abstract class AppSmokeTestPlugin : Plugin<Project> {
     override fun apply(project: Project) {
@@ -30,6 +31,7 @@ abstract class AppSmokeTestPlugin : Plugin<Project> {
                 description = "Starts the smokeTest archives built for this machine and waits for their healthcheck"
                 archiveFiles.from(MachineArchives.resolvable(project, "smokeTestArchives", declared))
                 healthTimeout.convention(DEFAULT_TIMEOUT)
+                requiredPolicy.from(RuntimePolicySource.files(project, "appSmokeTest"))
                 resultFile.set(project.layout.buildDirectory.file("app-smoke-test/result.txt"))
             }
         project.tasks.named("check") { dependsOn(smoke) }

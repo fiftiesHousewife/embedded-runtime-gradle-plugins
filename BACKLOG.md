@@ -8,13 +8,11 @@ Last updated 2026-10-25.
 
 ## Next: Gradle-native launchers and distributions
 
-Build Java launchers with Gradle's own `startScripts` and each target's archive with Gradle's
-`distribution` plugin, and drop the custom installer. Detailed plan:
-[plans/gradle-distributions.md](plans/gradle-distributions.md).
-
-- Includes removing `appInstall`, `appRollback`, `InstallLayout` and the `app-deploy` plugin:
-  installation on servers is left to OS packages (RPM, and DEB/Windows service packages if wanted)
-  or existing deployment tooling. Decided 2026-10-25: no custom installer, no manual instructions.
+Done on 2026-10-25 except one item: Java launchers come from Gradle's own `startScripts`, every
+target is a Gradle distribution, and the custom installer is gone (installation on servers is left to
+the RPM, container images or existing deployment tooling). Still open from
+[plans/gradle-distributions.md](plans/gradle-distributions.md): make the `main` distribution this
+machine's target, so plain `installDist` installs this machine's app with its runtime.
 
 ## Samples
 
@@ -47,7 +45,7 @@ Build Java launchers with Gradle's own `startScripts` and each target's archive 
 |---|---|
 | **Comment review** | Delete trivial comments; prefer meaningful function and class names to comments; keep KDoc on public API |
 | **Publish API docs** | KDoc as javadoc jars (Dokka) with the publications, and browsable HTML (e.g. GitHub Pages) |
-| **Review fixes** (open-source review, 2026-10-25) | Parse the SBOM with cyclonedx-core's `JsonParser` instead of a regex in `RuntimePolicyCheck`; check forbidden JVM options against the configured `jvmArgs`, not by string-matching the launcher; reject or implement Ivy optional `(…)` segments in `RuntimeRepository.downloadUri` and URL-encode values; fail on duplicate certificate aliases in `TrustedCertificates`; `InstallLayout.prune` ordering (moot once the installer is removed) |
+| **Review fixes** (open-source review, 2026-10-25) | Parse the SBOM with cyclonedx-core's `JsonParser` instead of a regex in `RuntimePolicyCheck`; check forbidden JVM options against the configured `jvmArgs`, not by string-matching the launcher; reject or implement Ivy optional `(…)` segments in `RuntimeRepository.downloadUri` and URL-encode values; fail on duplicate certificate aliases in `TrustedCertificates`; (`InstallLayout.prune` ordering is moot: the installer is gone) |
 | **Build speed** | Functional tests now run in parallel forks; measure, and consider a Gradle build scan or `--profile` to find the rest |
 
 ## Verification and CI

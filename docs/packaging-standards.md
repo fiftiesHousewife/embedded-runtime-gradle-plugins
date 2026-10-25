@@ -12,14 +12,14 @@ forgotten.
 | [CycloneDX](https://cyclonedx.org/specification/overview/) SBOM | A machine-readable list of every component | `META-INF/sbom.cdx.json` in every archive and published next to it, listing the runtime as well as the libraries |
 | [Package URL](https://github.com/package-url/purl-spec) | One identifier per component across ecosystems | Every SBOM component has a purl: `pkg:maven/…`, `pkg:npm/…`, `pkg:generic/…` for the runtime |
 | [Gradle Module Metadata](https://docs.gradle.org/current/userguide/publishing_gradle_module_metadata.html) | Variants described by attributes, not file names | One variant per target, with `org.gradle.native.operatingSystem` and `org.gradle.native.architecture` |
-| Checksums | A digest beside every published file | Gradle publishes `.sha256` and `.sha512` with each file; Gradle verifies them when it resolves an archive for `appInstall` |
+| Checksums | A digest beside every published file | Gradle publishes `.sha256` and `.sha512` with each file; Gradle verifies them when it resolves an archive, e.g. for `app-smoke-test` |
 | [OpenPGP signatures](https://www.rfc-editor.org/rfc/rfc9580) | Detached `.asc` beside every file, for Maven Central | `-PsigningKey` and `-PsigningPassword` sign the whole publication |
 | [OCI image annotations](https://github.com/opencontainers/image-spec/blob/main/annotations.md) | `org.opencontainers.image.*` labels | The generated Dockerfile sets `title`, `version` and `revision` |
 
 ## Archives: tar.gz, tar and zip
 
-* **One top-level directory**, `<app>-<version>/`, so extracting never scatters files into the
-  current directory, and two versions can sit side by side under `releases/`.
+* **One top-level directory**, `<app>-<version>-<target>/`, so extracting never scatters files into
+  the current directory, and two versions or targets can sit side by side.
 * **Unix permissions are recorded** in tar and zip alike, so `bin/<app>` and the runtime's
   binaries stay executable. Windows ignores them.
 * **`tar.gz` is the default** for every target: Linux and macOS have `tar`, Windows 10 and later has

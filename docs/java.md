@@ -102,9 +102,9 @@ It is enforced three times:
    `java.security`, `cacerts`, module list, launcher and SBOM, and fails the build on any shortfall:
    a project that hasn't locked its runtime options, passes a forbidden JVM option or ships a
    forbidden library gets no archive.
-3. **Checked again at install.** `appInstall`, from the app's build or the `app-deploy` plugin,
-   refuses a release that breaks the policy, whoever built it, when the installing machine sets
-   `appDeploy.securityPolicy` or `appDeploy.securityPolicyArtifact`.
+3. **Checked again before rollout.** A deployment pipeline that smoke-tests a published release
+   with the `app-smoke-test` plugin, and sets `appSmokeTest.securityPolicy` or
+   `appSmokeTest.securityPolicyArtifact`, refuses an archive that breaks the policy, whoever built it.
 
 Each runtime records the policy's id, version and SHA-256 in
 `runtime/conf/security/java-app-customisations.txt`.

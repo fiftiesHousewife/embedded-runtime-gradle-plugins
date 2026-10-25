@@ -1,5 +1,7 @@
 package io.github.fiftieshousewife.appcore.tasks
 
+import io.github.fiftieshousewife.appcore.RuntimePolicyCheck
+import io.github.fiftieshousewife.appcore.RuntimePolicySource
 import io.github.fiftieshousewife.appcore.Target
 import io.github.fiftieshousewife.appcore.archiveTree
 import org.gradle.api.DefaultTask
@@ -47,6 +49,14 @@ constructor(
     @get:Input @get:Optional
     abstract val failureHint: Property<String>
 
+    /**
+     * The organisation's runtime policy: an archive that breaks it fails before it is started,
+     * however it was built. Empty means no policy is required.
+     */
+    @get:InputFiles
+    @get:PathSensitive(PathSensitivity.RELATIVE)
+    abstract val requiredPolicy: ConfigurableFileCollection
+
     @get:OutputFile abstract val resultFile: RegularFileProperty
 
     init {
@@ -62,6 +72,7 @@ constructor(
     private fun test(index: Int, archiveFile: File): String {
         val host = Target.host()
         val home = extract(archiveFile, temporaryDir.resolve("extract-$index"))
+        requirePolicy(home)
         val manifest = AppManifest.read(home)
         val work = temporaryDir.resolve("run-$index").apply { mkdirs() }
         val launcher = launcher(home, manifest, host)
@@ -84,6 +95,18 @@ constructor(
         val launcher = home.resolve(if (host.isWindows) "bin/${manifest.name}.bat" else "bin/${manifest.name}")
         if (!launcher.isFile) throw GradleException("Launcher $launcher missing")
         return launcher
+    }
+
+    private fun requirePolicy(home: File) {
+        val policy = RuntimePolicySource.load(requiredPolicy.files, fs, archives, temporaryDir.resolve("policy"))
+            ?: return
+        val violations = RuntimePolicyCheck.violations(policy, home)
+        if (violations.isNotEmpty()) {
+            throw GradleException(
+                "${home.name} breaks runtime policy ${policy.label}:\n" + violations.joinToString("\n") { "  - $it" },
+            )
+        }
+        logger.lifecycle("${home.name} complies with runtime policy ${policy.label}")
     }
 
     /** Extracts [archiveFile] afresh and returns its single top-level directory. */

@@ -21,7 +21,7 @@ javaApp {                       // or nodeApp
 ```
 
 One format applies to every target. Whatever the format, an archive holds one directory
-`<app>-<version>/`, keeps Unix permissions, is smoke-tested and published the same way, and a
+`<app>-<version>-<target>/`, keeps Unix permissions, is smoke-tested and published the same way, and a
 consuming build that resolves by Gradle Module Metadata needs no change.
 
 A Mac target's archive is the macOS deliverable. A signed, notarized `.pkg` installer can be made
@@ -87,63 +87,36 @@ Two caveats. RPMs are not byte-reproducible, unlike the archives. The RPM is bui
 directory as this target's archive, but only the archive for the build machine is smoke-tested;
 publishing checks that as for archives.
 
-## Installing with Gradle
+## Built with Gradle's own distributions
 
-`appInstall` installs this machine's archive into a directory, from the app's own build or from a
-small deployment build on a server or deployment agent. It needs no root, and works the same on
-Linux, macOS and Windows:
+Each target is a [Gradle distribution](https://docs.gradle.org/current/userguide/distribution_plugin.html)
+named after it, so it has the distribution plugin's usual tasks:
 
-1. unpacks the archive as `releases/<app>-<version>/`;
-2. copies each file of `conf.defaults/` into `conf/` unless it is already there;
-3. starts the new release once, against that `conf/`, and waits for its health check: a release
-   that fails is deleted and never becomes current;
-4. points `current` at it and `previous` at the release it replaces, runs your restart command,
-   and deletes all but the newest `keep` releases.
+| Task | Does |
+|---|---|
+| `install<Target>Dist`, e.g. `installLinuxX64Dist` | Lays the app out in `build/app/<target>/<app>-<version>/` |
+| `<target>DistTar` / `<target>DistZip` | The archive, `build/distributions/<app>-<version>-<target>.tar.gz` (or `.zip`); only the `archiveFormat` one is enabled |
+| `appArchive` | Every target's archive |
 
-`appRollback` points `current` back at `previous` and runs the restart command.
+An archive's single top-level directory is `<app>-<version>-<target>/`, so archives for two targets
+unpack side by side.
 
-```
-/srv/orders/
-  releases/orders-service-1.4.2/
-  current -> releases/orders-service-1.4.2
-  previous -> releases/orders-service-1.4.1
-  conf/                  yours: app configuration, jvm.options (Java), env
-```
-
-The launcher recognises this layout (an app directory inside `releases/` takes the directory above
-as `APP_ROOT`), so configuration, data and logs live outside any one release.
-
-**From the app's build**, on the machine that runs it:
+Java launchers come from Gradle's own `startScripts` task. The plugin sets a script generator that
+starts the embedded runtime and adds `run`, `healthcheck` and `version`; `application {
+applicationDefaultJvmArgs }` and `javaApp { jvmArgs }` both end up in the script. To write the
+launcher yourself, replace the generator the standard way:
 
 ```kotlin
-javaApp {                                            // or nodeApp
-    install {
-        dir = file("/srv/orders")                    // or -PjavaApp.installDir=/srv/orders
-        restartCommand("systemctl", "--user", "restart", "orders")
-        keep = 3
-    }
+tasks.startScripts {
+    unixStartScriptGenerator = MyGenerator()       // an org.gradle.jvm.application.scripts.ScriptGenerator
 }
 ```
 
-**From a deployment build**, which needs only the published coordinates:
+The smoke test still starts the result, so a launcher that can't run the app fails the build.
 
-```kotlin
-// build.gradle.kts of the deployment build
-plugins { id("io.github.fiftieshousewife.app-deploy") version "1.0.0" }
-repositories { maven("https://repo.example.com/libs-release-local") }
-dependencies { app("com.example:orders-service:1.4.2") }
-appDeploy {
-    dir = file("/srv/orders")
-    restartCommand("systemctl", "--user", "restart", "orders")
-}
-```
-
-`./gradlew appInstall` resolves the archive built for this machine's OS and CPU and installs it;
-`./gradlew appRollback` goes back. The restart command is how the running process changes: point it
-at whatever supervises the app (a systemd user unit whose `ExecStart` is
-`/srv/orders/current/bin/orders-service run`, a Windows service, a process manager).
-
-Gradle, and so a JVM, must be on that machine. Where there is none, use the [RPM](#rpm).
+Installing on servers is left to the tools made for it: the RPM above, where dnf installs, upgrades
+and rolls back, a container image, or the deployment tooling you already run. Every one of them can
+take the archive as it is.
 
 ## As a container image
 

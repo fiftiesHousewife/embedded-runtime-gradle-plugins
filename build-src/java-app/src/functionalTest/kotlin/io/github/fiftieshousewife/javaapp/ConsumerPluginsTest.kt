@@ -1,6 +1,5 @@
 package io.github.fiftieshousewife.javaapp
 
-import io.github.fiftieshousewife.appcore.InstallLayout
 import io.github.fiftieshousewife.appcore.TestProject
 import org.junit.jupiter.api.Assertions.assertAll
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -9,7 +8,7 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.io.File
 
-/** Builds that use a published app: app-smoke-test checks it, app-deploy installs it. */
+/** Builds that use a published app: app-smoke-test checks it before it is rolled out. */
 class ConsumerPluginsTest {
     @TempDir
     lateinit var tmp: File
@@ -42,41 +41,14 @@ class ConsumerPluginsTest {
     }
 
     @Test
-    fun `a deployment build installs the published archive for its own machine`() {
-        val srv = tmp.resolve("srv")
-        val result =
-            consumer(
-                "deploy",
-                "deploy/build.gradle.kts.template",
-                "@REPO@" to published(),
-                "@DIR@" to srv.invariantSeparatorsPath,
-            ).build("appInstall")
-        assertAll(
-            { assertTrue(result.output.contains("svc-2.0.0 started against"), result.output) },
-            { assertEquals("svc-2.0.0", InstallLayout(srv).current?.name) },
-        )
-    }
-
-    @Test
-    fun `a deployment build that requires the runtime policy refuses an archive built without it`() {
+    fun `a pipeline that requires the runtime policy refuses an archive built without it`() {
         val policy = File(ConsumerPluginsTest::class.java.getResource("/fixtures/policy")!!.toURI())
-        val srv = tmp.resolve("srv")
-        val refused =
-            consumer(
-                "deploy",
-                "deploy/build.gradle.kts.template",
-                "@REPO@" to published(),
-                "@DIR@" to srv.invariantSeparatorsPath,
-            ).buildAndFail("appInstall", "-PappDeploy.securityPolicy=${policy.absolutePath}")
-        assertAll(
-            {
-                assertTrue(
-                    refused.output.contains("breaks runtime policy acme-java-runtime 7") &&
-                        refused.output.contains("it was not installed"),
-                    refused.output,
-                )
-            },
-            { assertTrue(InstallLayout(srv).current == null) },
+        val refused = consumer("deploy-check", "consumer/build.gradle.kts.template", "@REPO@" to published())
+            .buildAndFail("appSmokeTest", "-PappSmokeTest.securityPolicy=${policy.absolutePath}")
+        assertTrue(
+            refused.output.contains("breaks runtime policy acme-java-runtime 7") &&
+                refused.output.contains("does not lock runtime options"),
+            refused.output,
         )
     }
 }

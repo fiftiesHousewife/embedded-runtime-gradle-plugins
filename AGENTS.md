@@ -48,11 +48,10 @@ plugin from the portal.
 Where things are tested:
 
 - `JavaAppPluginTest`: the archive's contents and reproducibility, re-extracting a JDK with
-  read-only files, and `appInstall` end to end (upgrade keeping `conf/`, a release that fails its
-  health check never becoming current, rollback). `InstallLayout` has its own unit tests.
+  read-only files, launchers from Gradle's `startScripts` (and a build's own generator winning).
 - `JavaAppTargetsTest`: several targets in one build and one publication, the container context,
-  JDKs from a directory and from a shared local path, and the `app-smoke-test` and `app-deploy`
-  consumer plugins.
+  JDKs from a directory and from a shared local path, and the `app-smoke-test` consumer plugin
+  (`ConsumerPluginsTest`, including its runtime policy check).
 - `JavaAppModulesTest`: the jdeps default and `jlinkFindModules` fixing a missing module.
 - `JavaAppSecurityTest`: certificates, policy and ciphers seen by the running JVM (a probe program run
   on the built runtime), the customisation record and overlay, and the forbidden-module guard.
@@ -77,17 +76,18 @@ three are always released together at one version (`PluginVersion` reads it from
 resource). `AppWiring` builds the shared pipeline; `TargetPipeline` the part built once per target:
 
 ```
-appLaunchers<T> ─┐
-appManifest<T>  ─┼─► appAssemble<T> ─► appArchive<T> ──► publish (one variant per target)
-appSbom<T>      ─┘         │
-                           └─► appRpm<T> (Linux, rpm enabled) ──► appPublishRpm
-                     this machine's ──► appSmokeTest, runApp (HostTasks), jlinkFindModules
-                     a Linux one   ──► appDockerContext (DockerContext)
+startScripts (Java) / appLaunchers<T> (Node) ─┐
+appManifest<T>, appSbom<T>                     ─┼─► distribution <target> ─┬─► <target>DistTar/Zip ──► publish
+runtime/ (customiseRuntime<T> or Node)          ─┘    (Gradle's plugin)      └─► install<Target>Dist (build/app/<target>)
+                                                         appVerifyPolicy<T> ─┘   checked before any archive
+                     install<Target>Dist ──► appRpm<T> (Linux, rpm enabled) ──► appPublishRpm
+                     this machine's      ──► appSmokeTest, runApp (HostTasks), jlinkFindModules
+                     a Linux one         ──► appDockerContext (DockerContext)
 ```
 
 Each plugin contributes an `Ecosystem` (its names: `java`/`javaApp`/settings plugin id) and, per
-target, an `EcosystemSpec` (runtime name and version, launcher exec lines, archive contents, SBOM
-inputs). Everything Java- or Node-specific stays in its own module.
+target, an `EcosystemSpec` (runtime name and version, where the launchers come from, archive
+contents, SBOM inputs). Everything Java- or Node-specific stays in its own module.
 
 **Targets are known only after the build script runs,** so per-target tasks are registered in
 `afterEvaluate`, as are the Java plugin's JDK tasks (the Java release is final then too). Tasks a

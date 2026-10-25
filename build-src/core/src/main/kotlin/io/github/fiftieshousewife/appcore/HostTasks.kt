@@ -1,6 +1,5 @@
 package io.github.fiftieshousewife.appcore
 
-import io.github.fiftieshousewife.appcore.tasks.AppInstall
 import io.github.fiftieshousewife.appcore.tasks.AppSmokeTest
 import io.github.fiftieshousewife.appcore.tasks.RunApp
 import org.gradle.api.Project
@@ -8,8 +7,7 @@ import org.gradle.api.tasks.TaskProvider
 import java.time.Duration
 
 /**
- * `appSmokeTest`, `runApp`, `appInstall` and `appRollback`: the tasks that use this machine's
- * archive, once it is known.
+ * `appSmokeTest` and `runApp`: the tasks that use this machine's archive, once it is known.
  */
 internal class HostTasks(private val project: Project, private val wiring: AppWiring) {
     private val extension = wiring.extension
@@ -20,6 +18,7 @@ internal class HostTasks(private val project: Project, private val wiring: AppWi
             description = "Extracts this machine's archive, starts it and waits for its healthcheck"
             healthTimeout.set(extension.smokeTestTimeout)
             resultFile.set(wiring.workDir.map { it.file("smoke-test.txt") })
+            requiredPolicy.from(wiring.runtimePolicy)
             val enabled = extension.smokeTestEnabled
             onlyIf("${wiring.ecosystem.extensionName}.smokeTestEnabled is true") { enabled.get() }
         }
@@ -39,19 +38,9 @@ internal class HostTasks(private val project: Project, private val wiring: AppWi
             onlyIf("an archive is built for this machine") { dir.isPresent }
         }
 
-    private val install: TaskProvider<AppInstall>
-
-    init {
-        val settings = extension.install
-        settings.applyConventions(project, wiring.ecosystem.property("installDir"))
-        settings.requiredPolicy.from(wiring.runtimePolicy)
-        install = Installation.register(project, settings, wiring.ecosystem.extensionName)
-    }
-
-    /** This machine's archive is the one `appSmokeTest` starts, `runApp` runs and `appInstall` installs. */
+    /** This machine's archive is the one `appSmokeTest` starts and `runApp` runs. */
     fun use(hostTasks: TargetTasks) {
         smoke.configure { archiveFiles.from(hostTasks.archive.flatMap { it.archiveFile }) }
-        install.configure { archiveFiles.from(hostTasks.archive.flatMap { it.archiveFile }) }
         runApp.configure {
             dependsOn(hostTasks.assemble)
             appDir.set(project.layout.dir(hostTasks.assemble.map { it.destinationDir }))

@@ -1,6 +1,6 @@
 # Plan: Gradle-native launchers and distributions
 
-Status: agreed 2026-10-25; spike done the same day (findings at the end); implementation in progress. Owner decision: build on Gradle's own
+Status: done 2026-10-25 except making `main` the host target (see Progress). Owner decision: build on Gradle's own
 `application`/`distribution` machinery instead of beside it; no custom installer.
 
 ## Why
@@ -122,6 +122,9 @@ About a day of work after the spike, plus the spike itself (half a day).
   publication loses the classifier and the top directory takes the file name; and Gradle 9
   normalises file modes in archives, so the archive tasks call `useFileSystemPermissions()` to keep
   `runtime/lib/jspawnhelper` executable.
+- Step 5 done: the installer and `app-deploy` are removed; the runtime-policy check that ran at
+  install now runs in `app-smoke-test`, which deployment pipelines already use before a rollout.
+- Step 6 done: docs, `AGENTS.md`, skills and the article updated.
 - Not done: making `main` the host target (so plain `installDist` installs this machine's app with
   its runtime). Deferred: the default `main` distribution would need its own contents replaced.
 

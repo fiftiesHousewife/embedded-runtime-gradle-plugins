@@ -89,9 +89,9 @@ class TargetTasks(
  * The pipeline the Java and Node plugins share; not a public API. Once per target:
  *
  * ```
- * appLaunchers<T> ─┐
- * appManifest<T>  ─┼─► appAssemble<T> ─► appArchive<T> ──► publish
- * appSbom<T>      ─┘
+ * startScripts / appLaunchers<T> ─┐
+ * appManifest<T>                  ─┼─► distribution <target> ─► <target>DistTar/Zip ──► publish
+ * appSbom<T>                      ─┘                          ─► install<Target>Dist
  * ```
  *
  * plus, for this machine's archive only, `appSmokeTest` and `runApp`, and for a Linux archive

@@ -255,7 +255,7 @@ Repackaging the JDK changes the defaults. It doesn't make them binding.
 What can be made binding is narrower and more useful:
 
 1. **Check the artefact, not the intention.** A central runtime policy, published once and named by a machine-level property so projects can't unset it, is applied to every runtime and then checked against the files actually built: the effective `java.security`, the trusted certificates, the linked modules, the launcher and the SBOM. A project that falls short gets no archive.
-2. **Check again where it lands.** The same check runs before anything is installed, so an archive built some other way still can't reach a server.
+2. **Check again before it ships.** The same check runs when a deployment pipeline smoke-tests a release before rolling it out, so an archive built some other way still can't reach a server through that pipeline.
 3. **Close the doors that can be closed.** `security.overridePropertiesFile=false`, launchers that refuse `JAVA_TOOL_OPTIONS` and friends, root-owned read-only files under `/opt`, and a policy that forbids shipping a TLS library of the app's own, found through the SBOM.
 4. **Enforce the wire at the boundary.** Which ciphers and protocols actually cross the network is decided by whoever terminates the connection. An egress proxy or service mesh that terminates TLS under its own policy, with direct egress blocked, is the only control the application cannot bypass.
 

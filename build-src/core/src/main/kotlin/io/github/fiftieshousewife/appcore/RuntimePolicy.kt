@@ -24,7 +24,7 @@ import java.util.Properties
  * ```
  *
  * `customiseRuntime` applies it after the project's own settings, so it always wins;
- * `appVerifyPolicy` and `appInstall` check the actual files against it ([RuntimePolicyCheck]).
+ * `appVerifyPolicy` and `appSmokeTest` check the actual files against it ([RuntimePolicyCheck]).
  */
 data class RuntimePolicy(
     val id: String,

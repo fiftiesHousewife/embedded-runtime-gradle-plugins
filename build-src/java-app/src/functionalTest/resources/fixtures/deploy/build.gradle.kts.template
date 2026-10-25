@@ -1,4 +1,0 @@
-plugins { id("io.github.fiftieshousewife.app-deploy") }
-repositories { maven { url = uri("@REPO@") } }
-dependencies { app("com.example.test:svc:2.0.0") }
-appDeploy { dir = file("@DIR@") }

@@ -19,7 +19,7 @@ its health check: an upgrade is only done when that passes.
 - The plugins: find `io.github.fiftieshousewife.java-app.settings` / `.node-app.settings` in
   `settings.gradle.kts` and compare with the latest release.
 - The runtime the current release embeds: run `./gradlew appArchive` and read
-  `build/app/<target>/<app>-<version>/META-INF/app.json` (`runtime.name` and `runtime.version`).
+  `build/app/<target>/<app>-<version>/META-INF/app.json` (laid out by `install<Target>Dist`) (`runtime.name` and `runtime.version`).
 
 ## 2. Upgrade in this order, building after each
 

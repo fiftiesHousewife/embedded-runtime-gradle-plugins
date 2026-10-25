@@ -31,49 +31,52 @@ tasks.register("publishPlugins") {
 }
 
 // AI assistant files: one source in ai/, copied to the paths each tool requires (see ai/README.md).
+// Each entry is a destination and what it holds; check fails while any copy differs.
 val aiCopies =
     mapOf(
-        "agentSkills" to ("ai/skills" to ".agents/skills"),
-        "claudeSkills" to ("ai/skills" to "ai/claude/skills"),
-        "copilotPrompts" to ("ai/copilot/prompts" to ".github/prompts"),
+        ".agents/skills" to listOf("ai/skills"),
+        "ai/claude/skills" to listOf("ai/skills"),
+        "ai/claude/hooks/scripts" to listOf("ai/hooks"),
+        ".github/hooks" to listOf("ai/hooks", "ai/copilot/hooks"),
     )
+val aiFiles = mapOf(".github/copilot-instructions.md" to "ai/copilot/copilot-instructions.md", ".devin/hooks.v1.json" to "ai/devin/hooks.v1.json")
 val syncs =
-    aiCopies.map { (name, paths) ->
-        tasks.register<Sync>("sync${name.replaceFirstChar(Char::uppercase)}") {
-            from(paths.first)
-            into(paths.second)
+    aiCopies.map { (destination, sources) ->
+        tasks.register<Sync>("sync" + destination.split('/', '.', '-').joinToString("") { it.replaceFirstChar(Char::uppercase) }) {
+            sources.forEach { from(it) }
+            into(destination)
         }
-    }
-val copilotInstructions =
-    tasks.register<Copy>("syncCopilotInstructions") {
-        from("ai/copilot/copilot-instructions.md")
-        into(".github")
-    }
+    } +
+        aiFiles.map { (destination, source) ->
+            tasks.register<Copy>("copy" + destination.split('/', '.', '-').joinToString("") { it.replaceFirstChar(Char::uppercase) }) {
+                from(source)
+                into(destination.substringBeforeLast('/'))
+            }
+        }
 tasks.register("syncAiSkills") {
     group = "build setup"
     description = "Copies the AI assistant files in ai/ to where each tool reads them"
-    dependsOn(syncs, copilotInstructions)
+    dependsOn(syncs)
 }
 val verifyAiSkills =
     tasks.register("verifyAiSkills") {
         group = "verification"
         description = "Fails when a copy of the AI assistant files in ai/ is out of date"
-        val root = layout.projectDirectory
-        val pairs = aiCopies.values.toList() + ("ai/copilot/copilot-instructions.md" to ".github/copilot-instructions.md")
-        inputs.files(pairs.flatMap { listOf(root.file(it.first), root.file(it.second)) })
+        val root = layout.projectDirectory.asFile
+        val dirs = aiCopies
+        val files = aiFiles
+        inputs.files(dirs.flatMap { (d, s) -> s + d }.map { root.resolve(it) } + files.flatMap { listOf(it.key, it.value) }.map { root.resolve(it) })
         doLast {
-            // Local, so the task holds no reference to the build script (configuration cache).
-            fun sameContent(source: File, copy: File): Boolean {
-                if (source.isFile) return copy.isFile && source.readBytes().contentEquals(copy.readBytes())
-                val files = { dir: File -> dir.walkTopDown().filter(File::isFile).associateBy { it.relativeTo(dir).invariantSeparatorsPath } }
-                val a = files(source)
-                val b = if (copy.isDirectory) files(copy) else emptyMap()
-                return a.keys == b.keys && a.all { (path, file) -> file.readBytes().contentEquals(b.getValue(path).readBytes()) }
-            }
-            val stale = pairs.filter { (source, copy) -> !sameContent(root.file(source).asFile, root.file(copy).asFile) }
-            if (stale.isNotEmpty()) {
-                throw GradleException("Out of date: ${stale.joinToString { it.second }}. Run ./gradlew syncAiSkills")
-            }
+            // Local functions, so the task holds no reference to the build script (configuration cache).
+            fun tree(dir: File) = dir.walkTopDown().filter(File::isFile).associate { it.relativeTo(dir).invariantSeparatorsPath to it.readBytes().toList() }
+            val staleDirs = dirs.filter { (destination, sources) ->
+                sources.map { tree(root.resolve(it)) }.reduce { a, b -> a + b } != tree(root.resolve(destination))
+            }.keys
+            val staleFiles = files.filter { (destination, source) ->
+                !root.resolve(destination).isFile || !root.resolve(destination).readBytes().contentEquals(root.resolve(source).readBytes())
+            }.keys
+            val stale = staleDirs + staleFiles
+            if (stale.isNotEmpty()) throw GradleException("Out of date: ${stale.joinToString()}. Run ./gradlew syncAiSkills")
         }
     }
 tasks.named("check") { dependsOn(verifyAiSkills) }

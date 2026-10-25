@@ -18,9 +18,9 @@ deploy/                     curate-runtimes.sh (mirrors approved runtimes into t
 docs/                       user documentation, linked from the README; article.md is the article's home
 .github/scripts/            verify-rpm.sh: CI installs the sample's RPM in a Rocky Linux container
 .claude-plugin/             the Claude Code marketplace manifest (must stay at the root)
-ai/                         every AI assistant file, one source: skills, Copilot prompts and instructions,
-                            the Claude plugin and its hook; ./gradlew syncAiSkills copies them to
-                            .agents/skills, .github/prompts and .github/copilot-instructions.md (see ai/README.md);
+ai/                         every AI assistant file, one source: skills, the shared post-edit hook,
+                            Copilot and Devin hook configs, Copilot instructions, the Claude plugin; ./gradlew syncAiSkills copies them to
+                            .agents/skills, .github/hooks, .devin and .github/copilot-instructions.md (see ai/README.md);
                             keep the skills in step with the tasks and properties they name
 gradle/init.d/              init script for machines behind a binary repository
 gradle/libs.versions.toml   the one version catalogue, shared by every build here

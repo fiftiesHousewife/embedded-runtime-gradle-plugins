@@ -26,16 +26,22 @@ val aiSource = layout.projectDirectory.dir("../../ai")
 val aiResources =
     tasks.register<Sync>("aiResources") {
         val root = "io/github/fiftieshousewife/appcore/ai"
-        from(aiSource.dir("skills")) { into("$root/skills") }
-        from(aiSource.dir("copilot/prompts")) { into("$root/prompts") }
+        val parts = mapOf(
+            "skills" to "skills",
+            "hooks" to "hooks",
+            "copilot/hooks" to "copilot-hooks",
+            "devin" to "devin",
+        )
+        parts.forEach { (dir, into) -> from(aiSource.dir(dir)) { into("$root/$into") } }
         into(layout.buildDirectory.dir("generated/ai"))
-        val skills = aiSource.dir("skills").asFile
-        val prompts = aiSource.dir("copilot/prompts").asFile
-        inputs.dir(skills)
-        inputs.dir(prompts)
+        val sources = parts.mapValues { aiSource.dir(it.key).asFile }
+        sources.values.forEach { inputs.dir(it) }
         doLast {
-            val listed = listOf("skills" to skills, "prompts" to prompts).flatMap { (kind, dir) ->
-                dir.walkTopDown().filter(File::isFile).map { "$kind/" + it.relativeTo(dir).invariantSeparatorsPath }
+            val listed = sources.flatMap { (dir, file) ->
+                file.walkTopDown().filter(File::isFile).map {
+                    parts.getValue(dir) + "/" +
+                        it.relativeTo(file).invariantSeparatorsPath
+                }
             }
             destinationDir.resolve("$root/index.txt").writeText(listed.sorted().joinToString("\n", postfix = "\n"))
         }

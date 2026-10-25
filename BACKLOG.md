@@ -26,14 +26,15 @@ installs this machine's app with its runtime, and the custom installer is gone.
 
 ## AI tooling
 
-Done 2026-10-25: everything in `ai/` (see `ai/README.md`); skills in the open Agent Skills format
-shared by Copilot and Devin, Copilot prompt files and repository instructions, the Claude plugin with
-a tested build-check hook, and `./gradlew aiSkills` to install them in a project.
+Done 2026-10-25: everything in `ai/` (see `ai/README.md`): skills in the open Agent Skills format
+shared by Copilot and Devin (and slash commands in both), one post-edit build-check hook wired for
+Claude Code, Copilot and the Devin CLI and tested in CI both ways, Copilot repository instructions,
+and `./gradlew aiSkills` to install them in a project. Prompt files were dropped: skills replace them.
 
 | Item | Notes |
 |---|---|
 | **`.claude/settings.json`** | Sandbox blocks writing it; the snippet that auto-suggests the marketplace to collaborators is in the conversation of 2026-10-25. Owner to add |
-| **Copilot and Devin hooks** | Not added: neither documents a repository hook format that could be verified |
+| **Unverified hook details** | The exact argument names Copilot's `edit`/`create` and Devin's edit tools use for the file path (the script accepts `file_path` and `path`); whether Copilot's cloud agent and Devin's cloud sessions run these hooks; hooks in Visual Studio and JetBrains |
 | **Performance tuning skill** | Skill plus a docs section on tuning an embedded-runtime app, built around Java Flight Recorder (`-XX:StartFlightRecording`, `jfr print`, JDK Mission Control), GC choice and heap sizing in containers; needs `jdk.jfr` in the runtime |
 
 

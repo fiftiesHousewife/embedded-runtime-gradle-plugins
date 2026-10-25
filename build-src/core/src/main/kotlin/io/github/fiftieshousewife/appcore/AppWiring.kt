@@ -244,7 +244,8 @@ class AppWiring(
         val smoke = hostTasks.smoke
         tasks.register("aiSkills", InstallAiSkills::class.java) {
             group = "help"
-            description = "Writes the plugins' skills and prompt files for Copilot and Devin into .agents/ and .github/"
+            description =
+                "Writes the plugins' skills and hooks for Copilot and Devin into .agents/, .github/ and .devin/"
             projectDirectory.set(layout.projectDirectory)
         }
         val publishing = AppPublishing(project, this, services.components).apply { register(smoke) }

@@ -8,4 +8,5 @@ conventions (ktlint and detekt are blocking; every version lives in `gradle/libs
   `./gradlew -p build-src :java-app:functionalTest`.
 - User documentation is in `docs/`; keep it, `AGENTS.md` and `BACKLOG.md` current with every change.
 - Skills for common tasks (adopting the plugins, finding JDK modules for jlink, upgrading) are in
-  `.agents/skills/`; prompt files for them are in `.github/prompts/`.
+  `.agents/skills/`. All assistant files have one source in `ai/`: edit there, then run
+  `./gradlew syncAiSkills`.

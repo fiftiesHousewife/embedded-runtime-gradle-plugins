@@ -1,0 +1,10 @@
+{
+  "PostToolUse": [
+    {
+      "matcher": ".*",
+      "hooks": [
+        { "type": "command", "command": "sh .github/hooks/embedded-runtime-check-gradle-build.sh", "timeout": 300 }
+      ]
+    }
+  ]
+}

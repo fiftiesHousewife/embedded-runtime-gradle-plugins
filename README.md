@@ -79,13 +79,11 @@ The [samples](samples) are a plain Java HTTP service, a Spring Boot service and 
 ### AI assistant skills
 
 Skills that adopt the plugins in a project, find the JDK modules for jlink, and upgrade dependencies
-and runtimes:
+and runtimes, plus a hook that checks the build still configures after the agent edits a build file:
 
 - **GitHub Copilot** (agent mode in VS Code, Visual Studio and JetBrains IDEs, the Copilot app and
-  CLI, the cloud agent) **and Devin**: `./gradlew aiSkills` writes them into your project's
-  `.agents/skills/`, with Copilot Chat prompt files in `.github/prompts/`.
-- **Claude Code**: install the plugin, which also checks your build still configures after Claude
-  edits a build file:
+  CLI, the cloud agent) **and Devin**: `./gradlew aiSkills` writes them into your project.
+- **Claude Code**: install the plugin:
   ```
   /plugin install embedded-runtime --marketplace fiftiesHousewife/embedded-runtime-gradle-plugins
   ```

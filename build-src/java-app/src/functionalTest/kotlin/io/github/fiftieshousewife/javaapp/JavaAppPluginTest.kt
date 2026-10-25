@@ -90,7 +90,7 @@ class JavaAppPluginTest {
     }
 
     @Test
-    fun `aiSkills writes the skills for Copilot and Devin, and the Copilot prompt files, into the project`() {
+    fun `aiSkills writes the skills and hooks for Copilot and Devin into the project`() {
         val project = javaService(tmp)
         project.file(".agents/skills/our-own/SKILL.md", "ours")
         project.build("aiSkills")
@@ -103,7 +103,15 @@ class JavaAppPluginTest {
                     ).readText().contains("jlinkFindModules"),
                 )
             },
-            { assertTrue(root.resolve(".github/prompts/embedded-runtime-upgrade.prompt.md").isFile) },
+            { assertTrue(root.resolve(".github/hooks/embedded-runtime-check-gradle-build.sh").canExecute()) },
+            {
+                assertTrue(
+                    root.resolve(
+                        ".github/hooks/embedded-runtime-check-gradle-build.json",
+                    ).readText().contains("postToolUse"),
+                )
+            },
+            { assertTrue(root.resolve(".devin/hooks.v1.json").readText().contains("PostToolUse")) },
             { assertEquals("ours", root.resolve(".agents/skills/our-own/SKILL.md").readText().trim()) },
         )
     }

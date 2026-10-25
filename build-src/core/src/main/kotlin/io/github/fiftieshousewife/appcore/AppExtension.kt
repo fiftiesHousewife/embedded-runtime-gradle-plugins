@@ -57,6 +57,15 @@ abstract class AppExtension {
     /** Replaces [runtimeOptions]: `runtimeOptions("locked")`. */
     fun runtimeOptions(id: String) = runtimeOptions.set(RuntimeOptions.parse(id))
 
+    /**
+     * A CycloneDX JSON SBOM of the project's own making, used in every target's archive (as
+     * `META-INF/sbom.cdx.json`) and publication instead of the built-in one, which then does not run.
+     * Point it at another tool's output so the task dependency comes with it:
+     * `sbom = tasks.named<CyclonedxDirectTask>("cyclonedxDirectBom").flatMap { it.jsonOutput }`.
+     * The built-in SBOM lists the embedded runtime; a replacement should too, or scanners won't see it.
+     */
+    abstract val sbom: RegularFileProperty
+
     /** Default configuration shipped as `conf.defaults/`. Defaults to `src/deploy/conf`. */
     abstract val configDefaults: DirectoryProperty
 

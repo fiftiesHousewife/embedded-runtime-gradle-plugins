@@ -3,6 +3,7 @@ package io.github.fiftieshousewife.javaapp
 import io.github.fiftieshousewife.appcore.RecordingRepository
 import io.github.fiftieshousewife.appcore.RpmEntry
 import io.github.fiftieshousewife.appcore.RpmFile
+import io.github.fiftieshousewife.appcore.Target
 import io.github.fiftieshousewife.appcore.TestProject
 import org.gradle.testkit.runner.TaskOutcome
 import org.junit.jupiter.api.Assertions.assertAll
@@ -30,6 +31,34 @@ class JavaAppPackagingTest {
             { assertEquals(TaskOutcome.SUCCESS, built.task(":appSmokeTest")?.outcome) },
             { assertTrue(project.project.resolve("build/distributions/svc-2.0.0-$host.zip").isFile) },
             { assertTrue(gmm.contains(""""url": "svc-2.0.0-$host.zip""""), gmm) },
+        )
+    }
+
+    @Test
+    fun `a project's own SBOM replaces the built-in one in the archive and the publication`() {
+        val own = "{\"bomFormat\":\"CycloneDX\",\"specVersion\":\"1.6\",\"metadata\":{\"tools\":[{\"name\":\"ours\"}]}}"
+        val project =
+            javaService(
+                tmp,
+                JavaServiceOptions(
+                    "$FIXTURE_MODULES\nsbom = layout.projectDirectory.file(\"own-sbom.json\")",
+                    localRepo,
+                ),
+            )
+        project.file("own-sbom.json", own)
+        val built = project.build("publish")
+        val archived = project.project.resolve("build/app/$host/svc-2.0.0/META-INF/sbom.cdx.json").readText()
+        val published = project.project.resolve(
+            "build/repo/com/example/test/svc/2.0.0/svc-2.0.0-$host-cyclonedx.json",
+        ).readText()
+        assertAll(
+            {
+                assertTrue(
+                    built.task(":appSbom${Target.parse(host).taskSuffix}")?.outcome in setOf(null, TaskOutcome.SKIPPED),
+                )
+            },
+            { assertEquals(own, archived.trim()) },
+            { assertEquals(own, published.trim()) },
         )
     }
 

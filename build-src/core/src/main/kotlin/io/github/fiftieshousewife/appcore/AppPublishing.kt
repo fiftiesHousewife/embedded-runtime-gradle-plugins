@@ -95,10 +95,9 @@ internal class AppPublishing(
         built.forEach(::addVariant)
         publishing.publications.named(publicationName, MavenPublication::class.java) {
             built.forEach { t ->
-                artifact(t.sbom.flatMap { it.outputFile }) {
+                artifact(t.sbom) {
                     classifier = "${t.target.id}-cyclonedx"
                     extension = "json"
-                    builtBy(t.sbom)
                 }
             }
         }

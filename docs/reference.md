@@ -21,6 +21,7 @@ javaApp {                                       // nodeApp {} has the same first
     }
     dockerfile = file("docker/Dockerfile")      // default: Dockerfile, else src/deploy/docker/Dockerfile
     configDefaults = file("src/deploy/conf")    // shipped as conf.defaults/
+    sbom = file("build/reports/bom.json")       // your own CycloneDX SBOM instead of the built-in one
     smokeTestEnabled = true                     // start the archive during `check`
     smokeTestTimeout = Duration.ofSeconds(60)
     allowUntestedPublish = false

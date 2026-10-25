@@ -36,11 +36,6 @@ a tested build-check hook, and `./gradlew aiSkills` to install them in a project
 | **Copilot and Devin hooks** | Not added: neither documents a repository hook format that could be verified |
 | **Performance tuning skill** | Skill plus a docs section on tuning an embedded-runtime app, built around Java Flight Recorder (`-XX:StartFlightRecording`, `jfr print`, JDK Mission Control), GC choice and heap sizing in containers; needs `jdk.jfr` in the runtime |
 
-## Features
-
-| Item | Notes |
-|---|---|
-| **Replaceable SBOM generator** | Let a project use its own SBOM tool (e.g. the CycloneDX Gradle plugin, Syft) instead of the built-in generator, with the archive still carrying `META-INF/sbom.cdx.json` and publishing it |
 
 ## Code quality
 
@@ -58,6 +53,11 @@ a tested build-check hook, and `./gradlew aiSkills` to install them in a project
 | systemd step | `.github/scripts/verify-rpm.sh` now runs the unit under a real systemd (UBI init image); has not run in CI yet |
 | Windows pre-installed JDKs | `javaApp.jdk.<feature>.windows-x64.path` has unit tests only; functional tests skip on Windows (fixtures use system `tar`). Add a Windows functional path |
 | GitHub API access for the agent | Unauthenticated API calls hit the rate limit; `gh` config is unreadable in the sandbox |
+
+## Pins to recheck
+
+- Microsoft's download page (2026-10-25) lists macOS builds of 21.0.13 and 25.0.5 as "Coming soon":
+  check that the Microsoft pins resolve on `mac-x64` and `mac-aarch64` before the next pin bump.
 
 ## Older open items
 

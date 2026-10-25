@@ -18,6 +18,7 @@ import org.gradle.api.file.CopySpec
 import org.gradle.api.file.Directory
 import org.gradle.api.file.DuplicatesStrategy
 import org.gradle.api.file.FileCollection
+import org.gradle.api.file.RegularFile
 import org.gradle.api.provider.Provider
 import org.gradle.api.tasks.Sync
 import org.gradle.api.tasks.TaskProvider
@@ -83,7 +84,8 @@ class TargetTasks(
     val assemble: TaskProvider<Sync>,
     /** `appArchive<T>`: a Tar or Zip task, as [AppExtension.archiveFormat] says. */
     val archive: TaskProvider<out AbstractArchiveTask>,
-    val sbom: TaskProvider<GenerateSbom>,
+    /** This target's SBOM: the built-in one, or the project's own ([AppExtension.sbom]). */
+    val sbom: Provider<RegularFile>,
 )
 
 /**

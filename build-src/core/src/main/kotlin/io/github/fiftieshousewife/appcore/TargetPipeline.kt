@@ -7,6 +7,7 @@ import io.github.fiftieshousewife.appcore.tasks.VerifyRuntimePolicy
 import org.gradle.api.Project
 import org.gradle.api.distribution.DistributionContainer
 import org.gradle.api.file.DuplicatesStrategy
+import org.gradle.api.file.RegularFile
 import org.gradle.api.provider.Provider
 import org.gradle.api.tasks.Sync
 import org.gradle.api.tasks.TaskProvider
@@ -32,7 +33,9 @@ internal class TargetPipeline(private val project: Project, private val wiring: 
     private val topDirectory: Provider<String> get() = appName.zip(versionString) { n, v -> "$n-$v" }
 
     fun register(target: Target, spec: EcosystemSpec): TargetTasks {
-        val parts = Parts(registerLaunchers(target, spec), registerManifest(target, spec), registerSbom(target, spec))
+        val builtIn = registerSbom(target, spec)
+        val sbom = extension.sbom.orElse(builtIn.flatMap { it.outputFile })
+        val parts = Parts(registerLaunchers(target, spec), registerManifest(target, spec), sbom)
         val name = distributionName(target)
         registerDistribution(name, target, spec, parts)
         val install = tasks.named(target.installTaskName, Sync::class.java) {
@@ -50,7 +53,7 @@ internal class TargetPipeline(private val project: Project, private val wiring: 
         /** A task or file tree: whatever `bin/` is copied from. */
         val launchers: Any,
         val manifest: TaskProvider<GenerateAppManifest>,
-        val sbom: TaskProvider<GenerateSbom>,
+        val sbom: Provider<RegularFile>,
     )
 
     /**
@@ -88,7 +91,7 @@ internal class TargetPipeline(private val project: Project, private val wiring: 
         }
         into("META-INF") {
             from(parts.manifest)
-            from(parts.sbom)
+            from(parts.sbom) { rename { "sbom.cdx.json" } }
         }
         into("conf.defaults") { from(extension.configDefaults) }
         spec.contents(this)
@@ -175,6 +178,8 @@ internal class TargetPipeline(private val project: Project, private val wiring: 
 
     private fun registerSbom(target: Target, spec: EcosystemSpec) =
         tasks.register("appSbom${target.taskSuffix}", GenerateSbom::class.java) {
+            val replaced = extension.sbom
+            onlyIf("the project supplies no SBOM of its own (sbom)") { !replaced.isPresent }
             group = taskGroup
             description = "Generates a CycloneDX SBOM for ${target.id}, including the runtime"
             appGroup.set(groupString)

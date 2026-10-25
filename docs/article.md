@@ -77,15 +77,17 @@ What changed is where the answers live. Instead of a shared directory that every
 
 When Oracle changed how it licensed its JDK in 2018 and 2019, many organisations moved to OpenJDK builds from other vendors, some long established and some new. The builds come from the same OpenJDK source, pass the same compatibility tests, and behave the same for nearly every app. They differ in who stands behind them, which platforms they cover, and what they add:
 
-| Distribution | Built by | Why organisations choose it |
-| --- | --- | --- |
-| Temurin | Eclipse Adoptium | Vendor-neutral and free; the default in most build tools and CI images |
-| Oracle JDK | Oracle | The reference build; free under Oracle's NFTC licence for current releases, with paid support for older lines |
-| Corretto | Amazon | Free long-term support, the same builds Amazon runs its own services on |
-| Zulu | Azul | The widest matrix of versions and platforms, including old releases, with commercial support |
-| Liberica | BellSoft | Variants with JavaFX bundled, slim Lite builds, and CRaC-enabled builds for fast startup |
-| Microsoft Build of OpenJDK | Microsoft | The build Microsoft runs on Azure and supports there; long-term-support releases only |
-| SapMachine | SAP | The JDK SAP's own products run on, with builds for platforms such as AIX and musl-based Linux |
+| Distribution | Built by | Why organisations choose it | Ships a JRE |
+| --- | --- | --- | --- |
+| Temurin | Eclipse Adoptium | Vendor-neutral and free; the default in most build tools and CI images | Yes |
+| Oracle JDK | Oracle | The reference build; free under Oracle's NFTC licence for current releases, with paid support for older lines | No, JDK only since 11 |
+| Corretto | Amazon | Free long-term support, the same builds Amazon runs its own services on | No, JDK only (21) |
+| Zulu | Azul | The widest matrix of versions and platforms, including old releases, with commercial support | Yes |
+| Liberica | BellSoft | Variants with JavaFX bundled, slim Lite builds, and CRaC-enabled builds for fast startup | Yes |
+| Microsoft Build of OpenJDK | Microsoft | The build Microsoft runs on Azure and supports there; long-term-support releases only | No, JDK only |
+| SapMachine | SAP | The JDK SAP's own products run on, with builds for platforms such as AIX and musl-based Linux | Yes |
+
+The JRE column surprises people. OpenJDK itself has produced only a JDK since Java 11, and Oracle stopped offering a JRE download then. What some vendors still call a JRE is their own product: the full Java SE module set linked from their JDK, without the developer tools. Temurin, Zulu, Liberica and SapMachine publish one; Oracle, Corretto and Microsoft publish only the JDK (checked against each vendor's downloads for Java 21 in October 2026). Either way, a JRE is a general-purpose runtime for every app, which is exactly what jlink lets each app avoid.
 
 Most organisations pick one, sometimes two, usually for the support contract rather than the bits. The build should make that choice a single setting, and changing it should be safe.
 
@@ -231,7 +233,16 @@ first build. Measured for linux-x64 against Temurin 21.0.12.1+1, on 25 October 2
 | **The archive: trimmed runtime plus the service** | **58.9 MB** | **84 MB** (63 MB runtime, 21 MB libraries) |
 
 The whole archive, application included, is about the size of the vendor's JRE download on its own,
-and under a third of the JDK. Spring needs more of the JDK than the plain sample: `java.desktop`,
+and under a third of the JDK. Inside it, the runtime and Spring split roughly two to one:
+
+| Part of the archive | Compressed | Unpacked |
+|---|---|---|
+| Trimmed runtime (13 modules) | 39.3 MB | 61 MB |
+| Spring Boot, Tomcat, Jackson and the service (50 jars, 29 of them Spring's) | 19.7 MB | 21 MB |
+
+The trimmed runtime is about a quarter smaller than Temurin's 52.1 MB JRE, which carries the whole
+Java SE platform whether the service uses it or not. Spring's jars hardly shrink in the archive,
+because a jar is already compressed. Spring needs more of the JDK than the plain sample: `java.desktop`,
 pulled in by `java.beans`, is the largest of its modules, which is why the runtime is 63 MB here
 rather than 31 MB.
 

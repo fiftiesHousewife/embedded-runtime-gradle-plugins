@@ -56,4 +56,11 @@ class RpmLayoutTest {
             { assertTrue(postun.contains("""if [ "$1" -ge 1 ]; then systemctl try-restart orders.service"""), postun) },
         )
     }
+
+    @Test
+    fun `every template has Unix line endings, whatever the checkout`() {
+        listOf("app.service", "pre.sh", "post.sh", "preun.sh", "postun.sh").forEach {
+            assertFalse(RpmLayout.template(it).contains('\r'), it)
+        }
+    }
 }

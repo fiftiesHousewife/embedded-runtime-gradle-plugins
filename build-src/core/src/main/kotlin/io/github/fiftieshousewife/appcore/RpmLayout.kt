@@ -59,8 +59,10 @@ data class RpmLayout(
         private val RELEASE = Regex("[A-Za-z0-9._+~]+")
         private val VERSION = Regex("[A-Za-z0-9._+~^]+")
 
+        /** LF whatever the checkout did: a CR would end up in every unit value and scriptlet line. */
         fun template(name: String): String =
             RpmLayout::class.java.getResource("/io/github/fiftieshousewife/appcore/rpm/$name")?.readText()
+                ?.replace("\r\n", "\n")
                 ?: error("RPM template $name missing from the app-core jar")
     }
 }

@@ -25,6 +25,12 @@ itself runs on.
 
 ```kotlin
 // settings.gradle.kts
+pluginManagement {
+    repositories {
+        mavenCentral()                         // the plugins are published to Maven Central
+        gradlePluginPortal()
+    }
+}
 plugins {
     id("io.github.fiftieshousewife.java-app.settings") version "1.0.0"
 }

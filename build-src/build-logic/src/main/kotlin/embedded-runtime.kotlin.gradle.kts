@@ -7,7 +7,6 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 plugins {
     id("org.gradle.kotlin.kotlin-dsl")
     `maven-publish`
-    signing
     id("com.diffplug.spotless")
     id("dev.detekt")
     id("io.github.ben-manes.versions")
@@ -130,7 +129,7 @@ tasks.matching { it.name == "javadocJar" }.withType<Jar>().configureEach {
 }
 
 // Maven Central requires sources and javadoc jars, a POM carrying name, description, URL, licence,
-// developer and SCM, and a detached PGP signature per artifact.
+// developer and SCM, and a detached PGP signature per artifact (signing: embedded-runtime.gradle-plugin).
 publishing.publications.withType<MavenPublication>().configureEach {
     pom {
         name = project.name
@@ -155,17 +154,6 @@ publishing.publications.withType<MavenPublication>().configureEach {
             developerConnection = "scm:git:ssh://git@github.com/fiftiesHousewife/embedded-runtime-gradle-plugins.git"
         }
     }
-}
-
-// Signing is opt-in by key: a developer publishing to mavenLocal needs no signatory, while the
-// release pipeline passes -PsigningKey / -PsigningPassword (or ORG_GRADLE_PROJECT_signingKey).
-val signingKey = providers.gradleProperty("signingKey")
-signing {
-    isRequired = signingKey.isPresent
-    if (signingKey.isPresent) {
-        useInMemoryPgpKeys(signingKey.get(), providers.gradleProperty("signingPassword").orNull)
-    }
-    sign(publishing.publications)
 }
 
 publishing {

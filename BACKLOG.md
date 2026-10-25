@@ -43,11 +43,12 @@ and `./gradlew aiSkills` to install them in a project. Prompt files were dropped
 
 - The company's RPM-packaged JDK: real file name, install path, and whether it ships `jmods/`
   (naming described as `jdk<major>_<patch>-64_linux.x86_64.rpm`).
-- Publishing to Maven Central and the Gradle Plugin Portal. Checked 2026-10-25: all three modules
-  build their plugin, sources and javadoc jars, and `publishPlugins --validate-only` stops only at
-  "Missing publishing keys". Needs the owner's Portal account (GitHub login as fiftiesHousewife, for
-  the `io.github.fiftieshousewife` namespace) and its key and secret; for Central, a Sonatype
-  account with the namespace verified and a PGP key. The Portal approves a new plugin by hand.
+- **Publishing 1.0.0: ready, held by the owner until this backlog is clear.** Set up like the Clean
+  Code plugin (Vanniktech, Maven Central with plugin markers). Verified 2026-10-25: a release to a
+  scratch local repository is complete and signed, and a fresh project applying the plugins by id
+  and version from it builds and smoke-tests. Run `./gradlew publishToMavenCentral
+  -PreleaseVersion=1.0.0` (needs `mavenCentralUsername`/`mavenCentralPassword`). The Gradle Plugin
+  Portal is optional on top (`publishPlugins`, its own key, manual review).
 - Proposals awaiting a decision: Jib (the roadmap recommends leaving it out), SLSA provenance
   (roadmap: High), CDS/AOT cache opt-in (roadmap: Medium).
 - Article: the "HUFs" anecdote is unsourced; "Try it" uses version 1.0.0, which is not published.

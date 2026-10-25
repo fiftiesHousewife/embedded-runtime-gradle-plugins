@@ -10,6 +10,7 @@ dependencies {
     implementation("org.gradle.kotlin:gradle-kotlin-dsl-plugins:$expectedKotlinDslPluginsVersion")
     implementation("org.jetbrains.kotlin:kotlin-gradle-plugin:$embeddedKotlinVersion")
     implementation(libs.gradle.plugin.publish)
+    implementation(libs.gradle.maven.publish)
     implementation(libs.gradle.versions)
     implementation(libs.gradle.spotless)
     implementation(libs.gradle.detekt)

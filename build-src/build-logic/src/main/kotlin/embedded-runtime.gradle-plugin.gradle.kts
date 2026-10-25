@@ -1,8 +1,11 @@
-// A published Gradle plugin module: the shared Kotlin conventions, the Plugin Portal, and a
-// functional test suite that runs real Gradle builds through TestKit.
+import com.vanniktech.maven.publish.GradlePublishPlugin
+
+// A published Gradle plugin module: the shared Kotlin conventions, Maven Central and the Plugin
+// Portal, and a functional test suite that runs real Gradle builds through TestKit.
 plugins {
     id("embedded-runtime.kotlin")
     id("com.gradle.plugin-publish")
+    id("com.vanniktech.maven.publish")
 }
 
 val libs = versionCatalogs.named("libs")
@@ -33,6 +36,19 @@ testing {
     }
 }
 tasks.named("check") { dependsOn(testing.suites.named("functionalTest")) }
+
+// Maven Central, as the Clean Code plugin publishes: the module, its plugin markers (so builds that
+// list mavenCentral() in pluginManagement resolve the plugin ids), sources and the Dokka javadoc,
+// released without a manual step. `./gradlew publishToMavenCentral -PreleaseVersion=x.y.z` with
+// mavenCentralUsername/mavenCentralPassword and a signing key in ~/.gradle/gradle.properties or
+// ORG_GRADLE_PROJECT_* variables; nothing is baked in.
+mavenPublishing {
+    publishToMavenCentral(automaticRelease = true)
+    configure(GradlePublishPlugin())
+    val signingConfigured = listOf("signingInMemoryKey", "signing.keyId", "signing.gnupg.keyName")
+        .any { providers.gradleProperty(it).isPresent }
+    if (signingConfigured) signAllPublications()
+}
 
 gradlePlugin {
     website = projectUrl

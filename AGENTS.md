@@ -189,11 +189,16 @@ with `-PjavaApp.jdk.distribution=<id>`.
 **Add a target.** One constant in `Arch` or `Os` and one entry in `Target.SUPPORTED`. Target ids
 are published Maven classifiers: never change an existing one.
 
-**Release.** `./gradlew publish -PreleaseVersion=x.y.z -PsigningKey=… -PsigningPassword=…` puts all
-three modules on Maven Central (or the corporate repository); then `./gradlew publishPlugins
--PreleaseVersion=x.y.z` publishes the three plugins (`java-app`, `node-app`, and `app-smoke-test`
-from `app-core`) to the Gradle Plugin Portal. `app-core` must already be on Central, because the
-portal resolves plugin dependencies from there.
+**Release.** As the Clean Code plugin does: `./gradlew publishToMavenLocal -PreleaseVersion=x.y.z`
+to try it, then `./gradlew publishToMavenCentral -PreleaseVersion=x.y.z`, which publishes all three
+modules with their plugin markers, sources and Dokka javadoc through the Vanniktech plugin and
+releases them without a manual step. Credentials come from `~/.gradle/gradle.properties` or
+`ORG_GRADLE_PROJECT_*`: `mavenCentralUsername`/`mavenCentralPassword` (a Central Portal token for
+the `io.github.fiftieshousewife` namespace) and a signing key (`signing.keyId`/`signing.password`/
+`signing.secretKeyRingFile`, or `signingInMemoryKey`/`signingInMemoryKeyPassword`); every artifact
+is signed when one is set. Users then list `mavenCentral()` in `pluginManagement`. Plain `publish`
+publishes to every repository, Central included. `./gradlew publishPlugins` would add the Gradle
+Plugin Portal, with its own key and a manual review of each new plugin.
 
 ## Conventions
 

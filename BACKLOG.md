@@ -36,7 +36,7 @@ and `./gradlew aiSkills` to install them in a project. Prompt files were dropped
 
 | Item | Notes |
 |---|---|
-| **GitHub Pages for the API docs** | `.github/workflows/api-docs.yml` builds and deploys them; the owner must set Pages to "GitHub Actions" in the repository settings |
+| **GitHub Pages for the API docs** | `.github/workflows/api-docs.yml` builds them and deploys them once the owner sets Pages to "GitHub Actions" in the repository settings; until then the deploy job is skipped with a notice, not failed |
 | **Build speed** | Functional tests now run in parallel forks; measure, and consider a Gradle build scan or `--profile` to find the rest |
 
 ## Verification and CI

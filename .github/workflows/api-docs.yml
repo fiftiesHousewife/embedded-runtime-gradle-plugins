@@ -1,6 +1,6 @@
 # The plugins' API documentation (their KDoc, rendered by Dokka) on GitHub Pages.
-# Needs Pages set to "GitHub Actions" in the repository settings; until then the deploy step fails
-# and the HTML is still available as the run's artifact.
+# Needs Pages set to "GitHub Actions" in the repository settings; until then the deploy job is skipped
+# (with a notice) and the HTML is still available as the run's artifact.
 name: api-docs
 on:
   push:
@@ -47,8 +47,26 @@ jobs:
       - uses: actions/upload-pages-artifact@v4
         with:
           path: site
+  # Deploys only once Pages publishes from GitHub Actions, so a repository without it stays green.
+  pages:
+    runs-on: ubuntu-latest
+    outputs:
+      enabled: ${{ steps.check.outputs.enabled }}
+    steps:
+      - id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          build_type=$(gh api "repos/${{ github.repository }}/pages" --jq .build_type 2>/dev/null || true)
+          if [ "$build_type" = "workflow" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "::notice title=API docs not deployed::Set Pages to 'GitHub Actions' in the repository settings to publish them; the HTML is in this run's github-pages artifact."
+          fi
   deploy:
-    needs: build
+    needs: [build, pages]
+    if: needs.pages.outputs.enabled == 'true'
     runs-on: ubuntu-latest
     environment:
       name: github-pages

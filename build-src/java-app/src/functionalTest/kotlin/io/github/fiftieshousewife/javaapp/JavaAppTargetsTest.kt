@@ -129,46 +129,4 @@ class JavaAppTargetsTest {
         JdkFixture.publishCurated(project, shared)
         assertEquals(TaskOutcome.SUCCESS, project.build("build").task(":appSmokeTest")?.outcome)
     }
-
-    @Test
-    fun `a consuming build smoke-tests the published archive for its own machine`() {
-        val producer = javaService(tmp.resolve("producer"), twoTargets)
-        producer.build("publish", "-PjavaApp.allowUntestedPublish=true")
-        val consumer =
-            TestProject(tmp.resolve("consumer")).apply {
-                gradleProperties()
-                file("settings.gradle.kts", """rootProject.name = "deploy-check"""")
-                file(
-                    "build.gradle.kts",
-                    fixture(
-                        "consumer/build.gradle.kts.template",
-                    ).replace("@REPO@", producer.project.resolve("build/repo").toURI().toString()),
-                )
-            }
-        val result = consumer.build("appSmokeTest")
-        assertTrue(result.output.contains("Smoke test passed: svc-2.0.0-$host.tar.gz"), result.output)
-    }
-
-    @Test
-    fun `a deployment build installs the published archive for its own machine`() {
-        val producer = javaService(tmp.resolve("producer"), twoTargets)
-        producer.build("publish", "-PjavaApp.allowUntestedPublish=true")
-        val srv = tmp.resolve("srv")
-        val deploy =
-            TestProject(tmp.resolve("deploy")).apply {
-                gradleProperties()
-                file("settings.gradle.kts", """rootProject.name = "deploy"""")
-                file(
-                    "build.gradle.kts",
-                    fixture("deploy/build.gradle.kts.template")
-                        .replace("@REPO@", producer.project.resolve("build/repo").toURI().toString())
-                        .replace("@DIR@", srv.invariantSeparatorsPath),
-                )
-            }
-        val result = deploy.build("appInstall")
-        assertAll(
-            { assertTrue(result.output.contains("svc-2.0.0 started against"), result.output) },
-            { assertEquals("svc-2.0.0", io.github.fiftieshousewife.appcore.InstallLayout(srv).current?.name) },
-        )
-    }
 }

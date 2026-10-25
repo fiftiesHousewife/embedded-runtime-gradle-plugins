@@ -1,0 +1,139 @@
+import com.github.benmanes.gradle.versions.updates.DependencyUpdatesTask
+import io.gitlab.arturbosch.detekt.Detekt
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+
+// Every published module: compiled for the JVM Gradle runs on, checked by ktlint and detekt, and
+// published with everything Maven Central requires.
+plugins {
+    id("org.gradle.kotlin.kotlin-dsl")
+    `maven-publish`
+    signing
+    id("com.diffplug.spotless")
+    id("io.gitlab.arturbosch.detekt")
+    id("io.github.ben-manes.versions")
+}
+
+val libs = versionCatalogs.named("libs")
+val projectUrl = "https://github.com/fiftiesHousewife/embedded-runtime-gradle-plugins"
+
+group = "io.github.fiftieshousewife"
+version = providers.gradleProperty("releaseVersion").getOrElse("1.0.0-SNAPSHOT")
+
+/**
+ * The jars are loaded into the Gradle daemon, so their bytecode must be readable by the oldest JVM
+ * Gradle itself runs on, not by whatever JDK is on this developer's PATH. A toolchain pins the
+ * compiler and the bytecode level together, so the jar is identical wherever it is built.
+ *
+ * Applications *packaged* by these plugins are a separate matter: they run on their own embedded
+ * runtime, and Java apps are supported from Java 11 to 25 (see `JdkCatalog.SUPPORTED_FEATURES`).
+ */
+val gradleMinimumJvm = 17
+
+java {
+    // No vendor constraint: any JDK 17 compiles this, unlike the runtimes that get embedded, which
+    // are pinned to one exact build of one distribution.
+    toolchain { languageVersion = JavaLanguageVersion.of(gradleMinimumJvm) }
+}
+kotlin {
+    compilerOptions { jvmTarget = JvmTarget.fromTarget(gradleMinimumJvm.toString()) }
+}
+
+testing {
+    suites {
+        named<JvmTestSuite>("test") {
+            useJUnitJupiter(libs.findVersion("junit").get().requiredVersion)
+        }
+    }
+}
+
+// Quality gates: ktlint through Spotless for formatting, detekt in place of SpotBugs (which reads
+// Java bytecode patterns and has little to say about Kotlin), and ben-manes for dependency drift.
+spotless {
+    kotlin {
+        ktlint(libs.findVersion("ktlint").get().requiredVersion)
+        targetExclude("**/build/**")
+    }
+    kotlinGradle {
+        ktlint(libs.findVersion("ktlint").get().requiredVersion)
+    }
+}
+
+detekt {
+    buildUponDefaultConfig = true
+    config.setFrom(rootProject.files("config/detekt/detekt.yml"))
+    source.setFrom(
+        files("src/main/kotlin", "src/test/kotlin", "src/testFixtures/kotlin", "src/functionalTest/kotlin").filter { it.isDirectory },
+    )
+}
+tasks.withType<Detekt>().configureEach {
+    jvmTarget = gradleMinimumJvm.toString()
+    reports {
+        html.required = true
+        sarif.required = true
+    }
+}
+
+// Only report upgrades within the current major, so a report never suggests a jump that needs real
+// migration work.
+tasks.withType<DependencyUpdatesTask>().configureEach {
+    outputFormatter = "json"
+    rejectVersionIf {
+        candidate.version.substringBefore(".") != currentVersion.substringBefore(".")
+    }
+}
+
+// Maven Central requires sources and javadoc jars, a POM carrying name, description, URL, licence,
+// developer and SCM, and a detached PGP signature per artifact.
+publishing.publications.withType<MavenPublication>().configureEach {
+    pom {
+        name = project.name
+        description = project.description
+        url = projectUrl
+        licenses {
+            license {
+                name = "The Apache License, Version 2.0"
+                url = "https://www.apache.org/licenses/LICENSE-2.0.txt"
+            }
+        }
+        developers {
+            developer {
+                id = "fiftiesHousewife"
+                name = "Pippa Newbold"
+                email = "pippa.newbold@gmail.com"
+            }
+        }
+        scm {
+            url = projectUrl
+            connection = "scm:git:git://github.com/fiftiesHousewife/embedded-runtime-gradle-plugins.git"
+            developerConnection = "scm:git:ssh://git@github.com/fiftiesHousewife/embedded-runtime-gradle-plugins.git"
+        }
+    }
+}
+
+// Signing is opt-in by key: a developer publishing to mavenLocal needs no signatory, while the
+// release pipeline passes -PsigningKey / -PsigningPassword (or ORG_GRADLE_PROJECT_signingKey).
+val signingKey = providers.gradleProperty("signingKey")
+signing {
+    isRequired = signingKey.isPresent
+    if (signingKey.isPresent) {
+        useInMemoryPgpKeys(signingKey.get(), providers.gradleProperty("signingPassword").orNull)
+    }
+    sign(publishing.publications)
+}
+
+publishing {
+    repositories {
+        // ./gradlew publish -PreleaseVersion=1.2.0 publishes to the corporate Gradle plugin repository.
+        providers.gradleProperty("artifactory.url").orNull?.let { base ->
+            maven {
+                name = "artifactory"
+                url =
+                    uri(
+                        "${base.trimEnd('/')}/" +
+                            providers.gradleProperty("artifactory.repo.pluginsLocal").getOrElse("gradle-plugins-local"),
+                    )
+                credentials(PasswordCredentials::class)
+            }
+        }
+    }
+}

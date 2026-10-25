@@ -10,13 +10,13 @@ style:
     # "not applicable", and the toolchain resolver contract is built on early `Optional.empty()`.
     excludeGuardClauses: true
   MagicNumber:
-    excludes: ['**/test/**', '**/functionalTest/**']
+    excludes: ['**/test/**', '**/testFixtures/**', '**/functionalTest/**']
 
 naming:
   FunctionNaming:
     # Backtick test names are a sentence describing the behaviour under test.
-    excludes: ['**/test/**', '**/functionalTest/**']
+    excludes: ['**/test/**', '**/testFixtures/**', '**/functionalTest/**']
 
 performance:
   SpreadOperator:
-    excludes: ['**/test/**', '**/functionalTest/**']
+    excludes: ['**/test/**', '**/testFixtures/**', '**/functionalTest/**']

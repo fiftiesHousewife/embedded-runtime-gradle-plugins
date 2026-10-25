@@ -1,29 +1,28 @@
-# Platform bundle plugins
+# Embedded runtime Gradle plugins
 
-Gradle plugins that package a Java or Node.js application as a self-contained `.tar.gz` — your
-code, its libraries, and a pinned language runtime — so the artefact that passes CI is the artefact
-that runs in production, with no JDK or Node installed on the target machine.
+Package a Java or Node.js application **with its own runtime** as one `.tar.gz`: your code, its
+libraries, and a pinned JDK or Node.js. Servers and containers need nothing installed, and the
+archive that passes CI is the archive that runs in production.
 
-| Plugin | Applied in | Produces |
+| Plugin | For | Embeds |
 |---|---|---|
-| `io.github.fiftieshousewife.platform.settings` | `settings.gradle.kts` | Repositories, JDK toolchain provisioning, plugin versions |
-| `io.github.fiftieshousewife.platform.java-bundle` | `build.gradle.kts` | Java app + a jlink-trimmed JDK runtime |
-| `io.github.fiftieshousewife.platform.node-bundle` | `build.gradle.kts` | Node.js app + the official Node runtime |
+| `io.github.fiftieshousewife.java-app` | Java and Kotlin/JVM apps | A jlink-trimmed JDK from Temurin, Oracle, Corretto, Zulu, Liberica, Microsoft or SapMachine |
+| `io.github.fiftieshousewife.node-app` | Node.js apps | The official Node.js runtime |
 
-**Requirements.** Gradle 9.8 or newer, running on Java 17–27 (Gradle's own requirement). A bundled
-application may target **Java 11 to 25** independently of that — the compile JDK is provisioned by
-toolchain, not taken from your `PATH`.
+Each comes with a settings plugin (`….java-app.settings`, `….node-app.settings`) that sets up every
+repository the build needs, so projects declare none of their own.
 
----
+**Requirements:** Gradle 9.8 or newer. Java apps can target Java 11 to 25, whatever JDK Gradle
+itself runs on.
 
 ## Quick start
 
-### A Java service
+### Java (or Kotlin)
 
 ```kotlin
 // settings.gradle.kts
 plugins {
-    id("io.github.fiftieshousewife.platform.settings") version "1.0.0"
+    id("io.github.fiftieshousewife.java-app.settings") version "1.0.0"
 }
 rootProject.name = "orders-service"
 ```
@@ -31,7 +30,7 @@ rootProject.name = "orders-service"
 ```kotlin
 // build.gradle.kts
 plugins {
-    id("io.github.fiftieshousewife.platform.java-bundle")   // no version: the settings plugin pins it
+    id("io.github.fiftieshousewife.java-app")   // no version: the settings plugin supplies it
 }
 
 group = "com.example"
@@ -39,346 +38,289 @@ version = "1.4.2"
 
 application { mainClass = "com.example.orders.Main" }
 
-bundle {
+javaApp {
     javaVersion = 21
-    // Keep this explicit and reviewed: jdeps cannot see modules loaded reflectively, such as
-    // jdk.crypto.ec (TLS), java.naming (LDAP/JNDI) or jdk.localedata.
     jlinkModules = listOf("java.base", "java.sql", "java.naming", "jdk.crypto.ec")
     jvmArgs = listOf("-XX:MaxRAMPercentage=75")
 }
 ```
 
-```bash
-./gradlew build          # compiles, bundles, extracts and smoke-tests the archive
-./gradlew runBundle      # runs the assembled bundle in the foreground
-```
+For Kotlin, also apply `kotlin("jvm")`; nothing else changes.
 
-The result is `build/distributions/orders-service-1.4.2-linux-x64.tar.gz`.
+`jlinkModules` lists the JDK modules your app needs. `jdeps --print-module-deps app.jar` gives a
+starting point, but it misses modules loaded by name at runtime: add `jdk.crypto.ec` for TLS,
+`java.naming` for JNDI or LDAP and `jdk.localedata` for non-English locales if you use them.
 
-### A Node.js service
+### Node.js
 
 ```kotlin
-// build.gradle.kts
+// settings.gradle.kts
 plugins {
-    id("io.github.fiftieshousewife.platform.node-bundle")
+    id("io.github.fiftieshousewife.node-app.settings") version "1.0.0"
+}
+```
+
+```kotlin
+// build.gradle.kts, next to package.json and package-lock.json
+plugins {
+    id("io.github.fiftieshousewife.node-app")
 }
 
 version = "2.1.0"
 
-bundle {
+nodeApp {
     entryPoint = "server.mjs"
-    buildScript = "build"          // optional npm script run before packaging
-    nodeArgs = listOf("--enable-source-maps")
+    buildScript = "build"      // optional npm script to run first, e.g. a TypeScript compile
 }
 ```
 
-### What you get inside the archive
+A build with both Java and Node apps applies both settings plugins.
+
+### Build and run
+
+```bash
+./gradlew build      # compile, test, package, then start the archive and check its health
+./gradlew runApp     # run the packaged app in the foreground
+```
+
+The result is `build/distributions/orders-service-1.4.2-linux-x64.tar.gz`, named for the machine
+you built on. `build` only passes if the packaged app started and reported healthy.
+
+## What your app needs to do
+
+The launcher, `bin/<app>`, takes three commands:
+
+| Command | Does |
+|---|---|
+| `run [args]` | Starts the app |
+| `healthcheck` | Starts your app with `--healthcheck`; exit 0 means healthy |
+| `version` | Prints `META-INF/app.json` |
+
+So your app should read its port from `APP_PORT`, and exit 0 when started with `--healthcheck`
+if the running instance is healthy. The apps in [`samples/`](samples) do this in a few lines.
+
+The launcher also sets `APP_HOME`, `APP_ROOT`, `APP_CONF_DIR`, `APP_DATA_DIR` and `APP_LOG_DIR`,
+and adds `APP_JAVA_OPTS` / `APP_NODE_OPTS` to the runtime's options.
+
+Default configuration files go in `src/deploy/conf/` and ship as `conf.defaults/`. Read `conf/`
+first and fall back to `conf.defaults/`, so an upgrade never overwrites a deployed file.
+
+### Inside the archive
 
 ```
 orders-service-1.4.2/
-  bin/orders-service       # or orders-service.bat on Windows targets
-  runtime/                 # jlink image, or the Node runtime
-  lib/                     # the application jar and its dependencies (Java)
-  app/                     # your JS (Node)
-  conf.defaults/           # copied from src/bundle/conf
-  META-INF/bundle.json     # name, version, platform, runtime, git commit
-  META-INF/sbom.cdx.json   # CycloneDX SBOM, runtime included
+  bin/orders-service      # .bat on Windows targets
+  runtime/                # the embedded JDK or Node.js
+  lib/                    # Java: your jar and its dependencies
+  app/                    # Node: your code, package.json and production node_modules
+  conf.defaults/
+  META-INF/app.json       # name, version, target, runtime, git commit
+  META-INF/sbom.cdx.json  # CycloneDX SBOM, including the runtime
 ```
 
-This follows the `application` plugin's own conventions: one top-level directory
-`<base>-<version>`, `bin/` launchers, every jar in `lib/`, and the archive written to
-`build/distributions` as `<base>-<version>-<classifier>.<ext>`. The launcher names the
-application's own jar first on the classpath and then the `lib/*` wildcard, so the application's
-classes still win over a duplicate in a dependency.
+Archives are reproducible: rebuilding the same commit gives a byte-identical file.
 
-The launcher takes `version`, `run` and `healthcheck`. Configuration is read from `conf/` if
-present, falling back to `conf.defaults/`, so an upgrade never overwrites a deployed config file.
-
----
-
-## Choosing a JDK: distribution, release and exact version
-
-Three independent choices, each with a sensible default:
-
-```kotlin
-bundle {
-    javaVersion = 21          // feature release; 11–25. Default: the catalogue default (21)
-    jdkVersion = "21.0.13+9"  // exact build. Default: the catalogue pin for that release
-}
-```
+## Choosing a JDK
 
 ```properties
-# gradle.properties — which vendor, and an emergency patch ahead of the next plugin release
-platform.runtime.jdk.distribution=temurin
-platform.runtime.jdk.21=21.0.14+7
+# gradle.properties
+javaApp.jdk.distribution=corretto
 ```
 
-| Distribution | `jdkVersion` form | Source |
-|---|---|---|
-| `temurin` (default) | `21.0.13+9` — build number required | Adoptium GitHub release assets |
-| `oracle` | `25.0.3` — no build number | `download.oracle.com/java` archive |
+| Distribution | Exact version looks like |
+|---|---|
+| `temurin` (default) | `21.0.13+9` |
+| `oracle` | `25.0.3` |
+| `corretto` | `21.0.13.0.10` |
+| `zulu` | `21.54.107-ca-jdk21.0.13` |
+| `liberica` | `21.0.13+11` |
+| `microsoft` | `21.0.12` |
+| `sapmachine` | `21.0.13` |
 
-The **same** distribution and exact version is used for the compile toolchain and for the runtime
-linked into the bundle, so they can never drift apart.
-
-> **Licensing.** Whether you may redistribute a bundle with an Oracle runtime inside it is decided
-> by Oracle's licence, not by this plugin. Recent releases under the NFTC permit it; OTN-licensed
-> releases do not — which is why the Oracle 17 and 21 lines stop receiving free archive builds
-> while 25 continues. Check the licence of the exact version you pin. Temurin is Apache-2.0 and has
-> no such restriction.
-
-### Approved pins
-
-Shipped inside the plugin jar, in `runtimes.properties`. Releasing a new plugin version is how a
-runtime bump reaches every repository at once:
+Each plugin release pins an exact, tested version of every distribution and Java release, and the
+same JDK compiles your code and runs inside the archive. To take a security patch before the next
+plugin release, override the pin:
 
 ```properties
-jdk.default=21
-jdk.temurin.11=11.0.32.1+1    jdk.oracle.17=17.0.12
-jdk.temurin.17=17.0.21+9      jdk.oracle.21=21.0.12
-jdk.temurin.21=21.0.13+9      jdk.oracle.25=25.0.3
-jdk.temurin.25=25.0.5+8
-node.default=24.18.1
+javaApp.jdk.21=21.0.13+9
 ```
 
-Asking for a release with no pin fails with the property to set, rather than silently resolving
-something else.
+A version in the wrong form for its distribution is rejected before anything is downloaded.
+SapMachine 25 has no Intel Mac (`mac-x64`) build.
 
-### Another vendor, or a mirror
+> **Oracle licensing.** Whether you may redistribute an Oracle runtime inside your archive is
+> decided by Oracle's licence, not by these plugins. Recent releases under the NFTC allow it;
+> OTN-licensed releases do not. The other distributions are OpenJDK builds under GPLv2 with the
+> Classpath Exception.
 
-Override the base URL and the Ivy artifact pattern. Between them they address any flat HTTP tree,
-so a mirror, an internal build, or a vendor this plugin has never heard of needs no plugin change:
+To download from a mirror instead, see `javaApp.jdk.url` under [Configuration](#configuration).
 
-```properties
-platform.public.jdkUrl=https://mirror.example.com/jdks
-platform.public.jdkPattern=[organisation]/[revision]/[classifier]/jdk.[ext]
-```
-
-Available placeholders are `[organisation]`, `[module]`, `[revision]`, `[artifact]`, `[classifier]`
-and `[ext]`. What each one holds depends on the distribution — Oracle puts the platform in
-`[classifier]`, Temurin encodes it in `[artifact]` and leaves `[classifier]` empty — so keep the
-distribution closest to your layout and override from there. `platform.public.nodeUrl` and
-`platform.public.nodePattern` do the same for Node.
-
-> Runtime archives are resolved as ordinary Gradle dependencies through an Ivy-layout repository
-> rather than fetched by a download plugin. That is deliberate: it gets Gradle's artefact cache,
-> credentials, `--offline`, and `gradle/verification-metadata.xml` checksum verification for free.
-> A download plugin would re-implement all four, badly.
-
-## Target platform and CPU architecture
-
-Both the OS and the architecture are part of the target, and part of the published artefact's Maven
-classifier:
-
-```
-linux-x64   linux-aarch64   windows-x64   mac-x64   mac-aarch64
-```
+## Building for another OS or CPU
 
 ```bash
-./gradlew build -Pbundle.targetPlatform=linux-aarch64
+./gradlew build -PjavaApp.target=linux-aarch64      # or -PnodeApp.target=…
 ```
 
-A target that differs from the build host is a **cross build**. `jlink` runs from the host JDK
-against the target JDK's `jmods`, which is how a Windows laptop with no WSL2 or container runtime
-still produces a `linux-aarch64` runtime. A cross-built bundle cannot be started here, so its smoke
-test is skipped and `publish` refuses it unless you pass `-Pbundle.allowUntestedPublish=true`.
+Targets: `linux-x64`, `linux-aarch64`, `windows-x64`, `mac-x64`, `mac-aarch64`. A Mac or Windows
+laptop can build a Linux archive with no containers or WSL. An archive for another machine can't be
+started where it was built, so its health check is skipped and `publish` refuses it unless you pass
+`-PjavaApp.allowUntestedPublish=true`. Publish from CI on the target instead.
 
-Adding an architecture Temurin ships but this list omits (`ppc64le`, `s390x`) means adding one
-constant to `Arch` and one entry to `Platform.SUPPORTED`. Treat the existing ids as frozen: they are
-published classifiers.
+## Behind a corporate Artifactory
 
----
-
-## Machine configuration: public internet or Artifactory
-
-Set once per machine or CI image in `~/.gradle/gradle.properties` — never per project, so the same
-project builds unchanged either way:
+Set this once per machine or CI agent in `~/.gradle/gradle.properties`, never in a project:
 
 ```properties
-platform.repositories=artifactory
-platform.artifactory.url=https://artifactory.example.com/artifactory
+artifactory.url=https://artifactory.example.com/artifactory
 artifactoryUsername=build-user
 artifactoryPassword=<identity or reference token>
-# platform.tls.caFile=/etc/pki/corporate-ca.pem   # for npm; Gradle uses the JVM trust store
 ```
 
-Projects declare no repositories of their own. On CI, pass credentials as
-`ORG_GRADLE_PROJECT_artifactoryUsername` / `ORG_GRADLE_PROJECT_artifactoryPassword`.
+Every download then goes through Artifactory: libraries, Gradle plugins, JDKs, Node.js and npm
+packages. On CI, pass the credentials as `ORG_GRADLE_PROJECT_artifactoryUsername` and
+`ORG_GRADLE_PROJECT_artifactoryPassword`.
+
+Also copy [`gradle/init.d/embedded-runtime-artifactory.init.gradle.kts`](gradle/init.d) into
+`~/.gradle/init.d/`, so Gradle can download the settings plugins themselves from Artifactory.
 
 ### Repositories to create
 
-| Repository | Type | Notes |
+| Repository | Type | Holds |
 |---|---|---|
-| `maven-virtual` | Maven virtual | Remote to Maven Central plus local repos |
-| `gradle-plugins-virtual` | Maven virtual | Remote to `https://plugins.gradle.org/m2/` plus `gradle-plugins-local` |
-| `npm-virtual` | npm virtual | Remote to registry.npmjs.org |
-| `runtimes` | Generic local | Curated runtime archives |
-| `libs-release-local`, `libs-snapshot-local` | Maven local | Where bundles are published |
+| `maven-virtual` | Maven virtual | Maven Central, plus your local repositories |
+| `gradle-plugins-virtual` | Maven virtual | `https://plugins.gradle.org/m2/` (which also needs `plugins-artifacts.gradle.org`) |
+| `npm-virtual` | npm virtual | registry.npmjs.org |
+| `runtimes` | Generic local | Approved JDK and Node.js archives |
+| `libs-release-local`, `libs-snapshot-local` | Maven local | Your published apps |
 
-Note that `plugins.gradle.org` serves plugin *artefacts* from `plugins-artifacts.gradle.org`; a
-remote proxy must be able to reach both. Most build plugins are also on Maven Central, so a
-Central mirror covers the majority.
-
-Default curated layout — one generic repository, files renamed on upload, vendor-independent:
+JDK and Node.js archives are read from `runtimes` in this layout:
 
 ```
-runtimes/temurin/jdk/21.0.13_9/jdk-21.0.13_9-linux-x64.tar.gz
-runtimes/oracle/jdk/25.0.3/jdk-25.0.3-windows-x64.zip
+runtimes/temurin/jdk/21.0.12.1_1/jdk-21.0.12.1_1-linux-x64.tar.gz
 runtimes/nodejs/node/24.18.1/node-24.18.1-linux-x64.tar.gz
 ```
 
-[`deploy/curate-runtimes.sh`](deploy/curate-runtimes.sh) downloads an approved release, verifies it
-against the upstream SHA-256, renames it and uploads it with its checksum. Paths use `_` rather than
-`+` because some HTTP clients decode `+` as a space.
-
-If an existing Artifactory tree cannot be reshaped — a remote proxy mirroring a vendor's own layout
-verbatim, say — point the patterns at it instead:
+[`deploy/curate-runtimes.sh`](deploy/curate-runtimes.sh) downloads a Temurin or Node.js release,
+checks it against the vendor's SHA-256 and uploads it there. An existing tree with a different
+layout can be used as it is, by giving its pattern:
 
 ```properties
-platform.artifactory.runtimes.jdkPattern=[organisation]/[module]/[revision]/[artifact].[ext]
-platform.artifactory.runtimes.nodePattern=[organisation]/[module]/[revision]/[artifact].[ext]
+javaApp.jdk.artifactoryPattern=jdks/[organisation]/[classifier]/[revision].[ext]
 ```
 
-### All properties
+A pattern can use `[organisation]` (the distribution, e.g. `temurin`, or `nodejs`), `[module]` and
+`[artifact]` (both `jdk` or `node`), `[revision]` (the version, with `+` written as `_`),
+`[classifier]` (the target, e.g. `linux-x64`) and `[ext]` (`tar.gz`, or `zip` on Windows).
 
-| Property | Default | Meaning |
-|---|---|---|
-| `platform.repositories` | `public` | `public` or `artifactory` |
-| `platform.artifactory.url` | — | Base URL, required in Artifactory mode |
-| `platform.artifactory.repo.maven` | `maven-virtual` | Maven libraries |
-| `platform.artifactory.repo.gradlePlugins` | `gradle-plugins-virtual` | Gradle plugins |
-| `platform.artifactory.repo.npm` | `api/npm/npm-virtual` | npm registry |
-| `platform.artifactory.repo.runtimes` | `runtimes` | Curated JDK and Node archives |
-| `platform.artifactory.repo.releases` / `.snapshots` | `libs-release-local` / `libs-snapshot-local` | Where bundles are published |
-| `platform.artifactory.runtimes.jdkPattern` / `.nodePattern` | curated layout | Ivy pattern for the curated tree |
-| `platform.artifactory.allowInsecureProtocol` | `false` | Allow `http://` (test instances only) |
-| `artifactoryUsername` / `artifactoryPassword` | — | Credentials, used by every request |
-| `platform.tls.caFile` | — | PEM bundle npm should trust (corporate TLS) |
-| `platform.runtime.jdk.distribution` | `temurin` | `temurin` or `oracle` |
-| `platform.public.jdkUrl` / `.jdkPattern` | distribution default | JDK source in public mode |
-| `platform.public.nodeUrl` / `.nodePattern` | nodejs.org/dist | Node source in public mode |
-| `platform.public.npmRegistry` | registry.npmjs.org | npm registry in public mode |
-| `platform.runtime.jdk.<feature>` | catalogue | Override an exact JDK pin, e.g. `platform.runtime.jdk.21=21.0.14+7` |
-| `platform.runtime.node` | catalogue | Override the Node pin |
-| `bundle.targetPlatform` | build host | See *Target platform* above |
-| `bundle.allowUntestedPublish` | `false` | Permit publishing a cross-built (never-started) bundle |
-| `bundle.gitCommit` | `git rev-parse HEAD` | Commit recorded in `bundle.json` |
+## Publishing
 
----
-
-## Extension reference
-
-```kotlin
-bundle {
-    // shared by both plugins
-    appName = "orders-service"                   // default: project name
-    targetPlatform = platform("linux-x64")       // default: -Pbundle.targetPlatform, else host
-    configDefaults = file("src/bundle/conf")     // shipped as conf.defaults/
-    smokeTestEnabled = true
-    smokeTestTimeout = Duration.ofSeconds(60)
-    allowUntestedPublish = false
-
-    // java-bundle only
-    javaVersion = 21                             // feature release, 11–25
-    jdkVersion = "21.0.13+9"                     // exact build; default: catalogue pin
-    jlinkModules = listOf("java.base")
-    jlinkOptions = listOf("--strip-debug", "--no-man-pages", "--no-header-files", "--compress=zip-6")
-    jvmArgs = listOf("-XX:MaxRAMPercentage=75")  // baked into the launcher, before $APP_JAVA_OPTS
-
-    // node-bundle only
-    nodeVersion = "24.18.1"                      // default: catalogue pin
-    entryPoint = "main.js"                       // script under app/ that `run` starts
-    appFiles = files("dist")                     // default: src/ minus src/bundle/, or dist/
-    buildScript = "build"                        // npm script run before packaging
-    testScript = "test"                          // npm script run by `check`
-    ignoreInstallScripts = true                  // --ignore-scripts on the production install
-    portableInstallScripts = listOf("esbuild")   // vetted, do not block cross builds
-    nodeArgs = listOf("--enable-source-maps")
-}
-```
-
-`jlinkOptions` defaults to stripping debug info, man pages and headers, plus `--compress=zip-6` on
-Java 21 and newer (`--compress=2` before that, where the named levels do not exist).
-
-## Tasks
-
-| Task | Group | Notes |
-|---|---|---|
-| `bundleTar` | bundle | The archive; `assemble` depends on it |
-| `bundleSmokeTest` | verification | Extracts, runs `version` + `run` + `healthcheck`; `check` depends on it; skipped for cross builds |
-| `runBundle` | application | Runs the assembled bundle; `-Pargs="…"` |
-| `bundleJlink` | bundle | Java: the trimmed runtime |
-| `bundleDockerContext` | bundle | Container build context from the archive |
-| `npmInstall` / `npmTest` / `npmBuild` | bundle / verification | Node: `npm ci`, the `test` script, `bundle.buildScript` |
-| `npmInstallProduction` | bundle | Node: `npm ci --omit=dev` for the target platform |
-| `bundleVerifyNodeModules` | verification | Node: install-script check |
-| `bundleVerifyPublishable` | verification | Guards `publish*` |
-
-The Java plugin disables the `application` plugin's `distTar` / `distZip` so there is one way to
-ship the app; `installDist` still works.
-
-## Publishing a bundle
-
-`publish` attaches the archive to the project's Maven coordinates with the platform as the
-classifier, alongside its SBOM and Gradle Module Metadata:
+`./gradlew publish` uploads the archive and its SBOM to your Maven repository:
 
 ```
 com/example/orders-service/1.4.2/orders-service-1.4.2-linux-x64.tar.gz
 com/example/orders-service/1.4.2/orders-service-1.4.2-linux-x64-cyclonedx.json
-com/example/orders-service/1.4.2/orders-service-1.4.2.module
-com/example/orders-service/1.4.2/orders-service-1.4.2.pom
 ```
 
-The publication is a real Gradle software component, so the module metadata records the target
-machine using Gradle's standard attributes:
+With Artifactory configured, releases go to `libs-release-local` and `-SNAPSHOT` versions to
+`libs-snapshot-local`. To publish under other coordinates:
 
-```json
-"attributes": {
-  "org.gradle.category": "platform-bundle",
-  "org.gradle.dependency.bundling": "embedded",
-  "org.gradle.native.operatingSystem": "linux",
-  "org.gradle.native.architecture": "x86-64"
+```kotlin
+publishing.publications.named<MavenPublication>("javaApp") {   // or "nodeApp"
+    groupId = "com.acme.apps"
+    artifactId = "orders"
 }
 ```
 
-A consuming Gradle build can then resolve the bundle for its own machine rather than spelling out a
-classifier. Maven-only consumers — `deploy/install.sh`, an Artifactory REST call — are unaffected,
-because the classifier is still on the artifact.
+Pass `-PsigningKey=…` and `-PsigningPassword=…` to sign what you publish.
 
-> One build produces one platform, so each platform build publishes its own module metadata. If you
-> publish several platforms to the **same** coordinates from separate builds, the last `.module`
-> wins and describes only that platform. Either give each platform its own `artifactId`, or turn the
-> metadata off:
-> ```kotlin
-> tasks.withType<GenerateModuleMetadata>().configureEach { enabled = false }
-> ```
+## Deploying
 
-Set `-PsigningKey=…` (and `-PsigningPassword=…`) to sign publications. Archives are reproducible:
-rebuilding the same commit yields an identical checksum.
-
----
-
-## Working on these plugins
-
-The plugins live in [`build-src/`](build-src), included by the root build as a plugin build. The
-root build then **applies the settings plugin to itself**, so a change that breaks consumers breaks
-this build too.
+**To a server**, with [`deploy/install.sh`](deploy/install.sh), which needs no root:
 
 ```bash
-./gradlew check                 # ktlint, detekt, unit tests, TestKit functional tests
-./gradlew -p samples/java-service build
-./gradlew -p samples/node-service build
-
-./gradlew publish        -PreleaseVersion=1.2.0   # corporate Gradle plugin repository
-./gradlew publishPlugins -PreleaseVersion=1.2.0   # Gradle Plugin Portal
+deploy/install.sh install --coordinates com.example:orders-service:1.4.2 --app-root /srv/orders \
+    --repo-url https://artifactory.example.com/artifactory/libs-release-local
+deploy/install.sh rollback --app-root /srv/orders
+deploy/install.sh status   --app-root /srv/orders
 ```
 
-`./gradlew dependencyUpdates` reports available upgrades within the current major version.
-`./gradlew spotlessApply` fixes formatting.
+It keeps each release in its own directory under `releases/` and points `current` at the active
+one. It creates `conf/` from `conf.defaults/` once and never overwrites it, starts the app (as a
+systemd user service where available, otherwise in the background), waits for its health check, and
+rolls back automatically if that fails.
+Per-server settings such as `APP_PORT` go in `conf/env`.
 
-The plugin's own publication carries everything Maven Central requires: sources and javadoc jars,
-and a POM with name, description, URL, licence, developer and SCM. Signing is opt-in by key, so
-`publishToMavenLocal` needs no signatory while the release pipeline passes `-PsigningKey`.
+**As a container image:** `./gradlew appDockerContext` writes `build/docker-context/` with a
+Dockerfile and the app, ready for `docker build`. The base image needs only glibc and a shell. To
+use your own Dockerfile, put it at `src/deploy/docker/Dockerfile`.
 
-Unit tests in `build-src/src/test` assert the exact download URL for every distribution and
-platform — the one thing a functional test cannot check without reaching each vendor's real site.
+## Reference
+
+### `javaApp {}` and `nodeApp {}`
+
+```kotlin
+javaApp {                                       // nodeApp {} has the same first six settings
+    appName = "orders-service"                  // launcher and archive name; default: project name
+    target = target("linux-x64")                // default: -PjavaApp.target, else this machine
+    configDefaults = file("src/deploy/conf")    // shipped as conf.defaults/
+    smokeTestEnabled = true                     // start the archive during `check`
+    smokeTestTimeout = Duration.ofSeconds(60)
+    allowUntestedPublish = false
+
+    javaVersion = 21                            // 11 to 25
+    jdkVersion = "21.0.13+9"                    // default: the plugin's pin
+    jlinkModules = listOf("java.base")
+    jlinkOptions = listOf("--strip-debug", "--no-man-pages", "--no-header-files", "--compress=zip-6")
+    jvmArgs = listOf("-XX:MaxRAMPercentage=75") // before $APP_JAVA_OPTS
+}
+
+nodeApp {
+    nodeVersion = "24.18.1"                     // default: the plugin's pin
+    entryPoint = "main.js"                      // under app/; started by `run`
+    appFiles = files("dist")                    // default: src/ (minus src/deploy/), or dist/ with buildScript
+    buildScript = "build"                       // npm script run before packaging
+    testScript = "test"                         // npm script run by `check`, if package.json has it
+    ignoreInstallScripts = true                 // npm --ignore-scripts for production dependencies
+    portableInstallScripts = listOf("esbuild")  // vetted packages that don't block cross builds
+    nodeArgs = listOf("--enable-source-maps")   // before $APP_NODE_OPTS
+}
+```
+
+### Tasks
+
+| Task | Does |
+|---|---|
+| `appTar` | Builds the archive; part of `assemble` |
+| `appSmokeTest` | Starts the archive and waits for its health check; part of `check` |
+| `runApp` | Runs the packaged app; pass arguments with `-Pargs="…"` |
+| `appDockerContext` | Writes a container build context |
+| `jlink` | Java: builds the trimmed runtime |
+| `npmInstall`, `npmBuild`, `npmTest` | Node: `npm ci`, your build script, your test script |
+
+### Configuration
+
+Gradle properties, set in `gradle.properties`, `~/.gradle/gradle.properties` or with `-P`:
+
+| Property | Default | |
+|---|---|---|
+| `javaApp.jdk.distribution` | `temurin` | JDK vendor |
+| `javaApp.jdk.<feature>` | the plugin's pin | Exact JDK version, e.g. `javaApp.jdk.21=21.0.13+9` |
+| `javaApp.jdk.url`, `javaApp.jdk.pattern` | the vendor's site | Download JDKs from a mirror |
+| `nodeApp.node.version` | the plugin's pin | Exact Node.js version |
+| `nodeApp.node.url`, `nodeApp.node.pattern` | nodejs.org/dist | Download Node.js from a mirror |
+| `nodeApp.npm.registry` | registry.npmjs.org | npm registry when not using Artifactory |
+| `nodeApp.npm.caFile` | | PEM file of corporate CAs for npm |
+| `javaApp.target`, `nodeApp.target` | this machine | OS and CPU to build for |
+| `javaApp.allowUntestedPublish`, `nodeApp.allowUntestedPublish` | `false` | Allow publishing an archive that was never started |
+| `artifactory.url` | | Download everything through this Artifactory |
+| `artifactory.repo.maven` | `maven-virtual` | |
+| `artifactory.repo.gradlePlugins` | `gradle-plugins-virtual` | |
+| `artifactory.repo.npm` | `api/npm/npm-virtual` | |
+| `artifactory.repo.runtimes` | `runtimes` | |
+| `artifactory.repo.releases`, `artifactory.repo.snapshots` | `libs-release-local`, `libs-snapshot-local` | |
+| `javaApp.jdk.artifactoryPattern`, `nodeApp.node.artifactoryPattern` | the layout above | Layout of an existing runtimes tree |
+| `artifactory.allowInsecureProtocol` | `false` | Allow `http://` (test instances only) |
+
+## Licence
+
+[Apache License 2.0](LICENSE).

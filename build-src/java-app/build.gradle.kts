@@ -1,0 +1,58 @@
+plugins {
+    id("embedded-runtime.gradle-plugin")
+}
+
+description = "Packages a Java application with a pinned, jlink-trimmed embedded runtime"
+
+dependencies {
+    api(project(":app-core"))
+}
+
+gradlePlugin {
+    plugins {
+        register("javaAppSettings") {
+            id = "io.github.fiftieshousewife.java-app.settings"
+            implementationClass = "io.github.fiftieshousewife.javaapp.JavaAppSettingsPlugin"
+            displayName = "Java app repositories and JDK toolchains"
+            description =
+                "Routes Maven, plugin and JDK resolution to the public internet or a corporate " +
+                "Artifactory, and provisions compile JDKs at the exact version that gets embedded"
+            tags = listOf("toolchains", "jdk", "artifactory")
+        }
+        register("javaApp") {
+            id = "io.github.fiftieshousewife.java-app"
+            implementationClass = "io.github.fiftieshousewife.javaapp.JavaAppPlugin"
+            displayName = "Java app with embedded runtime"
+            description =
+                "Packages a Java 11 to 25 application with a pinned, jlink-trimmed runtime from " +
+                "Temurin, Oracle, Corretto, Zulu, Liberica, Microsoft or SapMachine"
+            tags = listOf("jlink", "packaging", "deployment")
+        }
+    }
+}
+
+// A build holding both Java and Node apps applies both settings plugins; the functional test that
+// proves this needs node-app on the TestKit plugin classpath too.
+val nodeAppPlugin = configurations.dependencyScope("nodeAppPlugin")
+val nodeAppPluginClasspath =
+    configurations.resolvable("nodeAppPluginClasspath") {
+        extendsFrom(nodeAppPlugin.get())
+        attributes {
+            attribute(Usage.USAGE_ATTRIBUTE, objects.named(Usage.JAVA_RUNTIME))
+            attribute(Category.CATEGORY_ATTRIBUTE, objects.named(Category.LIBRARY))
+            attribute(LibraryElements.LIBRARY_ELEMENTS_ATTRIBUTE, objects.named(LibraryElements.JAR))
+        }
+    }
+dependencies {
+    nodeAppPlugin(project(":node-app"))
+}
+tasks.pluginUnderTestMetadata {
+    pluginClasspath.from(nodeAppPluginClasspath)
+}
+
+// The deployment test installs a built archive with the repository's own installer.
+val installScript = layout.settingsDirectory.file("../deploy/install.sh")
+tasks.named<Test>("functionalTest") {
+    inputs.file(installScript).withPropertyName("installScript").withPathSensitivity(PathSensitivity.NONE)
+    systemProperty("installScript", installScript.asFile.absolutePath)
+}

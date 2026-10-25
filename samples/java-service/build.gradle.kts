@@ -1,5 +1,5 @@
 plugins {
-    id("io.github.fiftieshousewife.platform.java-bundle")
+    id("io.github.fiftieshousewife.java-app")
 }
 
 group = "io.github.fiftieshousewife.samples"
@@ -9,7 +9,7 @@ application {
     mainClass = "io.github.fiftieshousewife.samples.HelloService"
 }
 
-bundle {
+javaApp {
     javaVersion = 21
     // Reviewed explicitly: jdeps would suggest these, but misses anything loaded reflectively.
     jlinkModules = listOf("java.base", "jdk.httpserver")

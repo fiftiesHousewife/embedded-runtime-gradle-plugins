@@ -6,11 +6,14 @@ ktlint = "1.8.0"
 
 plugin-publish = "2.2.1"
 versions = "0.66.0"
-spotless = "8.9.0"
+spotless = "8.10.4"
 detekt = "1.23.8"
 
-[plugins]
-plugin-publish = { id = "com.gradle.plugin-publish", version.ref = "plugin-publish" }
-versions = { id = "com.github.ben-manes.versions", version.ref = "versions" }
-spotless = { id = "com.diffplug.spotless", version.ref = "spotless" }
-detekt = { id = "io.gitlab.arturbosch.detekt", version.ref = "detekt" }
+[libraries]
+junit-bom = { module = "org.junit:junit-bom", version.ref = "junit" }
+junit-jupiter-api = { module = "org.junit.jupiter:junit-jupiter-api" }
+# Gradle plugins applied from build-src/build-logic convention plugins, as ordinary dependencies.
+gradle-plugin-publish = { module = "com.gradle.plugin-publish:com.gradle.plugin-publish.gradle.plugin", version.ref = "plugin-publish" }
+gradle-versions = { module = "io.github.ben-manes.versions:io.github.ben-manes.versions.gradle.plugin", version.ref = "versions" }
+gradle-spotless = { module = "com.diffplug.spotless:com.diffplug.spotless.gradle.plugin", version.ref = "spotless" }
+gradle-detekt = { module = "io.gitlab.arturbosch.detekt:io.gitlab.arturbosch.detekt.gradle.plugin", version.ref = "detekt" }

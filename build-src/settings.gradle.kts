@@ -1,7 +1,8 @@
-// This build produces the platform plugins, so it is the one build that cannot apply them: it
-// declares public repositories itself. Behind Artifactory,
-// gradle/init.d/platform-artifactory.init.gradle.kts redirects them.
+// This build produces the plugins, so it is the one build that cannot apply them: it declares
+// public repositories itself. Behind Artifactory, gradle/init.d/embedded-runtime-artifactory.init.gradle.kts
+// redirects them.
 pluginManagement {
+    includeBuild("build-logic")
     repositories {
         // Most build plugins publish to both; preferring Central means a corporate mirror of
         // Central covers nearly everything, and only genuinely portal-only plugins need
@@ -22,4 +23,8 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "platform-gradle-plugins"
+rootProject.name = "embedded-runtime-gradle-plugins"
+
+// Published as io.github.fiftieshousewife:app-core / java-app / node-app.
+include("app-core", "java-app", "node-app")
+project(":app-core").projectDir = file("core")

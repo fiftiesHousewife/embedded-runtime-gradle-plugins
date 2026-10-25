@@ -1,18 +1,19 @@
 #!/usr/bin/env bash
 # Mirrors approved runtime archives into the curated Artifactory layout read by
-# io.github.fiftieshousewife.platform (platform.artifactory.repo.runtimes, default "runtimes"):
+# the io.github.fiftieshousewife java-app and node-app plugins (artifactory.repo.runtimes, default
+# "runtimes"):
 #
-#   runtimes/temurin/jdk/<version_>/jdk-<version_>-<platform>.<ext>
-#   runtimes/nodejs/node/<version>/node-<version>-<platform>.<ext>
+#   runtimes/temurin/jdk/<version_>/jdk-<version_>-<target>.<ext>
+#   runtimes/nodejs/node/<version>/node-<version>-<target>.<ext>
 #
 # Every archive is checked against the upstream published SHA-256 before upload, and uploaded with
 # that checksum so Artifactory verifies it too. Run it from a machine that can reach both the
 # internet and Artifactory, when a new runtime is approved (e.g. a quarterly Java CPU).
 #
 # Usage:
-#   curate-runtimes.sh jdk  21.0.12.1+1 [platform ...]
-#   curate-runtimes.sh node 24.18.1     [platform ...]
-#   platforms default to: linux-x64 linux-aarch64 windows-x64 mac-aarch64
+#   curate-runtimes.sh jdk  21.0.12.1+1 [target ...]
+#   curate-runtimes.sh node 24.18.1     [target ...]
+#   targets default to: linux-x64 linux-aarch64 windows-x64 mac-aarch64
 #
 # Environment:
 #   ARTIFACTORY_URL      e.g. https://artifactory.example.com/artifactory   (required)
@@ -23,10 +24,10 @@
 #   CURL_CA_BUNDLE       optional corporate CA bundle
 set -euo pipefail
 
-KIND=${1:?usage: curate-runtimes.sh jdk|node VERSION [platform ...]}
+KIND=${1:?usage: curate-runtimes.sh jdk|node VERSION [target ...]}
 VERSION=${2:?version required}
 shift 2
-PLATFORMS=("$@"); [ ${#PLATFORMS[@]} -gt 0 ] || PLATFORMS=(linux-x64 linux-aarch64 windows-x64 mac-aarch64)
+TARGETS=("$@"); [ ${#TARGETS[@]} -gt 0 ] || TARGETS=(linux-x64 linux-aarch64 windows-x64 mac-aarch64)
 ART=${ARTIFACTORY_URL:?ARTIFACTORY_URL is required}
 REPO=${ARTIFACTORY_REPO:-runtimes}
 TEMURIN=${TEMURIN_BASE_URL:-https://github.com/adoptium}
@@ -45,7 +46,7 @@ upload() { # file path checksum
   echo "uploaded $REPO/$2"
 }
 
-for p in "${PLATFORMS[@]}"; do
+for p in "${TARGETS[@]}"; do
   os=${p%-*}; arch=${p#*-}
   ext=tar.gz; [ "$os" = windows ] && ext=zip
   case "$KIND" in

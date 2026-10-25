@@ -1,0 +1,16 @@
+package io.github.fiftieshousewife.appcore
+
+import java.util.Properties
+
+/**
+ * The version these plugins were released at, written into a resource at build time. `app-core`,
+ * `java-app` and `node-app` are always released together, so one version describes all three.
+ */
+object PluginVersion {
+    val current: String by lazy {
+        Properties()
+            .apply {
+                PluginVersion::class.java.getResourceAsStream("/io/github/fiftieshousewife/appcore/version.properties")?.use(::load)
+            }.getProperty("version") ?: error("version.properties missing from the app-core jar")
+    }
+}

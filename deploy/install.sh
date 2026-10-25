@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Platform bundle installer — no root required.
+# App archive installer — no root required.
 #
-# Installs a bundle produced by io.github.fiftieshousewife.platform (Java or Node, the layout is identical) into
-# an application root owned by the invoking account:
+# Installs an archive produced by the io.github.fiftieshousewife java-app or node-app plugin (the
+# layout is identical for both) into an application root owned by the invoking account:
 #
 #   $APP_ROOT/
-#     releases/<version>/   one extracted bundle per version
+#     releases/<version>/   one extracted archive per version
 #     current -> releases/<version>
 #     conf/                 seeded from conf.defaults/ once; never overwritten (conf/env: KEY=VALUE)
 #     data/  logs/  run/
@@ -18,9 +18,9 @@
 #   install.sh start | stop | restart --app-root DIR
 #
 # Options:
-#   --repo-url URL          Maven repository holding the bundle
+#   --repo-url URL          Maven repository holding the archive
 #                           (default $INSTALL_REPO_URL, e.g. https://artifactory.example.com/artifactory/libs-release-local)
-#   --platform ID           bundle classifier (default: this machine, e.g. linux-x64)
+#   --target ID             archive classifier (default: this machine, e.g. linux-x64)
 #   --supervisor MODE       auto (default) | systemd (user unit) | nohup | none
 #   --health-timeout SEC    seconds to wait for `bin/<app> healthcheck` (default 60)
 #   --keep N                releases to keep, including current (default 3)
@@ -37,7 +37,7 @@ die() { echo "install.sh: $*" >&2; exit 1; }
 log() { echo "==> $*"; }
 
 COMMAND=${1:-}; [ $# -gt 0 ] && shift
-COORDS="" ARCHIVE="" SHA="" APP_ROOT="" REPO_URL=${INSTALL_REPO_URL:-} PLATFORM=""
+COORDS="" ARCHIVE="" SHA="" APP_ROOT="" REPO_URL=${INSTALL_REPO_URL:-} TARGET=""
 SUPERVISOR=auto HEALTH_TIMEOUT=60 KEEP=3 FORCE=false
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -46,7 +46,7 @@ while [ $# -gt 0 ]; do
     --sha256) SHA=$2; shift 2 ;;
     --app-root) APP_ROOT=$2; shift 2 ;;
     --repo-url) REPO_URL=$2; shift 2 ;;
-    --platform) PLATFORM=$2; shift 2 ;;
+    --target) TARGET=$2; shift 2 ;;
     --supervisor) SUPERVISOR=$2; shift 2 ;;
     --health-timeout) HEALTH_TIMEOUT=$2; shift 2 ;;
     --keep) KEEP=$2; shift 2 ;;
@@ -60,16 +60,16 @@ mkdir -p "$APP_ROOT"
 APP_ROOT=$(cd "$APP_ROOT" && pwd -P)
 umask 027
 
-host_platform() {
+host_target() {
   local os arch
   case "$(uname -s)" in Linux) os=linux ;; Darwin) os=mac ;; *) die "unsupported OS $(uname -s)" ;; esac
   case "$(uname -m)" in x86_64|amd64) arch=x64 ;; aarch64|arm64) arch=aarch64 ;; *) die "unsupported arch $(uname -m)" ;; esac
   echo "$os-$arch"
 }
 
-# Reads a top-level string field from META-INF/bundle.json without needing jq.
+# Reads a top-level string field from META-INF/app.json without needing jq.
 manifest_field() {
-  sed -n "s/^ *\"$2\" *: *\"\\([^\"]*\\)\".*/\\1/p" "$1/META-INF/bundle.json" | head -n 1
+  sed -n "s/^ *\"$2\" *: *\"\\([^\"]*\\)\".*/\\1/p" "$1/META-INF/app.json" | head -n 1
 }
 
 current_release() { [ -L "$APP_ROOT/current" ] && basename "$(readlink "$APP_ROOT/current")" || true; }
@@ -113,7 +113,7 @@ write_unit() { # name
   cat > "$dir/$(unit_name "$1")" <<EOF
 # Managed by install.sh — regenerated on every install.
 [Unit]
-Description=$1 (platform bundle)
+Description=$1
 After=network-online.target
 
 [Service]
@@ -136,7 +136,7 @@ EOF
   systemctl --user enable "$(unit_name "$1")" >/dev/null 2>&1 || true
   if command -v loginctl >/dev/null && [ "$(loginctl show-user "$(id -un)" -p Linger --value 2>/dev/null)" != yes ]; then
     echo "WARNING: lingering is off for $(id -un): the service stops at logout and does not start at boot." >&2
-    echo "         Ask your platform team to run: loginctl enable-linger $(id -un)" >&2
+    echo "         Ask an administrator to run: loginctl enable-linger $(id -un)" >&2
   fi
 }
 
@@ -219,8 +219,10 @@ seed_config() { # release-dir
 prune() {
   local current previous keep=$KEEP
   current=$(current_release); previous=$(cat "$APP_ROOT/run/previous" 2>/dev/null || true)
-  # Oldest first by modification time; never remove current or previous.
-  ls -1tr "$APP_ROOT/releases" 2>/dev/null | grep -v '^\.' | head -n "-$keep" | while read -r r; do
+  # Oldest first by modification time, all but the newest $keep; never remove current or previous.
+  # (awk rather than `head -n -N`, which BSD/macOS head does not support.)
+  ls -1tr "$APP_ROOT/releases" 2>/dev/null | grep -v '^\.' |
+    awk -v keep="$keep" '{ r[NR] = $0 } END { for (i = 1; i <= NR - keep; i++) print r[i] }' | while read -r r; do
     [ "$r" = "$current" ] || [ "$r" = "$previous" ] && continue
     rm -rf "${APP_ROOT:?}/releases/$r" && log "pruned release $r"
   done
@@ -229,7 +231,7 @@ prune() {
 # ---- commands -----------------------------------------------------------------------------------
 
 cmd_install() {
-  PLATFORM=${PLATFORM:-$(host_platform)}
+  TARGET=${TARGET:-$(host_target)}
   local file
   work=$(mktemp -d "$APP_ROOT/.install.XXXXXX") # global: the EXIT trap runs after this function returns
   trap 'rm -rf "${work:-}"' EXIT
@@ -238,7 +240,7 @@ cmd_install() {
     [ -n "$REPO_URL" ] || die "--repo-url (or INSTALL_REPO_URL) is required with --coordinates"
     IFS=: read -r group name version <<< "$COORDS"
     [ -n "${version:-}" ] || die "--coordinates must be GROUP:NAME:VERSION"
-    file="$name-$version-$PLATFORM.tar.gz"
+    file="$name-$version-$TARGET.tar.gz"
     local url="${REPO_URL%/}/${group//.//}/$name/$version/$file"
     log "downloading $url"
     curl_get "$url" "$work/$file"
@@ -261,11 +263,11 @@ cmd_install() {
   tar -xzf "$work/$file" -C "$work/x"
   local top; top=$(ls -1 "$work/x")
   [ "$(echo "$top" | wc -l)" -eq 1 ] && [ -d "$work/x/$top" ] || die "archive must contain exactly one top-level directory"
-  local name version platform
+  local name version target
   name=$(manifest_field "$work/x/$top" name); version=$(manifest_field "$work/x/$top" version)
-  platform=$(manifest_field "$work/x/$top" platform)
-  [ -n "$name" ] && [ -n "$version" ] || die "META-INF/bundle.json missing or unreadable"
-  [ "$platform" = "$(host_platform)" ] || die "bundle is for $platform, this machine is $(host_platform)"
+  target=$(manifest_field "$work/x/$top" target)
+  [ -n "$name" ] && [ -n "$version" ] || die "META-INF/app.json missing or unreadable"
+  [ "$target" = "$(host_target)" ] || die "archive is for $target, this machine is $(host_target)"
 
   mkdir -p "$APP_ROOT/releases"
   if [ -e "$APP_ROOT/releases/$version" ]; then

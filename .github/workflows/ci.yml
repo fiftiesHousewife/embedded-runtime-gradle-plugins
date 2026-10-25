@@ -23,7 +23,7 @@ jobs:
         with:
           distribution: temurin
           # 17 is the toolchain the plugin itself compiles against; 21 runs Gradle and is what the
-          # samples bundle. Gradle 9 itself requires 17 or newer.
+          # samples embed. Gradle 9 itself requires 17 or newer.
           java-version: |
             17
             21

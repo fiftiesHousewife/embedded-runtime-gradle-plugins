@@ -1,4 +1,4 @@
-// Minimal service implementing the bundle contract:
+// Minimal service implementing the launcher contract:
 //   bin/node-service run          serves HTTP on APP_PORT
 //   bin/node-service healthcheck  (passed through as --healthcheck) exits 0 when healthy
 import { createServer } from 'node:http';

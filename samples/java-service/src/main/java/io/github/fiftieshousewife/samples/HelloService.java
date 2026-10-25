@@ -14,7 +14,7 @@ import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 
 /**
- * Minimal service implementing the bundle contract:
+ * Minimal service implementing the launcher contract:
  * {@code bin/java-service run} serves HTTP on {@code APP_PORT};
  * {@code bin/java-service healthcheck} (passed through as {@code --healthcheck}) exits 0 when healthy.
  */

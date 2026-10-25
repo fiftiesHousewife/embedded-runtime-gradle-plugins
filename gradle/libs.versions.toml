@@ -16,6 +16,7 @@ packageurl = "1.5.0"
 redline = "1.2.10"
 commons-compress = "1.28.0"
 xz = "1.12"
+zstd-jni = "1.5.7-24"
 bouncycastle = "1.86"
 
 # Used by samples/spring-boot-service only.
@@ -98,6 +99,7 @@ packageurl = { module = "com.github.package-url:packageurl-java", version.ref = 
 redline = { module = "org.redline-rpm:redline", version.ref = "redline" }
 commons-compress = { module = "org.apache.commons:commons-compress", version.ref = "commons-compress" }
 xz = { module = "org.tukaani:xz", version.ref = "xz" }
+zstd-jni = { module = "com.github.luben:zstd-jni", version.ref = "zstd-jni" }
 bouncycastle-pg = { module = "org.bouncycastle:bcpg-jdk18on", version.ref = "bouncycastle" }
 junit-bom = { module = "org.junit:junit-bom", version.ref = "junit" }
 junit-jupiter-api = { module = "org.junit.jupiter:junit-jupiter-api" }

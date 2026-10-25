@@ -3,8 +3,10 @@ package io.github.fiftieshousewife.javaapp
 import io.github.fiftieshousewife.appcore.AppWiring
 import io.github.fiftieshousewife.appcore.RuntimeArtifact
 import io.github.fiftieshousewife.appcore.Target
+import io.github.fiftieshousewife.appcore.tasks.ExtractRpmRuntime
 import org.gradle.api.GradleException
 import org.gradle.api.Project
+import org.gradle.api.Task
 import org.gradle.api.file.Directory
 import org.gradle.api.provider.Provider
 import org.gradle.api.tasks.Sync
@@ -17,16 +19,17 @@ import java.io.File
  */
 internal class JdkHome(
     val dir: Provider<Directory>,
-    val builtBy: TaskProvider<Sync>?,
+    val builtBy: TaskProvider<out Task>?,
     val jmods: Provider<Directory>? = null,
-    private val jmodsBuiltBy: TaskProvider<Sync>? = null,
+    private val jmodsBuiltBy: TaskProvider<out Task>? = null,
 ) {
-    val tasks: List<TaskProvider<Sync>> get() = listOfNotNull(builtBy, jmodsBuiltBy)
+    val tasks: List<TaskProvider<out Task>> get() = listOfNotNull(builtBy, jmodsBuiltBy)
 }
 
 /**
  * The JDK for each target, set up once: a directory configured by path is used as it is, an archive
- * configured by path is extracted, and otherwise the pinned JDK is resolved from [JdkSources].
+ * configured by path is extracted, and otherwise the pinned JDK is resolved from [JdkSources]. An
+ * RPM (by its `.rpm` name or the repository's pattern) is unpacked and its JDK home found inside.
  * Called once the build script has run, when the Java release is final.
  */
 internal class Jdks(
@@ -43,16 +46,22 @@ internal class Jdks(
         val local = JdkSources.localJdk(project.providers, feature, target)
         return when {
             local == null -> downloadedJdk(target, feature)
+
             local.isDirectory -> JdkHome(project.layout.dir(project.provider { local }), builtBy = null)
-            local.isFile -> extracted(target, project.provider { local })
-            else -> throw GradleException("${JdkSources.pathProperty(feature, target)} is $local, which does not exist")
+
+            local.isFile -> extracted(target, project.provider { local }, rpm = local.name.endsWith(".rpm", true))
+
+            else -> throw GradleException(
+                "${JdkSources.pathProperty(feature, target)} is $local, which does not exist. In gradle.properties " +
+                    "a backslash escapes the next character: write Windows paths as C:/Program Files/Java/jdk-21.",
+            )
         }
     }
 
     /** The pinned JDK for [target], resolved like any other dependency, with its jmods if separate. */
     private fun downloadedJdk(target: Target, feature: Int): JdkHome {
         val sources = JdkSources.from(project.providers)
-        val jdk = extracted(target, resolved("jdk", target) { sources.artifact(it, target) })
+        val jdk = extracted(target, resolved("jdk", target) { sources.artifact(it, target) }, sources.archivesAreRpms)
         if (!sources.distribution.separateJmods(feature)) return jdk
         val archive = resolved("jmods", target) { sources.jmodsArtifact(it, target) }
         val jmods = extract("extractJmods${target.taskSuffix}", archive, "jdk/${target.id}-jmods")
@@ -65,8 +74,20 @@ internal class Jdks(
         return wiring.singleFile(configuration)
     }
 
-    private fun extracted(target: Target, archive: Provider<File>): JdkHome {
-        val task = extract("extractJdk${target.taskSuffix}", archive, "jdk/${target.id}")
+    private fun extracted(target: Target, archive: Provider<File>, rpm: Boolean): JdkHome {
+        val name = "extractJdk${target.taskSuffix}"
+        val destination = wiring.workDir.map { it.dir("jdk/${target.id}") }
+        if (rpm) {
+            val task = project.tasks.register(name, ExtractRpmRuntime::class.java) {
+                group = wiring.taskGroup
+                description = "Extracts the ${target.id} JDK from its RPM"
+                this.rpm.fileProvider(archive)
+                marker.set("release")
+                outputDir.set(destination)
+            }
+            return JdkHome(task.flatMap { it.outputDir }, task)
+        }
+        val task = extract(name, archive, "jdk/${target.id}")
         return JdkHome(project.layout.dir(task.map { it.destinationDir }), task)
     }
 

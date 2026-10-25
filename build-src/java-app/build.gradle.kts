@@ -6,6 +6,8 @@ description = "Packages a Java application with a pinned, jlink-trimmed embedded
 
 dependencies {
     api(project(":app-core"))
+    // The functional tests package the test JDK as an RPM, as an organisation's binary repository holds one.
+    "functionalTestImplementation"(libs.redline)
 }
 
 // The JDK pins are versions in gradle/libs.versions.toml (`jdk-<distribution>-<feature>`, which the

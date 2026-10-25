@@ -62,6 +62,7 @@ constructor(
 
         val tool = JdkTools.home(toolJdk.get().asFile)
         val targetHome = JdkTools.home(targetJdk.get().asFile)
+        JdkTools.requirePinned(jdkVersion.get(), targetHome)
         val cross = host.get() != target.get()
         val jmods = targetJmods.orNull?.asFile ?: targetHome.resolve("jmods")
         if (cross && !jmods.isDirectory) {

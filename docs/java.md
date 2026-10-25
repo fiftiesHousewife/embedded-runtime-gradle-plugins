@@ -215,7 +215,13 @@ javaApp.jdk.21.windows-x64.path=/shared/jdks/jdk-21-windows.zip
 ```
 
 A JDK configured this way wins over every other source for that release and target, so it also
-covers JDKs installed from your own RPMs. The JDK used to run `jlink` (the one for the machine you
-build on) and each target's JDK must be the same exact version. Gradle compiles with an archive
-configured this way directly; for an installed directory, also list it in
-`org.gradle.java.installations.paths`.
+covers JDKs installed from your own RPMs; an `.rpm` file itself is unpacked and the JDK found inside
+it. On Windows write the path with forward slashes (`C:/Program Files/Java/jdk-21`), because a
+backslash in `gradle.properties` escapes the next character. The JDK used to run `jlink` (the one for
+the machine you build on) and each target's JDK must be the same exact version, and that version
+must be the one pinned: a JDK a patch behind stops the build. Gradle compiles with a zip or tar.gz
+configured this way directly; for an installed directory or an RPM, it uses an installed JDK, so
+also list it in `org.gradle.java.installations.paths` if Gradle doesn't find it on its own.
+
+JDK RPMs in a binary repository, under your own naming, are covered in
+[Behind a corporate binary repository](binary-repository.md#jdks-packaged-as-rpms).

@@ -74,6 +74,10 @@ dependencies {
         exclude(group = "org.bouncycastle")
     }
     implementation(libs.bouncycastle.pg)
+    // Reading RPM-packaged runtimes: Redline parses the headers, Commons Compress the cpio payload;
+    // zstd-jni backs Commons Compress for zstd payloads, the default of RHEL 9 and later.
+    implementation(libs.commons.compress)
+    implementation(libs.zstd.jni)
     constraints {
         implementation(libs.commons.compress) { because("Redline 1.2.10 asks for 1.21, which has known CVEs") }
         implementation(libs.xz) { because("Redline 1.2.10 asks for 1.4") }

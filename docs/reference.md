@@ -112,5 +112,7 @@ Gradle properties, set in `gradle.properties`, `~/.gradle/gradle.properties` or 
 | `binaryRepo.repo.runtimes` | `runtimes` | |
 | `binaryRepo.repo.releases`, `binaryRepo.repo.snapshots` | `libs-release-local`, `libs-snapshot-local` | |
 | `binaryRepo.repo.rpm` | `rpm-local` | Where `appPublishRpm` uploads |
-| `javaApp.jdk.binaryRepoPattern`, `nodeApp.node.binaryRepoPattern` | the layout above | Layout of an existing runtimes tree |
+| `javaApp.jdk.binaryRepoPattern`, `nodeApp.node.binaryRepoPattern` | the layout above | Layout of an existing runtimes tree; a JDK pattern ending in `.rpm` reads JDK RPMs |
+| `javaApp.jdk.binaryRepo` | `binaryRepo.repo.runtimes` | The repository holding JDKs, e.g. `yum-local` |
+| `javaApp.jdk.revisionFormat` | `[underscored]` | How a curated pattern's `[revision]` spells the version: `[feature]_[update]` gives `21_5` for 21.0.5 |
 | `binaryRepo.allowInsecureProtocol` | `false` | Allow `http://` (test instances only) |

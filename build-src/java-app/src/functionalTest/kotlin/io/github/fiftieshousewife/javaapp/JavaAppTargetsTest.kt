@@ -126,6 +126,31 @@ class JavaAppTargetsTest {
     }
 
     @Test
+    fun `a JDK packaged as an RPM, named the organisation's way, is extracted and embedded`() {
+        val repository = tmp.resolve("corporate-jdks")
+        JdkFixture.publishRpm(repository, group = "temurin")
+        val jdk = JdkFixture.home.absolutePath
+        val project = javaService(
+            tmp,
+            JavaServiceOptions(
+                publishJdk = false,
+                properties = listOf(
+                    JdkSources.LOCAL_PATH to repository.absolutePath,
+                    JdkSources.LOCAL_PATTERN to "[organisation]/jdk[revision]-64_[classifier].rpm",
+                    JdkSources.REVISION_FORMAT to "[feature]_[update]",
+                    // Gradle can't provision a compiler from an RPM: it compiles with the installed JDK.
+                    "org.gradle.java.installations.paths" to jdk,
+                ),
+            ),
+        )
+        val result = project.build("build")
+        assertAll(
+            { assertEquals(TaskOutcome.SUCCESS, result.task(":extractJdk${Target.parse(host).taskSuffix}")?.outcome) },
+            { assertEquals(TaskOutcome.SUCCESS, result.task(":appSmokeTest")?.outcome) },
+        )
+    }
+
+    @Test
     fun `JDK archives are read from a shared local directory`() {
         val shared = tmp.resolve("shared-jdks")
         val project =

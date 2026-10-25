@@ -106,10 +106,31 @@ data class JdkVersion(val value: String) {
     /** `21.0.13_9` — the form Adoptium uses in file names and the curated repository uses in paths. */
     val underscored: String get() = value.replace('+', '_')
 
+    /**
+     * [format] with its tokens filled from this version, for naming files in a repository laid out
+     * your own way: `[version]` (`21.0.5+9`), `[underscored]` (`21.0.5_9`), `[feature]` (`21`),
+     * `[interim]` (`0`), `[update]` (`5`), `[patch]` (`0` when absent) and `[build]` (`9`, empty when absent).
+     */
+    fun format(format: String): String {
+        val numbers = value.substringBefore('+').substringBefore('-').split('.')
+        val tokens =
+            mapOf(
+                "version" to value,
+                "underscored" to underscored,
+                "feature" to feature.toString(),
+                "interim" to numbers.getOrElse(1) { "0" },
+                "update" to numbers.getOrElse(2) { "0" },
+                "patch" to numbers.getOrElse(3) { "0" },
+                "build" to value.substringAfter('+', ""),
+            )
+        return TOKEN.replace(format) { tokens[it.groupValues[1]] ?: it.value }
+    }
+
     override fun toString() = value
 
     private companion object {
         // The version ends up in a URL path, so only characters some vendor actually uses get in.
         val FORMAT = Regex("""\d+[0-9A-Za-z.+-]*""")
+        val TOKEN = Regex("""\[([a-z]+)]""")
     }
 }

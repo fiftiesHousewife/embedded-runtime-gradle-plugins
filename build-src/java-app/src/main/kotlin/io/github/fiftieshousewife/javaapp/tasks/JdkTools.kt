@@ -18,6 +18,23 @@ object JdkTools {
         .getProperty("JAVA_VERSION")
         ?.trim('"')
 
+    /**
+     * Refuses a JDK that isn't the pinned release, such as an installed one a patch behind: the
+     * archive's manifest and SBOM name the pin. Vendors spell versions differently, so the `release`
+     * file's `JAVA_VERSION` (`21.0.5`) must start the pin (`21.0.5`, `21.0.5+11`, `21.0.5.0.11`) or follow
+     * `jdk` in it (Zulu's `21.38.21-ca-jdk21.0.5`).
+     */
+    fun requirePinned(pin: String, home: File) {
+        val actual = javaVersion(home) ?: return
+        // Whole version components only: 21.0.1 must not pass for 21.0.10.
+        val matches = Regex("""(^|jdk)${Regex.escape(actual)}(\D|$)""").containsMatchIn(pin)
+        if (matches) return
+        throw GradleException(
+            "The JDK at $home is $actual, but the build pins $pin (javaApp.jdk.<feature> or the catalogue). " +
+                "Install $pin there, or pin the version that is installed.",
+        )
+    }
+
     fun tool(home: File, name: String): File =
         home.resolve("bin/$name").let { if (it.isFile) it else home.resolve("bin/$name.exe") }
 

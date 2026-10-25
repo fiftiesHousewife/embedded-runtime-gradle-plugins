@@ -2,6 +2,9 @@ package io.github.fiftieshousewife.javaapp
 
 import io.github.fiftieshousewife.appcore.TestProject
 import org.junit.jupiter.api.Assumptions.assumeTrue
+import org.redline_rpm.Builder
+import org.redline_rpm.header.Architecture
+import org.redline_rpm.header.Os
 import java.io.File
 import java.io.IOException
 import java.nio.file.Files
@@ -43,6 +46,41 @@ object JdkFixture {
         val version = jdkVersion.replace('+', '_')
         archive(root.resolve("temurin/jdk/$version/jdk-$version-$target.tar.gz"))
     }
+
+    /**
+     * Publishes the test JDK as an RPM under [root], named the way an organisation might:
+     * `<root>/<group>/jdk<feature>_<update>-64_<target>.rpm`, installed under `/usr/lib/jvm/`.
+     */
+    fun publishRpm(root: File, group: String, target: String = TestProject.hostTarget()): File {
+        val (feature, update) = jdkVersion.substringBefore('+').split('.').let { it[0] to it.getOrElse(2) { "0" } }
+        val out = root.resolve("$group/jdk${feature}_$update-64_$target.rpm")
+        out.parentFile.mkdirs()
+        sharedRpm.copyTo(out, overwrite = true)
+        return out
+    }
+
+    /** The test JDK as an RPM, built once per test JVM with Redline. */
+    private val sharedRpm: File by lazy {
+        val dir = Files.createTempDirectory("jdk-rpm").toFile()
+        Runtime.getRuntime().addShutdownHook(Thread { dir.deleteRecursively() })
+        val install = "/usr/lib/jvm/jdk-$jdkVersion"
+        val builder = Builder().apply {
+            setPackage("jdk", jdkVersion.substringBefore('+'), "1")
+            setPlatform(Architecture.X86_64, Os.LINUX)
+        }
+        home.walkTopDown().filter { !it.isDirectory || Files.isSymbolicLink(it.toPath()) }.forEach { file ->
+            val path = "$install/${file.relativeTo(home).invariantSeparatorsPath}"
+            if (Files.isSymbolicLink(file.toPath())) {
+                builder.addLink(path, Files.readSymbolicLink(file.toPath()).toString())
+            } else {
+                builder.addFile(path, file, if (file.canExecute()) OCTAL_755 else OCTAL_644)
+            }
+        }
+        dir.resolve(builder.build(dir))
+    }
+
+    private const val OCTAL_644 = 420
+    private const val OCTAL_755 = 493
 
     /** Every target's archive holds the same bytes, so each test links one shared archive under its name. */
     private fun archive(out: File) {

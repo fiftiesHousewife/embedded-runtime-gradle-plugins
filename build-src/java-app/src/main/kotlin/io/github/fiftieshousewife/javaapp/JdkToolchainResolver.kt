@@ -45,7 +45,7 @@ abstract class JdkToolchainResolver : JavaToolchainResolver {
         val version = JdkCatalog.pinnedJdk(providers, sources.distribution, feature).takeIf { servable }
         if (version == null || target == null) return null
         return ToolchainRequests.uri(JdkSources.localJdk(providers, version.feature, target)) {
-            sources.downloadUri(version, target)
+            sources.downloadUri(version, target).takeUnless { sources.archivesAreRpms }
         }
     }
 }
@@ -62,12 +62,14 @@ internal object ToolchainRequests {
     }
 
     /**
-     * A JDK configured by path wins. Gradle provisions toolchains from archives only, so an installed
-     * directory is left to Gradle's own detection (`org.gradle.java.installations.paths`).
+     * A JDK configured by path wins. Gradle provisions toolchains from zip and tar.gz archives only, so
+     * an installed directory or an RPM is left to the JDKs Gradle finds on the machine (installed ones,
+     * and `org.gradle.java.installations.paths`), as is a download that is an RPM ([download] null).
+     * Nothing is ever fetched from anywhere else.
      */
-    fun uri(local: File?, download: () -> URI): URI? = when {
+    fun uri(local: File?, download: () -> URI?): URI? = when {
         local == null -> download()
-        local.isFile -> local.toURI()
+        local.isFile && !local.name.endsWith(".rpm", ignoreCase = true) -> local.toURI()
         else -> null
     }
 

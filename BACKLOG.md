@@ -41,8 +41,6 @@ and `./gradlew aiSkills` to install them in a project. Prompt files were dropped
 
 ## Older open items
 
-- The company's RPM-packaged JDK: real file name, install path, and whether it ships `jmods/`
-  (naming described as `jdk<major>_<patch>-64_linux.x86_64.rpm`).
 - **Publishing 1.0.0: ready, held by the owner until this backlog is clear.** Set up like the Clean
   Code plugin (Vanniktech, Maven Central with plugin markers). Verified 2026-10-25: a release to a
   scratch local repository is complete and signed, and a fresh project applying the plugins by id

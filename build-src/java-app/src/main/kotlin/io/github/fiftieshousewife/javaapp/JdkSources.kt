@@ -43,9 +43,18 @@ class JdkSources(val distribution: JdkDistribution, private val location: JdkLoc
     fun artifact(version: JdkVersion, target: Target): RuntimeArtifact = when (location) {
         is JdkLocation.Public -> distribution.artifact(version, target)
 
-        // Renamed on upload, so the vendor's own naming is irrelevant here.
-        is JdkLocation.Curated -> RuntimeArtifact.curated(distribution.group, "jdk", version.underscored, target)
+        // Renamed on upload, so the vendor's own naming is irrelevant here; the revision is spelled
+        // as the tree names it.
+        is JdkLocation.Curated ->
+            RuntimeArtifact.curated(distribution.group, "jdk", location.revision(version), target)
     }
+
+    /**
+     * Whether the JDK archives here are RPMs: the pattern names its files `….rpm`. Gradle can't
+     * provision a compile toolchain from an RPM, so the toolchain resolver leaves those to the JDKs
+     * installed on the machine, and the plugin extracts the runtime itself.
+     */
+    val archivesAreRpms: Boolean get() = repository.artifactPattern.endsWith(".rpm", ignoreCase = true)
 
     /**
      * The separate `jmods/` archive for a release whose JDK lacks it ([JdkDistribution.separateJmods]).
@@ -54,7 +63,13 @@ class JdkSources(val distribution: JdkDistribution, private val location: JdkLoc
      */
     fun jmodsArtifact(version: JdkVersion, target: Target): RuntimeArtifact = when (location) {
         is JdkLocation.Public -> distribution.jmodsArtifact(version, target)
-        is JdkLocation.Curated -> RuntimeArtifact.curated(distribution.group, "jmods", version.underscored, target)
+
+        is JdkLocation.Curated -> RuntimeArtifact.curated(
+            distribution.group,
+            "jmods",
+            location.revision(version),
+            target,
+        )
     }
 
     fun downloadUri(version: JdkVersion, target: Target): URI = repository.downloadUri(artifact(version, target))
@@ -75,6 +90,15 @@ class JdkSources(val distribution: JdkDistribution, private val location: JdkLoc
 
         /** Ivy pattern for the curated BinaryRepository tree, when it cannot use the default layout. */
         const val BINARY_REPO_PATTERN = "javaApp.jdk.binaryRepoPattern"
+
+        /** The binary repository's repository holding JDKs, when it isn't `binaryRepo.repo.runtimes`: `yum-local`. */
+        const val BINARY_REPO_NAME = "javaApp.jdk.binaryRepo"
+
+        /**
+         * How a curated pattern's `[revision]` spells the version, from [JdkVersion.format]'s tokens:
+         * `[feature]_[update]` names `jdk21_5…` for 21.0.5. Default `[underscored]`.
+         */
+        const val REVISION_FORMAT = "javaApp.jdk.revisionFormat"
 
         /** An absolute path to a shared directory of JDK archives, laid out like the curated BinaryRepository tree. */
         const val LOCAL_PATH = "javaApp.jdk.localPath"
@@ -99,9 +123,17 @@ class JdkSources(val distribution: JdkDistribution, private val location: JdkLoc
         private fun location(providers: ProviderFactory): JdkLocation {
             val localPath = providers.setting(LOCAL_PATH)
             val binaryRepo = BinaryRepository.from(providers)
+            val revision = providers.setting(REVISION_FORMAT)
             return when {
-                localPath != null -> JdkLocation.local(File(localPath), providers.setting(LOCAL_PATTERN))
-                binaryRepo != null -> JdkLocation.binaryRepo(binaryRepo, providers.setting(BINARY_REPO_PATTERN))
+                localPath != null -> JdkLocation.local(File(localPath), providers.setting(LOCAL_PATTERN), revision)
+
+                binaryRepo != null -> JdkLocation.binaryRepo(
+                    binaryRepo,
+                    providers.setting(BINARY_REPO_PATTERN),
+                    revision,
+                    providers.setting(BINARY_REPO_NAME),
+                )
+
                 else -> JdkLocation.Public(providers.setting(PUBLIC_URL), providers.setting(PUBLIC_PATTERN))
             }
         }
@@ -119,13 +151,30 @@ sealed interface JdkLocation {
         val baseUrl: URI,
         /** Override of [RuntimeRepository.CURATED_PATTERN]. */
         val pattern: String? = null,
-    ) : JdkLocation
+        /** How `[revision]` spells the version; see [JdkSources.REVISION_FORMAT]. */
+        val revisionFormat: String? = null,
+    ) : JdkLocation {
+        fun revision(version: JdkVersion): String = revisionFormat?.let(version::format) ?: version.underscored
+    }
 
     companion object {
-        fun binaryRepo(binaryRepo: BinaryRepository, pattern: String? = null) =
-            Curated("binaryRepoJdks", binaryRepo.runtimesUrl, pattern)
+        fun binaryRepo(
+            binaryRepo: BinaryRepository,
+            pattern: String? = null,
+            revisionFormat: String? = null,
+            repository: String? = null,
+        ) = Curated(
+            "binaryRepoJdks",
+            repository?.let(binaryRepo::repo) ?: binaryRepo.runtimesUrl,
+            pattern,
+            revisionFormat,
+        )
 
-        fun local(directory: File, pattern: String? = null) =
-            Curated("localJdks", RuntimeRepository.slash(directory.absoluteFile.toURI().toString()), pattern)
+        fun local(directory: File, pattern: String? = null, revisionFormat: String? = null) = Curated(
+            "localJdks",
+            RuntimeRepository.slash(directory.absoluteFile.toURI().toString()),
+            pattern,
+            revisionFormat,
+        )
     }
 }

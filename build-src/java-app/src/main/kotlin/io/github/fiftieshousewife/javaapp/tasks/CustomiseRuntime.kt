@@ -12,6 +12,7 @@ import org.gradle.api.file.FileSystemOperations
 import org.gradle.api.provider.ListProperty
 import org.gradle.api.provider.MapProperty
 import org.gradle.api.provider.Property
+import org.gradle.api.provider.ProviderFactory
 import org.gradle.api.tasks.CacheableTask
 import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.InputDirectory
@@ -22,6 +23,8 @@ import org.gradle.api.tasks.PathSensitive
 import org.gradle.api.tasks.PathSensitivity
 import org.gradle.api.tasks.TaskAction
 import java.io.File
+import java.net.PasswordAuthentication
+import java.net.URI
 import java.nio.file.Files
 import java.nio.file.StandardOpenOption
 import java.util.Properties
@@ -42,6 +45,7 @@ abstract class CustomiseRuntime
 constructor(
     private val fs: FileSystemOperations,
     private val archives: ArchiveOperations,
+    private val providers: ProviderFactory,
 ) : DefaultTask() {
     @get:InputDirectory
     @get:PathSensitive(PathSensitivity.RELATIVE)
@@ -51,6 +55,9 @@ constructor(
     @get:InputFiles
     @get:PathSensitive(PathSensitivity.NAME_ONLY)
     abstract val trustedCertificates: ConfigurableFileCollection
+
+    /** URI → pinned SHA-256 of approved CA certificates to fetch; see [JavaRuntimeSecurity.trustedCertificateUris]. */
+    @get:Input abstract val trustedCertificateUris: MapProperty<String, String>
 
     @get:Input abstract val replaceDefaultTrust: Property<Boolean>
 
@@ -100,7 +107,10 @@ constructor(
     }
 
     private fun trust(out: File): List<String> {
-        val files = TrustedCertificates.certificateFiles(trustedCertificates.asFileTree.files)
+        val fetched = trustedCertificateUris.get().map { (uri, sha256) ->
+            PinnedDownload(::binaryRepoLogin).fetch(URI.create(uri), sha256, temporaryDir.resolve("fetched"))
+        }
+        val files = TrustedCertificates.certificateFiles(trustedCertificates.asFileTree.files + fetched)
         val replace = replaceDefaultTrust.get()
         if (replace && files.isEmpty()) {
             throw GradleException(
@@ -162,6 +172,17 @@ constructor(
             certificates,
             replace = false,
             prefix = TrustedCertificates.POLICY,
+        )
+    }
+
+    /** The binary repository's credentials, only for URIs under `binaryRepo.url`. */
+    private fun binaryRepoLogin(uri: URI): PasswordAuthentication? {
+        val repo = providers.gradleProperty("binaryRepo.url").orNull ?: return null
+        val user = providers.gradleProperty("binaryRepoUsername").orNull ?: return null
+        if (!uri.toString().startsWith(repo.trimEnd('/') + "/")) return null
+        return PasswordAuthentication(
+            user,
+            providers.gradleProperty("binaryRepoPassword").orNull.orEmpty().toCharArray(),
         )
     }
 

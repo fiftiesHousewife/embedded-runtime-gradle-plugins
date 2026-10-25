@@ -33,6 +33,7 @@ internal class JavaConventions(private val project: Project, private val extensi
 
     private fun security() = extension.security.apply {
         replaceDefaultTrust.convention(false)
+        trustedCertificateUris.convention(emptyMap())
         properties.convention(emptyMap())
         disabledTlsAlgorithms.convention(emptyList())
         disabledCertPathAlgorithms.convention(emptyList())

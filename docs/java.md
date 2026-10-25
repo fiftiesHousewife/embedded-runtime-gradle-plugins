@@ -35,6 +35,7 @@ configuration in the build, applied to every target's runtime after `jlink`:
 javaApp {
     security {
         trustedCertificates.from("security/certs")          // approved CAs, added to cacerts
+        trustedCertificate(uri("https://pki.example.com/root-ca.pem"), sha256 = "9f86d0…")  // fetched, pinned
         propertiesFiles.from("security/java.security")      // your policy, applied over the JDK's
         properties.put("networkaddress.cache.ttl", "30")
         disabledTlsAlgorithms.addAll("TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA384", "TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA384")
@@ -46,6 +47,7 @@ javaApp {
 | Setting | Does |
 |---|---|
 | `trustedCertificates` | PEM or DER files (or directories of them) added to the runtime's `cacerts` |
+| `trustedCertificate(uri, sha256)` | A certificate fetched by URI (`https:` or `file:`), refused unless its SHA-256 matches the pin; repository credentials are sent only to URIs under `binaryRepo.url` |
 | `replaceDefaultTrust` | Trust only those certificates, instead of adding them to the JDK's own CAs |
 | `propertiesFiles`, `properties` | Security properties set in `conf/security/java.security`, files first |
 | `disabledTlsAlgorithms`, `disabledCertPathAlgorithms`, `disabledJarAlgorithms` | Added to the JDK's own lists, never replacing them |

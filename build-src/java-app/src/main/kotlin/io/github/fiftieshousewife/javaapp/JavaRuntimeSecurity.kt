@@ -4,6 +4,7 @@ import org.gradle.api.file.ConfigurableFileCollection
 import org.gradle.api.provider.ListProperty
 import org.gradle.api.provider.MapProperty
 import org.gradle.api.provider.Property
+import java.net.URI
 
 /**
  * `javaApp { security { … } }`: an organisation's changes to the JDK it was given, applied to every
@@ -17,6 +18,18 @@ abstract class JavaRuntimeSecurity {
      * `.pem`, `.crt`, `.cer` and `.der`), added to the runtime's `lib/security/cacerts`.
      */
     abstract val trustedCertificates: ConfigurableFileCollection
+
+    /**
+     * Approved CA certificates to fetch, by URI (`https:` or `file:`), each pinned by the SHA-256 of
+     * the file so a changed certificate fails the build instead of being trusted. Added with
+     * [trustedCertificate]. Fetched through the JVM's proxy settings; the binary repository's
+     * credentials are sent only to URIs under `binaryRepo.url`.
+     */
+    abstract val trustedCertificateUris: MapProperty<String, String>
+
+    /** `trustedCertificate(uri("https://pki.example.com/root-ca.pem"), sha256 = "9f86d081…")` */
+    fun trustedCertificate(uri: URI, sha256: String) =
+        trustedCertificateUris.put(uri.toString(), sha256.lowercase().replace(":", ""))
 
     /** Trust only [trustedCertificates], instead of adding them to the JDK's own CAs. Default false. */
     abstract val replaceDefaultTrust: Property<Boolean>

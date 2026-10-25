@@ -49,6 +49,7 @@ internal class JavaRuntimeTasks(
             val security = extension.security
             runtime.set(jlink.flatMap { it.outputDir })
             trustedCertificates.from(security.trustedCertificates)
+            trustedCertificateUris.set(security.trustedCertificateUris)
             replaceDefaultTrust.set(security.replaceDefaultTrust)
             propertiesFiles.from(security.propertiesFiles)
             properties.set(security.properties)

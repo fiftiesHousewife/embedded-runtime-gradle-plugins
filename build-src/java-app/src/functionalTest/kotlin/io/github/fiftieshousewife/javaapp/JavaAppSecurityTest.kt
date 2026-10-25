@@ -9,6 +9,8 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.io.File
+import java.security.MessageDigest
+import java.util.HexFormat
 import java.util.concurrent.TimeUnit
 
 /** An organisation's certificates, policy and hardening, applied to the runtime and seen by its JVM. */
@@ -56,6 +58,19 @@ class JavaAppSecurityTest {
             { assertTrue(record.contains("SHA-256 8D:0E:B1"), record) },
             { assertTrue(runtime.resolve("conf/acme/README.txt").isFile) },
         )
+    }
+
+    @Test
+    fun `a certificate fetched by URI and pinned by its SHA-256 is trusted`() {
+        val pem = fixture("certificates/acme-root.pem")
+        val certificate = tmp.resolve("pki/acme-root.pem").apply { parentFile.mkdirs() }.apply { writeText(pem) }
+        val sha256 = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(certificate.readBytes()))
+        val pinned = "$FIXTURE_MODULES\nsecurity { trustedCertificate(uri(\"${certificate.toURI()}\"), \"$sha256\") }"
+        val project = javaService(tmp.resolve("project"), JavaServiceOptions(javaApp = pinned))
+        project.build("appArchive")
+        val runtime = project.project.resolve("build/app/${TestProject.hostTarget()}/svc-2.0.0/runtime")
+        val record = runtime.resolve("conf/security/java-app-customisations.txt").readText()
+        assertTrue(record.contains("approved-acme-root") && record.contains("CN=acme root CA"), record)
     }
 
     @Test

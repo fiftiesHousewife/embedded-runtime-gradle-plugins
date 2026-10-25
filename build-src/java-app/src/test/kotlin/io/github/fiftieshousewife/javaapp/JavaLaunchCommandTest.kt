@@ -62,7 +62,7 @@ class JavaLaunchCommandTest {
         assertAll(
             {
                 assertEquals(
-                    "[ -d \"\$APP_LOG_DIR\" ] || (umask 027 && mkdir -p \"\$APP_LOG_DIR\")",
+                    "[ -d \"\$APP_LOG_DIR\" ] || (umask 027 && mkdir -p \"\$APP_LOG_DIR\") 2>/dev/null || true",
                     lines.first(),
                 )
             },
@@ -80,7 +80,7 @@ class JavaLaunchCommandTest {
     fun `the Windows launcher escapes the percent in the crash log name`() {
         val lines = JavaLaunchCommand.windows(launch.copy(logDirFiles = true)).lines()
         assertAll(
-            { assertEquals("if not exist \"%APP_LOG_DIR%\" mkdir \"%APP_LOG_DIR%\"", lines.first()) },
+            { assertEquals("if not exist \"%APP_LOG_DIR%\" mkdir \"%APP_LOG_DIR%\" 2>nul", lines.first()) },
             {
                 assertEquals(
                     "\"%APP_HOME%\\runtime\\bin\\java.exe\" \"-XX:HeapDumpPath=%APP_LOG_DIR%\" " +

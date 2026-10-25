@@ -24,9 +24,14 @@ internal data class JavaLaunch(
  * argument file) if there is one, then `$APP_JAVA_OPTS`.
  */
 internal object JavaLaunchCommand {
-    /** The log directory, created owner-and-group only when missing, so a heap dump has somewhere to go. */
-    private const val POSIX_LOG_DIR = "[ -d \"\$APP_LOG_DIR\" ] || (umask 027 && mkdir -p \"\$APP_LOG_DIR\")\n"
-    private const val WINDOWS_LOG_DIR = "if not exist \"%APP_LOG_DIR%\" mkdir \"%APP_LOG_DIR%\"\n"
+    /**
+     * The log directory, created owner-and-group only when missing, so a heap dump has somewhere to
+     * go. Never fatal: an account that can't create it (a read-only install, a sandboxed service)
+     * still starts the app, which then loses only its heap dump.
+     */
+    private const val POSIX_LOG_DIR =
+        "[ -d \"\$APP_LOG_DIR\" ] || (umask 027 && mkdir -p \"\$APP_LOG_DIR\") 2>/dev/null || true\n"
+    private const val WINDOWS_LOG_DIR = "if not exist \"%APP_LOG_DIR%\" mkdir \"%APP_LOG_DIR%\" 2>nul\n"
     private const val POSIX_LOG_OPTIONS =
         "\"-XX:HeapDumpPath=\$APP_LOG_DIR\" \"-XX:ErrorFile=\$APP_LOG_DIR/hs_err_pid%p.log\""
 

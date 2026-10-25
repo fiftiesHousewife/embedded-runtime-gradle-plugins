@@ -108,6 +108,22 @@ class JavaAppPluginTest {
         )
     }
 
+    @Test
+    fun `an account that can't create the log directory still starts the app`() {
+        val project = javaService(tmp)
+        project.file("src/main/java/test/Main.java", OUT_OF_MEMORY_APP)
+        project.build("installDist")
+        val installed = project.project.resolve("build/install/svc")
+        installed.setWritable(false) // as /opt/<app> is to the service account
+        val (exit, output) = try {
+            runWithSmallHeap(installed.resolve("bin/svc"))
+        } finally {
+            installed.setWritable(true)
+        }
+        // The app ran (and ran out of memory) rather than the launcher stopping at mkdir.
+        assertEquals(OUT_OF_MEMORY_EXIT, exit, output)
+    }
+
     private fun runWithSmallHeap(launcher: File): Pair<Int, String> {
         val process = ProcessBuilder(launcher.absolutePath, "run")
             .redirectErrorStream(true)

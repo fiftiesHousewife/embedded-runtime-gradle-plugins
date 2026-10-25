@@ -26,7 +26,7 @@ The shared JRE ended in three steps over four years:
 | JDK 9 | 2017 | The module system arrives with [jlink (JEP 282)](https://openjdk.org/jeps/282), which links a runtime from only the modules an app needs |
 | JDK 8 | 2014 | `jdeps` ships, listing which JDK packages and, later, which modules a jar depends on |
 
-The two tools are meant to be used together: jdeps says which modules an app needs, and jlink builds a runtime of exactly those. For this project's sample service the difference is stark. The full Temurin 21 JDK is 336 MB unpacked, the runtime jlink makes for the service is 31 MB, and the whole archive, app and runtime together, is 17 MB. That is small enough to ship with every release, and the shared install, with every problem above, goes away.
+The two tools are meant to be used together: jdeps says which modules an app needs, and jlink builds a runtime of exactly those. For this project's sample service the difference is stark. The full Temurin 21 JDK is 353 MB unpacked, the runtime jlink makes for the service is 41 MB, and the whole archive, app and runtime together, is 21 MB to download (linux-x64; a megabyte here is a million bytes). That is small enough to ship with every release, and the shared install, with every problem above, goes away.
 
 The catch is in how jdeps works. It reads the class files and records every class they name, so it sees only what the code refers to directly. As the [OpenJDK wiki](https://wiki.openjdk.org/x/CAESAQ) puts it, dependencies loaded with `Class.forName` or as service providers are not reported. Some of Java's most important modules arrive exactly that way:
 
@@ -223,28 +223,29 @@ so the repository also packages a Spring Boot 4.1 web service with Actuator. Its
 modules: jdeps found all thirteen the service needs (`java.base`, `java.compiler`, `java.desktop`,
 `java.instrument`, `java.management`, `java.naming`, `java.net.http`, `java.prefs`, `java.scripting`,
 `java.security.jgss`, `java.sql`, `jdk.jfr`, `jdk.unsupported`), and the smoke test passed on the
-first build. Measured for linux-x64 against Temurin 21.0.12.1+1, on 25 October 2026:
+first build. Measured for linux-x64 against Temurin 21.0.12.1+1, on 25 October 2026 (re-measured
+the same day, in megabytes of a million bytes throughout):
 
 | What ships | Compressed | Unpacked |
 |---|---|---|
 | Full Temurin 21 JDK | 207.5 MB | 353 MB |
 | Temurin 21 JRE alone | 52.1 MB | not measured |
-| The service's libraries (50 jars) | | 21 MB |
-| **The archive: trimmed runtime plus the service** | **58.9 MB** | **84 MB** (63 MB runtime, 21 MB libraries) |
+| The service's libraries (50 jars) | | 21.8 MB |
+| **The archive: trimmed runtime plus the service** | **58.9 MB** | **85.7 MB** (63.9 MB runtime, 21.8 MB libraries) |
 
 The whole archive, application included, is about the size of the vendor's JRE download on its own,
 and under a third of the JDK. Inside it, the runtime and Spring split roughly two to one:
 
 | Part of the archive | Compressed | Unpacked |
 |---|---|---|
-| Trimmed runtime (13 modules) | 39.3 MB | 61 MB |
-| Spring Boot, Tomcat, Jackson and the service (50 jars, 29 of them Spring's) | 19.7 MB | 21 MB |
+| Trimmed runtime (the 13 modules jdeps found, 18 with what they need) | 39.3 MB | 63.9 MB |
+| Spring Boot, Tomcat, Jackson and the service (50 jars, 29 of them Spring's) | 19.7 MB | 21.8 MB |
 
 The trimmed runtime is about a quarter smaller than Temurin's 52.1 MB JRE, which carries the whole
 Java SE platform whether the service uses it or not. Spring's jars hardly shrink in the archive,
 because a jar is already compressed. Spring needs more of the JDK than the plain sample: `java.desktop`,
-pulled in by `java.beans`, is the largest of its modules, which is why the runtime is 63 MB here
-rather than 31 MB.
+pulled in by `java.beans`, is the largest of its modules, which is why the runtime is 63.9 MB here
+rather than 40.9 MB. A megabyte in these tables is a million bytes.
 
 ## Hardening every runtime
 

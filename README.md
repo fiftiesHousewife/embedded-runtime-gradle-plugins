@@ -185,17 +185,18 @@ See [What your app needs to do](docs/your-app.md#nodejs-trusted-cas-and-tls) and
 
 ### How big the archive is
 
-Measured for linux-x64 against Temurin 21.0.12.1+1, on 25 October 2026:
+Measured for linux-x64 against Temurin 21.0.12.1+1, on 25 October 2026, in megabytes of a million
+bytes:
 
 | | Compressed | Unpacked |
 |---|---|---|
 | Full Temurin 21 JDK, for comparison | 207.5 MB | 353 MB |
 | Temurin 21 JRE, for comparison | 52.1 MB | |
-| **Spring Boot 4.1 web service with Actuator: the whole archive** | **58.9 MB** | **84 MB** |
-| of which the trimmed runtime (13 modules, all found by jdeps) | 39.3 MB | 61 MB |
-| of which Spring Boot, Tomcat, Jackson and the service (50 jars) | 19.7 MB | 21 MB |
-| **Plain HTTP service on the JDK's own server: the whole archive** | **17 MB** | |
-| of which the trimmed runtime (`java.base`, `jdk.httpserver`) | | 31 MB |
+| **Spring Boot 4.1 web service with Actuator: the whole archive** | **58.9 MB** | **85.7 MB** |
+| of which the trimmed runtime (13 modules found by jdeps, 18 with what they need) | 39.3 MB | 63.9 MB |
+| of which Spring Boot, Tomcat, Jackson and the service (50 jars) | 19.7 MB | 21.8 MB |
+| **Plain HTTP service on the JDK's own server: the whole archive** | **21.0 MB** | **40.9 MB** |
+| of which the trimmed runtime (`java.base`, `jdk.httpserver`; 26 MB of it is the JVM itself) | | 40.9 MB |
 
 A whole Spring Boot service, runtime included, is about the size of the vendor's JRE download
 alone. The runtime grows with the modules the app needs: Spring's `java.desktop`, pulled in by

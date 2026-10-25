@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Assertions.assertAll
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Assumptions.assumeTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.io.File
@@ -33,6 +34,14 @@ class JavaAppTargetsTest {
             { assertTrue(project.project.resolve("build/distributions/svc-2.0.0-$host.tar.gz").isFile) },
             { assertTrue(project.project.resolve("build/distributions/svc-2.0.0-linux-aarch64.tar.gz").isFile) },
         )
+    }
+
+    @Test
+    fun `a build for another machine only links with this machine's JDK`() {
+        assumeTrue(host != "linux-aarch64", "the fixture publishes linux-aarch64 as the other machine")
+        val project = javaService(tmp, JavaServiceOptions(javaApp = "$FIXTURE_MODULES\ntargets(\"linux-aarch64\")"))
+        project.build("appArchive")
+        assertTrue(project.project.resolve("build/distributions/svc-2.0.0-linux-aarch64.tar.gz").isFile)
     }
 
     @Test

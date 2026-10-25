@@ -19,19 +19,25 @@ internal class JavaRuntimeTasks(
     private val wiring: AppWiring,
 ) {
     private val jdks = Jdks(project, extension, wiring)
+
+    /**
+     * This machine's JDK, which runs jdeps and jlink. Each task asks for it before it is registered:
+     * setting it up registers its download tasks, which Gradle forbids while a task is being created.
+     */
     private val hostJdk get() = jdks.forTarget(wiring.host)
     private val group = JavaAppPlugin.ECOSYSTEM.taskGroup
 
     /** Links [target]'s trimmed runtime with this machine's jlink, from [target]'s JDK. */
     fun jlink(target: Target): TaskProvider<JlinkRuntime> {
         val targetHome = jdks.forTarget(target)
+        val toolHome = hostJdk
         return project.tasks.register("jlink${target.taskSuffix}", JlinkRuntime::class.java) {
             group = this@JavaRuntimeTasks.group
             description = "Links the trimmed Java runtime for ${target.id}"
-            toolJdk.set(hostJdk.dir)
+            toolJdk.set(toolHome.dir)
             targetJdk.set(targetHome.dir)
             targetHome.jmods?.let(targetJmods::set)
-            dependsOn(hostJdk.tasks + targetHome.tasks)
+            dependsOn(toolHome.tasks + targetHome.tasks)
             jdkVersion.set(extension.jdkVersion)
             host.set(wiring.host)
             this.target.set(target)
@@ -63,25 +69,29 @@ internal class JavaRuntimeTasks(
             outputDir.set(wiring.workDir.map { it.dir("runtime/${target.id}") })
         }
 
-    fun jdeps() = project.tasks.register("jdeps", JdepsModules::class.java) {
-        group = this@JavaRuntimeTasks.group
-        description = "Finds the JDK modules the app and its dependencies use, with jdeps"
-        jdk.set(hostJdk.dir)
-        hostJdk.builtBy?.let { dependsOn(it) }
-        jdkVersion.set(extension.jdkVersion)
-        javaFeature.set(extension.javaVersion)
-        appJar.from(project.tasks.named("jar", Jar::class.java))
-        classpath.from(project.configurations.named("runtimeClasspath"))
-        outputFile.set(project.layout.buildDirectory.file("app-work/jdeps/modules.txt"))
+    fun jdeps(): TaskProvider<JdepsModules> {
+        val home = hostJdk
+        return project.tasks.register("jdeps", JdepsModules::class.java) {
+            group = this@JavaRuntimeTasks.group
+            description = "Finds the JDK modules the app and its dependencies use, with jdeps"
+            jdk.set(home.dir)
+            home.builtBy?.let { dependsOn(it) }
+            jdkVersion.set(extension.jdkVersion)
+            javaFeature.set(extension.javaVersion)
+            appJar.from(project.tasks.named("jar", Jar::class.java))
+            classpath.from(project.configurations.named("runtimeClasspath"))
+            outputFile.set(project.layout.buildDirectory.file("app-work/jdeps/modules.txt"))
+        }
     }
 
     fun findModules() {
+        val home = hostJdk
         project.tasks.register("jlinkFindModules", JlinkFindModules::class.java) {
             group = this@JavaRuntimeTasks.group
             description = "Runs the app, adding each JDK module it turns out to need, until it is healthy"
-            jdk.set(hostJdk.dir)
-            hostJdk.jmods?.let(jmods::set)
-            dependsOn(hostJdk.tasks)
+            jdk.set(home.dir)
+            home.jmods?.let(jmods::set)
+            dependsOn(home.tasks)
             useThisMachinesApp(this)
             appName.set(extension.appName)
             expectedVersion.set(project.provider { project.version.toString() })

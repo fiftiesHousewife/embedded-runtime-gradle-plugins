@@ -7,7 +7,7 @@
   "plugins": [
     {
       "name": "embedded-runtime",
-      "source": "./claude-plugin",
+      "source": "./ai/claude",
       "description": "Skills for the embedded runtime Gradle plugins: adopt them, find the JDK modules for jlink, upgrade dependencies and runtimes"
     }
   ]

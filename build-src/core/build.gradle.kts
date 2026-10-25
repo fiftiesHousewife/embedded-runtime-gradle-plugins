@@ -20,6 +20,27 @@ gradlePlugin {
     }
 }
 
+// The AI assistant files in the repository's ai/ folder, shipped in the jar for `aiSkills` to write
+// into a project, with an index because a jar's resources cannot be listed.
+val aiSource = layout.projectDirectory.dir("../../ai")
+val aiResources =
+    tasks.register<Sync>("aiResources") {
+        val root = "io/github/fiftieshousewife/appcore/ai"
+        from(aiSource.dir("skills")) { into("$root/skills") }
+        from(aiSource.dir("copilot/prompts")) { into("$root/prompts") }
+        into(layout.buildDirectory.dir("generated/ai"))
+        val skills = aiSource.dir("skills").asFile
+        val prompts = aiSource.dir("copilot/prompts").asFile
+        inputs.dir(skills)
+        inputs.dir(prompts)
+        doLast {
+            val listed = listOf("skills" to skills, "prompts" to prompts).flatMap { (kind, dir) ->
+                dir.walkTopDown().filter(File::isFile).map { "$kind/" + it.relativeTo(dir).invariantSeparatorsPath }
+            }
+            destinationDir.resolve("$root/index.txt").writeText(listed.sorted().joinToString("\n", postfix = "\n"))
+        }
+    }
+
 // The settings plugins align project-plugin versions with their own, read from this resource.
 val versionResource =
     tasks.register<WriteProperties>("versionResource") {
@@ -30,6 +51,7 @@ val versionResource =
     }
 sourceSets.main {
     resources.srcDir(versionResource.map { layout.buildDirectory.dir("generated/version").get() })
+    resources.srcDir(aiResources.map { layout.buildDirectory.dir("generated/ai").get() })
 }
 
 dependencies {

@@ -1,5 +1,5 @@
 ---
-name: jlink-modules
+name: embedded-runtime-jlink-modules
 description: Find every JDK module a Java app needs so its jlink-trimmed runtime works, using the java-app plugin's jdeps and jlinkFindModules tasks. Use when appSmokeTest fails with NoClassDefFoundError or ClassNotFoundException for a java.* / javax.* / jdk.* / sun.* class, when setting up javaApp for a new app, or when asked which modules the runtime should contain.
 ---
 

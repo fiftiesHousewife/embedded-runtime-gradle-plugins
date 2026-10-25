@@ -4,6 +4,7 @@ import io.github.fiftieshousewife.appcore.tasks.GenerateAppManifest
 import io.github.fiftieshousewife.appcore.tasks.GenerateLaunchers
 import io.github.fiftieshousewife.appcore.tasks.GenerateSbom
 import io.github.fiftieshousewife.appcore.tasks.GitCommitValueSource
+import io.github.fiftieshousewife.appcore.tasks.InstallAiSkills
 import io.github.fiftieshousewife.appcore.tasks.WriteTextFile
 import org.gradle.api.GradleException
 import org.gradle.api.NamedDomainObjectProvider
@@ -239,6 +240,11 @@ class AppWiring(
             }
         val hostTasks = HostTasks(project, this)
         val smoke = hostTasks.smoke
+        tasks.register("aiSkills", InstallAiSkills::class.java) {
+            group = "help"
+            description = "Writes the plugins' skills and prompt files for Copilot and Devin into .agents/ and .github/"
+            projectDirectory.set(layout.projectDirectory)
+        }
         val publishing = AppPublishing(project, this, services.components).apply { register(smoke) }
         tasks.named("assemble") { dependsOn(allArchives) }
         tasks.named("check") { dependsOn(smoke) }

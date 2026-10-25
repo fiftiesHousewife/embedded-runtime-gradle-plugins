@@ -28,13 +28,14 @@ installs this machine's app with its runtime, and the custom installer is gone.
 
 ## AI tooling
 
+Done 2026-10-25: everything in `ai/` (see `ai/README.md`); skills in the open Agent Skills format
+shared by Copilot and Devin, Copilot prompt files and repository instructions, the Claude plugin with
+a tested build-check hook, and `./gradlew aiSkills` to install them in a project.
+
 | Item | Notes |
 |---|---|
-| **One `ai/` folder** | Move `claude-plugin/` to `ai/claude/`; the marketplace manifest stays at `.claude-plugin/marketplace.json` (it must be at the repo root) and points into `ai/claude` |
-| **GitHub Copilot** | Must not assume the Copilot CLI: cover the IDE (VS Code, JetBrains, Visual Studio) via repository custom instructions (`.github/copilot-instructions.md`, path-scoped `.github/instructions/*.instructions.md`) and prompt files (`.github/prompts/*.prompt.md`), plus the coding agent. Mirror the three skills (adopt, jlink-modules, upgrade). Research current file formats before writing |
-| **Devin** | Equivalent knowledge/playbooks for the same three tasks. Research Devin's current repository conventions before writing |
-| **Hooks** | Enable and test hooks where they help (e.g. format with spotless after edits to Kotlin; run unit tests of the touched module). Prove each fires |
-| **`.claude/settings.json`** | Sandbox blocks writing it; the snippet that auto-suggests the marketplace to collaborators is in the conversation of 2026-10-25 and in the README section on skills. Owner to add |
+| **`.claude/settings.json`** | Sandbox blocks writing it; the snippet that auto-suggests the marketplace to collaborators is in the conversation of 2026-10-25. Owner to add |
+| **Copilot and Devin hooks** | Not added: neither documents a repository hook format that could be verified |
 | **Performance tuning skill** | Skill plus a docs section on tuning an embedded-runtime app, built around Java Flight Recorder (`-XX:StartFlightRecording`, `jfr print`, JDK Mission Control), GC choice and heap sizing in containers; needs `jdk.jfr` in the runtime |
 
 ## Code quality

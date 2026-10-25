@@ -17,8 +17,11 @@ build-src/                  the plugin build, included by the root build
 deploy/                     curate-runtimes.sh (mirrors approved runtimes into the binary repository)
 docs/                       user documentation, linked from the README; article.md is the article's home
 .github/scripts/            verify-rpm.sh: CI installs the sample's RPM in a Rocky Linux container
-.claude-plugin/, claude-plugin/   Claude Code marketplace and the embedded-runtime plugin's skills; keep the
-                            skills in step with the tasks and properties they name
+.claude-plugin/             the Claude Code marketplace manifest (must stay at the root)
+ai/                         every AI assistant file, one source: skills, Copilot prompts and instructions,
+                            the Claude plugin and its hook; ./gradlew syncAiSkills copies them to
+                            .agents/skills, .github/prompts and .github/copilot-instructions.md (see ai/README.md);
+                            keep the skills in step with the tasks and properties they name
 gradle/init.d/              init script for machines behind a binary repository
 gradle/libs.versions.toml   the one version catalogue, shared by every build here
 samples/                    a Java and a Node service, built in CI end to end

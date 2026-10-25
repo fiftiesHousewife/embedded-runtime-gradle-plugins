@@ -1,5 +1,5 @@
 ---
-name: upgrade
+name: embedded-runtime-upgrade
 description: Upgrade a project built with the embedded runtime Gradle plugins to the latest versions - its libraries, Gradle plugins, the embedded JDK or Node.js, and the plugins themselves - and prove the packaged app still starts. Use when asked to upgrade, update dependencies, take a Java/Node security patch, bump to the latest, or review Renovate/Dependabot pull requests in such a project.
 ---
 

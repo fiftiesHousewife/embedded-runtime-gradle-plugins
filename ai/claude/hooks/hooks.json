@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/check-gradle-build.sh\"",
+            "timeout": 300,
+            "statusMessage": "Checking the Gradle build still configures"
+          }
+        ]
+      }
+    ]
+  }
+}

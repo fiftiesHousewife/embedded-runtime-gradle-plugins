@@ -44,8 +44,6 @@ and `./gradlew aiSkills` to install them in a project. Prompt files were dropped
 
 | Item | Notes |
 |---|---|
-| Windows CI after the LF fix | Confirm the `ci` run on `c03d1f0` or later is green on Windows |
-| systemd step | `.github/scripts/verify-rpm.sh` now runs the unit under a real systemd (UBI init image); has not run in CI yet |
 | Windows pre-installed JDKs | `javaApp.jdk.<feature>.windows-x64.path` has unit tests only; functional tests skip on Windows (fixtures use system `tar`). Add a Windows functional path |
 | GitHub API access for the agent | Unauthenticated API calls hit the rate limit; `gh` config is unreadable in the sandbox |
 

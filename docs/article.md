@@ -293,6 +293,31 @@ What can be made binding is narrower and more useful:
 
 That is a better deal than repackaging: the policy lives in one versioned place, every runtime records which version it carries, and the checks look at what is really there.
 
+## How Gradle ships an application, and what changes
+
+Gradle already has a standard way to ship a Java application, and these plugins build on it rather than beside it.
+
+The [`application` plugin](https://docs.gradle.org/current/userguide/application_plugin.html) adds a `run` task and `startScripts`, which writes two launchers: `bin/<app>` for POSIX shells and `bin/<app>.bat` for Windows. It also applies the [`distribution` plugin](https://docs.gradle.org/current/userguide/distribution_plugin.html), which defines one distribution, `main`: the launchers in `bin/`, the app's jar and its runtime classpath in `lib/`, and anything under `src/main/dist`. `distZip` and `distTar` archive it as `<app>-<version>.zip` and `.tar`, and `installDist` copies it to `build/install/<app>`.
+
+What that distribution leaves out is Java. The generated launcher looks for a runtime when it starts, in `JAVA_HOME` or else on the `PATH`. So the archive works only where someone has already installed a suitable Java, which brings back every problem of the shared install. Gradle has no task to link a runtime and no notion of a target operating system, and it neither publishes nor tests the distribution unless the build adds that itself.
+
+These plugins keep Gradle's tasks and change what goes into them:
+
+| | Gradle's `application` and `distribution` plugins | With these plugins |
+| --- | --- | --- |
+| Distributions | One, `main` | One per target (`linuxX64`, `windowsX64`, …); `main` is this machine's |
+| Java | Found when the app starts: `JAVA_HOME`, else `PATH` | `runtime/` inside the archive; `JAVA_HOME` is ignored |
+| Launcher | `startScripts` with Gradle's template | The same task with a script generator that starts the embedded runtime, plus `run`, `healthcheck` and `version` |
+| Runtime options | `applicationDefaultJvmArgs`, then `JAVA_OPTS` and `<APP>_OPTS` | The build's JVM options, then `APP_JAVA_OPTS` and a `jvm.options` file, or nothing at all when options are locked |
+| Contents | `bin/`, `lib/`, `src/main/dist` | Also `runtime/`, `conf.defaults/`, `META-INF/app.json` and an SBOM |
+| Archives | `<app>-<version>.zip` and `.tar` | `<app>-<version>-<target>.tar.gz` (`.zip` for Windows), unpacking to a directory named for the target |
+| Publishing | Not published | Each archive published under the target's classifier, described by module metadata |
+| Testing | None | The archive is unpacked and started before it can be published |
+
+The familiar tasks still do what their names say. `installDist` lays out this machine's app with its runtime; `installLinuxX64Dist` and `linuxX64DistTar` do the same for another target. A project customises the launcher the usual way, through `startScripts` or its own generator, and adds files to a target's distribution the way it would to any Gradle distribution. The smoke test still has to pass, so a change that breaks the launcher fails the build instead of a deployment.
+
+Gradle has no application plugin for Node.js, so the Node plugin creates the same distributions itself. A Node archive has the same layout, with `app/` in place of `lib/`, and the same tasks build it. A deployment pipeline handles both ecosystems in the same way.
+
 ## Every target from one build
 
 A team on Macs that deploys to Linux, with a few Windows customers, needs three archives. One line asks for them:
@@ -310,8 +335,6 @@ An archive for another machine cannot be started where it was built, so only thi
 ## Proving the archive works
 
 Every app answers to one small contract: read the port from `APP_PORT`, and exit 0 when started with `--healthcheck` if the running instance is healthy. The generated launcher, `bin/<app>`, turns that into `run`, `healthcheck` and `version` commands that servers, containers and the build all use.
-
-None of this replaces Gradle's own machinery; it is built on it. The launcher comes from Gradle's standard `startScripts` task, with a script generator that starts the embedded runtime instead of whatever `JAVA_HOME` finds, so a project can still customise it the way it would any Gradle application. Each target is an ordinary Gradle distribution, with the usual `install…Dist`, `…DistTar` and `…DistZip` tasks, and plain `installDist` lays out this machine's app with its runtime.
 
 `./gradlew build` then tests the archive itself, not the build directories it came from. It extracts the finished `.tar.gz` to a scratch directory, checks that `version` reports the right release, starts the app on a free port, and waits for the health check. A build that passes has started the exact file it will publish.
 

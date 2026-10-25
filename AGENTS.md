@@ -1,7 +1,7 @@
 # Working on this repository
 
 Notes for anyone (human or agent) changing the plugins. What has been asked for and not yet done is in [BACKLOG.md](BACKLOG.md) (keep it current);
-researched gaps are in [ROADMAP.md](ROADMAP.md); larger designs live in [plans/](plans). The [README](README.md) and [`docs/`](docs)
+researched gaps are in [ROADMAP.md](ROADMAP.md). The [README](README.md) and [`docs/`](docs)
 are for people *using* them and must stay free of anything below. Keep the README a short overview
 that links into `docs/`.
 
@@ -14,14 +14,14 @@ build-src/                  the plugin build, included by the root build
   java-app/                 io.github.fiftieshousewife:java-app      package …javaapp
   node-app/                 io.github.fiftieshousewife:node-app      package …nodeapp
   config/detekt/detekt.yml  deviations from detekt's defaults only
-deploy/                     curate-runtimes.sh (mirrors approved runtimes into the binary repository)
+scripts/                    curate-runtimes.sh (mirrors approved runtimes into the binary repository)
 docs/                       user documentation, linked from the README; article.md is the article's home
 .github/scripts/            verify-rpm.sh: CI installs the sample's RPM in a Rocky Linux container
 .claude-plugin/             the Claude Code marketplace manifest (must stay at the root)
-ai/                         every AI assistant file, one source: skills, the shared post-edit hook,
-                            Copilot and Devin hook configs, Copilot instructions, the Claude plugin; ./gradlew syncAiSkills copies them to
-                            .agents/skills, .github/hooks, .devin and .github/copilot-instructions.md (see ai/README.md);
-                            keep the skills in step with the tasks and properties they name
+ai/                         the AI assistant files the plugins ship: skills, the shared post-edit hook,
+                            Copilot and Devin hook configs, the Claude plugin (see ai/README.md); ./gradlew
+                            syncAiSkills updates the Claude plugin's copies; keep the skills in step with the
+                            tasks and properties they name. Copilot's instructions for this repo: .github/
 gradle/init.d/              init script for machines behind a binary repository
 gradle/libs.versions.toml   the one version catalogue, shared by every build here
 samples/                    a Java and a Node service, built in CI end to end

@@ -57,7 +57,7 @@ runtimes/temurin/jdk/21.0.12.1_1/jdk-21.0.12.1_1-linux-x64.tar.gz
 runtimes/nodejs/node/24.18.1/node-24.18.1-linux-x64.tar.gz
 ```
 
-[`deploy/curate-runtimes.sh`](../deploy/curate-runtimes.sh) downloads a JDK of any supported
+[`scripts/curate-runtimes.sh`](../scripts/curate-runtimes.sh) downloads a JDK of any supported
 distribution (`DISTRIBUTION=temurin` by default, and Temurin's separate jmods for Java 24 and
 later) or a Node.js release, checks it against the vendor's SHA-256 and uploads it there. Temurin,
 Oracle, Microsoft and SapMachine publish that checksum beside the archive; for Corretto, Zulu and

@@ -8,7 +8,7 @@ Last updated 2026-10-25.
 
 ## Next: Gradle-native launchers and distributions
 
-Done on 2026-10-25 ([plans/gradle-distributions.md](plans/gradle-distributions.md)): Java launchers
+Done on 2026-10-25 (the plan is in git history, removed in the commit after it was done): Java launchers
 come from Gradle's own `startScripts`, every target is a Gradle distribution, plain `installDist`
 installs this machine's app with its runtime, and the custom installer is gone.
 

@@ -7,6 +7,5 @@ conventions (ktlint and detekt are blocking; every version lives in `gradle/libs
 - Build and test with `./gradlew check`; one module's functional tests with
   `./gradlew -p build-src :java-app:functionalTest`.
 - User documentation is in `docs/`; keep it, `AGENTS.md` and `BACKLOG.md` current with every change.
-- Skills for common tasks (adopting the plugins, finding JDK modules for jlink, upgrading) are in
-  `.agents/skills/`. All assistant files have one source in `ai/`: edit there, then run
-  `./gradlew syncAiSkills`.
+- The plugins' AI assistant skills and post-edit hook live in `ai/` (see `ai/README.md`); after
+  editing them, run `./gradlew syncAiSkills` to update the Claude Code plugin's copies.

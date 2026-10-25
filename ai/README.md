@@ -1,18 +1,20 @@
 # AI assistant files
 
-One source for every assistant, copied to where each tool looks. Edit only the files here, then run
-`./gradlew syncAiSkills`; `./gradlew check` fails while a copy is out of date.
+The assistant files the plugins ship to projects that use them, one source for every assistant.
+`./gradlew aiSkills` writes them into a project where Copilot and Devin look; the Claude Code plugin
+in `claude/` carries its own copies, which `./gradlew syncAiSkills` updates (`./gradlew check` fails
+while they are out of date).
 
-| Source | Copied to | Read by |
+| Source | In a project | Read by |
 |---|---|---|
 | `skills/<name>/SKILL.md` | `.agents/skills/` | GitHub Copilot (agent mode in VS Code, Visual Studio and JetBrains IDEs, the Copilot app and CLI, the cloud agent, code review) and Devin, in the open Agent Skills format. Each skill is also a slash command (`/embedded-runtime-adopt`) in Copilot and `@skills:embedded-runtime-adopt` in Devin |
-| `skills/<name>/SKILL.md` | `claude/skills/` | Claude Code, through the `embedded-runtime` plugin in `claude/` (marketplace in `/.claude-plugin/`) |
-| `hooks/embedded-runtime-check-gradle-build.sh` | `claude/hooks/scripts/`, `.github/hooks/` | The post-edit build check, shared by all three tools |
+| `skills/<name>/SKILL.md` | the plugin's `claude/skills/` | Claude Code, through the `embedded-runtime` plugin in `claude/` (marketplace in `/.claude-plugin/`) |
+| `hooks/embedded-runtime-check-gradle-build.sh` | `.github/hooks/`, and the plugin's `claude/hooks/scripts/` | The post-edit build check, shared by all three tools |
 | `copilot/hooks/*.json` | `.github/hooks/` | Copilot's `postToolUse` hook (Copilot CLI and the cloud agent, which reads it from the default branch; GitHub documents no hooks in the IDEs) |
 | `devin/hooks.v1.json` | `.devin/hooks.v1.json` | The Devin CLI's `PostToolUse` hook, on its `write`, `edit` and `apply_patch` tools |
-| `copilot/copilot-instructions.md` | `.github/copilot-instructions.md` | Copilot Chat, code review and the cloud agent, for work on this repository |
 
-The tools fix those destination paths, which is why the copies exist.
+This repository doesn't install them on itself; Copilot's instructions for working here are in
+`/.github/copilot-instructions.md`.
 
 ## The post-edit hook
 

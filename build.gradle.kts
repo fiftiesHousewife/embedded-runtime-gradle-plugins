@@ -30,32 +30,23 @@ tasks.register("publishPlugins") {
     dependsOn(modules.map { pluginBuild.task("$it:publishPlugins") })
 }
 
-// AI assistant files: one source in ai/, copied to the paths each tool requires (see ai/README.md).
-// Each entry is a destination and what it holds; check fails while any copy differs.
+// AI assistant files: one source in ai/. The Claude Code plugin is installed from ai/claude alone, so
+// it carries its own copies of the skills and the hook; check fails while a copy differs.
 val aiCopies =
     mapOf(
-        ".agents/skills" to listOf("ai/skills"),
         "ai/claude/skills" to listOf("ai/skills"),
         "ai/claude/hooks/scripts" to listOf("ai/hooks"),
-        ".github/hooks" to listOf("ai/hooks", "ai/copilot/hooks"),
     )
-val aiFiles = mapOf(".github/copilot-instructions.md" to "ai/copilot/copilot-instructions.md", ".devin/hooks.v1.json" to "ai/devin/hooks.v1.json")
 val syncs =
     aiCopies.map { (destination, sources) ->
         tasks.register<Sync>("sync" + destination.split('/', '.', '-').joinToString("") { it.replaceFirstChar(Char::uppercase) }) {
             sources.forEach { from(it) }
             into(destination)
         }
-    } +
-        aiFiles.map { (destination, source) ->
-            tasks.register<Copy>("copy" + destination.split('/', '.', '-').joinToString("") { it.replaceFirstChar(Char::uppercase) }) {
-                from(source)
-                into(destination.substringBeforeLast('/'))
-            }
-        }
+    }
 tasks.register("syncAiSkills") {
     group = "build setup"
-    description = "Copies the AI assistant files in ai/ to where each tool reads them"
+    description = "Copies the skills and hook in ai/ into the Claude Code plugin in ai/claude"
     dependsOn(syncs)
 }
 val verifyAiSkills =
@@ -64,18 +55,14 @@ val verifyAiSkills =
         description = "Fails when a copy of the AI assistant files in ai/ is out of date"
         val root = layout.projectDirectory.asFile
         val dirs = aiCopies
-        val files = aiFiles
-        inputs.files(dirs.flatMap { (d, s) -> s + d }.map { root.resolve(it) } + files.flatMap { listOf(it.key, it.value) }.map { root.resolve(it) })
+        inputs.files(dirs.flatMap { (d, s) -> s + d }.map { root.resolve(it) })
         doLast {
             // Local functions, so the task holds no reference to the build script (configuration cache).
             fun tree(dir: File) = dir.walkTopDown().filter(File::isFile).associate { it.relativeTo(dir).invariantSeparatorsPath to it.readBytes().toList() }
             val staleDirs = dirs.filter { (destination, sources) ->
                 sources.map { tree(root.resolve(it)) }.reduce { a, b -> a + b } != tree(root.resolve(destination))
             }.keys
-            val staleFiles = files.filter { (destination, source) ->
-                !root.resolve(destination).isFile || !root.resolve(destination).readBytes().contentEquals(root.resolve(source).readBytes())
-            }.keys
-            val stale = staleDirs + staleFiles
+            val stale = staleDirs
             if (stale.isNotEmpty()) throw GradleException("Out of date: ${stale.joinToString()}. Run ./gradlew syncAiSkills")
         }
     }

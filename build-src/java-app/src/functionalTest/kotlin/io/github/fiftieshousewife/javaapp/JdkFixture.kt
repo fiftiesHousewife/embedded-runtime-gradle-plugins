@@ -23,12 +23,37 @@ object JdkFixture {
             JdkSources.VERSION_PREFIX + javaFeature to jdkVersion,
         )
 
+    /** The JDK running the tests, which the fixtures repackage. */
+    val home: File get() = File(System.getProperty("java.home"))
+
     /** Publishes the test JDK as `OpenJDK<f>U-jdk_<arch>_<os>_hotspot_<v>.tar.gz` for each target id. */
     fun publish(
         project: TestProject,
         vararg targets: String = arrayOf(TestProject.hostTarget()),
+    ) = targets.forEach { t ->
+        val (os, arch) = t.split("-")
+        archive(
+            project,
+            project.sources
+                .resolve("adoptium/temurin$javaFeature-binaries/releases/download/jdk-$jdkVersion")
+                .resolve("OpenJDK${javaFeature}U-jdk_${arch}_${os}_hotspot_${jdkVersion.replace('+', '_')}.tar.gz"),
+        )
+    }
+
+    /** Lays the test JDK out under [root] the way a curated Artifactory tree (or a shared local directory) holds it. */
+    fun publishCurated(
+        project: TestProject,
+        root: File,
+        target: String = TestProject.hostTarget(),
     ) {
-        val home = File(System.getProperty("java.home"))
+        val version = jdkVersion.replace('+', '_')
+        archive(project, root.resolve("temurin/jdk/$version/jdk-$version-$target.tar.gz"))
+    }
+
+    private fun archive(
+        project: TestProject,
+        out: File,
+    ) {
         assumeTrue(home.resolve("jmods").isDirectory, "the test JDK must ship jmods/")
         val stage = project.dir.resolve("stage/jdk-$jdkVersion")
         if (!stage.exists()) {
@@ -36,14 +61,7 @@ object JdkFixture {
             // Dereference links (distro JDKs link into /etc); dangling ones are skipped, not fatal.
             TestProject.run("sh", "-c", "cd '${home.absolutePath}' && tar -chf - . 2>/dev/null | (cd '${stage.absolutePath}' && tar -xf -)")
         }
-        targets.forEach { t ->
-            val (os, arch) = t.split("-")
-            val out =
-                project.sources
-                    .resolve("adoptium/temurin$javaFeature-binaries/releases/download/jdk-$jdkVersion")
-                    .resolve("OpenJDK${javaFeature}U-jdk_${arch}_${os}_hotspot_${jdkVersion.replace('+', '_')}.tar.gz")
-            out.parentFile.mkdirs()
-            TestProject.run("tar", "-czf", out.absolutePath, "-C", stage.parentFile.absolutePath, stage.name)
-        }
+        out.parentFile.mkdirs()
+        TestProject.run("tar", "-czf", out.absolutePath, "-C", stage.parentFile.absolutePath, stage.name)
     }
 }

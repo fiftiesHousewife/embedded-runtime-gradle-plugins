@@ -10,7 +10,8 @@ archive that passes CI is the archive that runs in production.
 | `io.github.fiftieshousewife.node-app` | Node.js apps | The official Node.js runtime |
 
 Each comes with a settings plugin (`….java-app.settings`, `….node-app.settings`) that sets up every
-repository the build needs, so projects declare none of their own.
+repository the build needs, so projects declare none of their own. A third plugin,
+`io.github.fiftieshousewife.app-smoke-test`, checks a published app from any other build.
 
 **Requirements:** Gradle 9.8 or newer. Java apps can target Java 11 to 25, whatever JDK Gradle
 itself runs on.
@@ -40,16 +41,11 @@ application { mainClass = "com.example.orders.Main" }
 
 javaApp {
     javaVersion = 21
-    jlinkModules = listOf("java.base", "java.sql", "java.naming", "jdk.crypto.ec")
     jvmArgs = listOf("-XX:MaxRAMPercentage=75")
 }
 ```
 
 For Kotlin, also apply `kotlin("jvm")`; nothing else changes.
-
-`jlinkModules` lists the JDK modules your app needs. `jdeps --print-module-deps app.jar` gives a
-starting point, but it misses modules loaded by name at runtime: add `jdk.crypto.ec` for TLS,
-`java.naming` for JNDI or LDAP and `jdk.localedata` for non-English locales if you use them.
 
 ### Node.js
 
@@ -86,6 +82,26 @@ A build with both Java and Node apps applies both settings plugins.
 The result is `build/distributions/orders-service-1.4.2-linux-x64.tar.gz`, named for the machine
 you built on. `build` only passes if the packaged app started and reported healthy.
 
+## Building for Linux, Mac and Windows
+
+One build can make an archive for each OS and CPU you deploy to, and publish them all together:
+
+```kotlin
+javaApp {                                       // or nodeApp
+    targets("linux-x64", "linux-aarch64", "windows-x64", "mac-aarch64")
+}
+```
+
+or, without changing the build, `./gradlew build -PjavaApp.targets=linux-x64,windows-x64`. The
+default is the machine you build on. A Mac or Windows laptop can build Linux archives with no
+containers or WSL.
+
+Only the archive for the machine you build on can be started there, so only that one is
+smoke-tested. `publish` refuses archives that were never started unless you set
+`allowUntestedPublish = true` (or pass `-PjavaApp.allowUntestedPublish=true`). The safest setup
+publishes each target from a CI job running on it; [smoke-testing the published app](#smoke-testing-a-published-app)
+on each target afterwards is the alternative.
+
 ## What your app needs to do
 
 The launcher, `bin/<app>`, takes three commands:
@@ -119,6 +135,26 @@ orders-service-1.4.2/
 ```
 
 Archives are reproducible: rebuilding the same commit gives a byte-identical file.
+
+## Which JDK modules go in
+
+The embedded runtime holds only the JDK modules your app uses. By default these are what `jdeps`
+finds in your code and its dependencies. jdeps can't see modules loaded by name at runtime, such as
+`jdk.crypto.ec` for TLS, `java.naming` for JNDI or LDAP, or `jdk.localedata` for other locales.
+If one is missing, the smoke test fails and says so. Then run:
+
+```bash
+./gradlew jlinkFindModules
+```
+
+It starts the app, adds the module holding each JDK class it fails to load, and tries again until
+the app is healthy, then prints what to add:
+
+```kotlin
+javaApp { additionalModules.addAll("jdk.crypto.ec") }
+```
+
+To choose the modules yourself instead, set `jlinkModules = listOf(...)`.
 
 ## Choosing a JDK
 
@@ -155,16 +191,27 @@ SapMachine 25 has no Intel Mac (`mac-x64`) build.
 
 To download from a mirror instead, see `javaApp.jdk.url` under [Configuration](#configuration).
 
-## Building for another OS or CPU
+### JDKs already on disk
 
-```bash
-./gradlew build -PjavaApp.target=linux-aarch64      # or -PnodeApp.target=…
+To use JDKs you already have instead of downloading them, point at a shared directory of archives,
+laid out like the [Artifactory runtimes repository](#repositories-to-create):
+
+```properties
+javaApp.jdk.localPath=/shared/jdks     # /shared/jdks/temurin/jdk/21.0.12.1_1/jdk-21.0.12.1_1-linux-x64.tar.gz
 ```
 
-Targets: `linux-x64`, `linux-aarch64`, `windows-x64`, `mac-x64`, `mac-aarch64`. A Mac or Windows
-laptop can build a Linux archive with no containers or WSL. An archive for another machine can't be
-started where it was built, so its health check is skipped and `publish` refuses it unless you pass
-`-PjavaApp.allowUntestedPublish=true`. Publish from CI on the target instead.
+or configure one JDK at a time, as an installed directory or an archive:
+
+```properties
+javaApp.jdk.21.linux-x64.path=/usr/lib/jvm/jdk-21
+javaApp.jdk.21.windows-x64.path=/shared/jdks/jdk-21-windows.zip
+```
+
+A JDK configured this way wins over every other source for that release and target, so it also
+covers JDKs installed from your own RPMs. The JDK used to run `jlink` (the one for the machine you
+build on) and each target's JDK must be the same exact version. Gradle compiles with an archive
+configured this way directly; for an installed directory, also list it in
+`org.gradle.java.installations.paths`.
 
 ## Behind a corporate Artifactory
 
@@ -214,11 +261,14 @@ A pattern can use `[organisation]` (the distribution, e.g. `temurin`, or `nodejs
 
 ## Publishing
 
-`./gradlew publish` uploads the archive and its SBOM to your Maven repository:
+`./gradlew publish` uploads every target's archive and SBOM to your Maven repository, under one
+version, with the target as the classifier:
 
 ```
 com/example/orders-service/1.4.2/orders-service-1.4.2-linux-x64.tar.gz
 com/example/orders-service/1.4.2/orders-service-1.4.2-linux-x64-cyclonedx.json
+com/example/orders-service/1.4.2/orders-service-1.4.2-windows-x64.tar.gz
+…
 ```
 
 With Artifactory configured, releases go to `libs-release-local` and `-SNAPSHOT` versions to
@@ -251,17 +301,37 @@ rolls back automatically if that fails.
 Per-server settings such as `APP_PORT` go in `conf/env`.
 
 **As a container image:** `./gradlew appDockerContext` writes `build/docker-context/` with a
-Dockerfile and the app, ready for `docker build`. The base image needs only glibc and a shell. To
-use your own Dockerfile, put it at `src/deploy/docker/Dockerfile`.
+Dockerfile and a Linux archive under `app/`, ready for `docker build`. It uses your project's own
+`Dockerfile` (or `src/deploy/docker/Dockerfile`, or whatever `dockerfile` is set to) if there is
+one, and otherwise generates one whose base image needs only glibc and a shell. It needs a Linux
+target, and prefers the one matching your machine's CPU.
+
+## Smoke-testing a published app
+
+Any build can check a published app, for example a deployment pipeline before it rolls a release
+out, with the same smoke test the app's own build runs:
+
+```kotlin
+// build.gradle.kts of the checking build
+plugins {
+    id("io.github.fiftieshousewife.app-smoke-test") version "1.0.0"
+}
+repositories { maven("https://artifactory.example.com/artifactory/libs-release-local") }
+dependencies { smokeTest("com.example:orders-service:1.4.2") }
+```
+
+`./gradlew appSmokeTest` downloads the archive built for the machine it runs on, starts it and
+waits for its health check. Run it on each target you publish for.
 
 ## Reference
 
 ### `javaApp {}` and `nodeApp {}`
 
 ```kotlin
-javaApp {                                       // nodeApp {} has the same first six settings
+javaApp {                                       // nodeApp {} has the same first seven settings
     appName = "orders-service"                  // launcher and archive name; default: project name
-    target = target("linux-x64")                // default: -PjavaApp.target, else this machine
+    targets("linux-x64", "windows-x64")         // default: -PjavaApp.targets, else this machine
+    dockerfile = file("docker/Dockerfile")      // default: Dockerfile, else src/deploy/docker/Dockerfile
     configDefaults = file("src/deploy/conf")    // shipped as conf.defaults/
     smokeTestEnabled = true                     // start the archive during `check`
     smokeTestTimeout = Duration.ofSeconds(60)
@@ -269,7 +339,8 @@ javaApp {                                       // nodeApp {} has the same first
 
     javaVersion = 21                            // 11 to 25
     jdkVersion = "21.0.13+9"                    // default: the plugin's pin
-    jlinkModules = listOf("java.base")
+    additionalModules = listOf("jdk.crypto.ec") // added to what jdeps finds
+    jlinkModules = listOf("java.base")          // instead: exactly these modules
     jlinkOptions = listOf("--strip-debug", "--no-man-pages", "--no-header-files", "--compress=zip-6")
     jvmArgs = listOf("-XX:MaxRAMPercentage=75") // before $APP_JAVA_OPTS
 }
@@ -290,11 +361,13 @@ nodeApp {
 
 | Task | Does |
 |---|---|
-| `appTar` | Builds the archive; part of `assemble` |
-| `appSmokeTest` | Starts the archive and waits for its health check; part of `check` |
-| `runApp` | Runs the packaged app; pass arguments with `-Pargs="…"` |
+| `appTar` | Builds every target's archive (`appTarLinuxX64` and so on for one); part of `assemble` |
+| `appSmokeTest` | Starts this machine's archive and waits for its health check; part of `check` |
+| `runApp` | Runs this machine's packaged app; pass arguments with `-Pargs="…"` |
 | `appDockerContext` | Writes a container build context |
-| `jlink` | Java: builds the trimmed runtime |
+| `jdeps` | Java: lists the JDK modules the code uses |
+| `jlinkFindModules` | Java: finds the modules jdeps can't see, by running the app |
+| `jlinkLinuxX64`, … | Java: builds one target's trimmed runtime |
 | `npmInstall`, `npmBuild`, `npmTest` | Node: `npm ci`, your build script, your test script |
 
 ### Configuration
@@ -306,11 +379,13 @@ Gradle properties, set in `gradle.properties`, `~/.gradle/gradle.properties` or 
 | `javaApp.jdk.distribution` | `temurin` | JDK vendor |
 | `javaApp.jdk.<feature>` | the plugin's pin | Exact JDK version, e.g. `javaApp.jdk.21=21.0.13+9` |
 | `javaApp.jdk.url`, `javaApp.jdk.pattern` | the vendor's site | Download JDKs from a mirror |
+| `javaApp.jdk.localPath`, `javaApp.jdk.localPattern` | | Read JDK archives from a shared directory |
+| `javaApp.jdk.<feature>.<target>.path` | | One JDK, as a directory or archive, e.g. `javaApp.jdk.21.linux-x64.path` |
 | `nodeApp.node.version` | the plugin's pin | Exact Node.js version |
 | `nodeApp.node.url`, `nodeApp.node.pattern` | nodejs.org/dist | Download Node.js from a mirror |
 | `nodeApp.npm.registry` | registry.npmjs.org | npm registry when not using Artifactory |
 | `nodeApp.npm.caFile` | | PEM file of corporate CAs for npm |
-| `javaApp.target`, `nodeApp.target` | this machine | OS and CPU to build for |
+| `javaApp.targets`, `nodeApp.targets` | this machine | Comma-separated targets to build |
 | `javaApp.allowUntestedPublish`, `nodeApp.allowUntestedPublish` | `false` | Allow publishing an archive that was never started |
 | `artifactory.url` | | Download everything through this Artifactory |
 | `artifactory.repo.maven` | `maven-virtual` | |

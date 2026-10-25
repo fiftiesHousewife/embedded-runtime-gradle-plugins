@@ -3,16 +3,24 @@ package io.github.fiftieshousewife.javaapp
 import io.github.fiftieshousewife.appcore.AppWiring
 import io.github.fiftieshousewife.appcore.Ecosystem
 import io.github.fiftieshousewife.appcore.EcosystemSpec
+import io.github.fiftieshousewife.appcore.Target
+import io.github.fiftieshousewife.appcore.tasks.AppSmokeTest
 import io.github.fiftieshousewife.appcore.tasks.GenerateLaunchers.Companion.cmdQuote
 import io.github.fiftieshousewife.appcore.tasks.GenerateLaunchers.Companion.shQuote
+import io.github.fiftieshousewife.javaapp.tasks.JdepsModules
+import io.github.fiftieshousewife.javaapp.tasks.JlinkFindModules
 import io.github.fiftieshousewife.javaapp.tasks.JlinkRuntime
+import org.gradle.api.GradleException
 import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.gradle.api.artifacts.component.ModuleComponentIdentifier
 import org.gradle.api.component.SoftwareComponentFactory
 import org.gradle.api.file.ArchiveOperations
+import org.gradle.api.file.Directory
 import org.gradle.api.plugins.JavaApplication
 import org.gradle.api.plugins.JavaPluginExtension
+import org.gradle.api.provider.Provider
+import org.gradle.api.tasks.Sync
 import org.gradle.api.tasks.TaskProvider
 import org.gradle.api.tasks.bundling.Jar
 import org.gradle.jvm.toolchain.JavaLanguageVersion
@@ -20,15 +28,18 @@ import javax.inject.Inject
 
 /**
  * `io.github.fiftieshousewife.java-app` — a Java application packaged with a jlink-trimmed runtime
- * of the configured JDK distribution into a self-contained `.tar.gz`.
+ * of the configured JDK distribution into a self-contained `.tar.gz` per target.
  *
- * Compilation and the bundled runtime use the same feature release and the same exact pin: the
- * toolchain resolver ([JavaAppSettingsPlugin]) and the runtime archive dependency both come from
- * [JdkCatalog] and [JdkSources].
+ * Compilation and the embedded runtime use the same feature release and the same exact pin: the
+ * toolchain resolver ([JavaAppSettingsPlugin]) and the runtime archives both come from [JdkCatalog]
+ * and [JdkSources].
  *
- * The archive layout follows the `application` plugin's: `bin/<app>`, `lib/` (the application jar and
- * its dependencies), plus `runtime/` (jlink image), `conf.defaults/` and
+ * The archive layout follows the `application` plugin's: `bin/<app>`, `lib/` (the application jar
+ * and its dependencies), plus `runtime/` (jlink image), `conf.defaults/` and
  * `META-INF/{app.json,sbom.cdx.json}`.
+ *
+ * The runtime's modules default to what `jdeps` finds plus `additionalModules`; `jlinkFindModules`
+ * finds the ones jdeps cannot see by running the app.
  */
 abstract class JavaAppPlugin
     @Inject
@@ -41,20 +52,34 @@ abstract class JavaAppPlugin
             val extension = project.extensions.create(ECOSYSTEM.extensionName, JavaAppExtension::class.java)
             val wiring = AppWiring(project, ECOSYSTEM, extension, archives, components)
             wiring.applyConventions()
-            applyConventions(project, extension)
-
-            val jlink = registerJlink(project, extension, wiring)
+            val detectedModules = project.objects.listProperty(String::class.java)
+            applyConventions(project, extension, detectedModules)
 
             // The archive replaces the application plugin's script-based distributions; keeping both
             // would publish two different ways to run the same app. installDist remains available.
             listOf("distTar", "distZip").forEach { name -> project.tasks.named(name) { enabled = false } }
 
-            wiring.register(ecosystemSpec(project, extension, jlink))
+            // Targets and the JDK release are final once the build script has run; JDKs are set up
+            // then, before the shared pipeline asks for each target's contribution.
+            val jdks = Jdks(project, extension, wiring)
+            project.afterEvaluate {
+                val hostJdk = jdks.forTarget(wiring.host)
+                val jdeps = registerJdeps(project, extension, hostJdk)
+                detectedModules.set(jdeps.flatMap { it.outputFile }.map { JdepsModules.read(it.asFile) })
+                registerFindModules(project, extension, wiring, hostJdk)
+            }
+            wiring.register { target ->
+                ecosystemSpec(project, extension, registerJlink(project, extension, wiring, jdks, target))
+            }
+            project.tasks.named("appSmokeTest", AppSmokeTest::class.java) {
+                failureHint.set("If the app is missing a JDK module, ./gradlew jlinkFindModules finds which.")
+            }
         }
 
         private fun applyConventions(
             project: Project,
             extension: JavaAppExtension,
+            detectedModules: Provider<List<String>>,
         ) {
             val sources = JdkSources.from(project.providers)
             extension.javaVersion.convention(JdkCatalog.defaultJavaFeature)
@@ -62,7 +87,10 @@ abstract class JavaAppPlugin
             // than as a missing pin or a jlink failure further down.
             val javaFeature = extension.javaVersion.map(JdkCatalog::requireSupported)
             extension.jdkVersion.convention(JdkCatalog.jdkVersion(project.providers, sources.distribution, javaFeature))
-            extension.jlinkModules.convention(listOf("java.base"))
+            extension.additionalModules.convention(emptyList())
+            extension.jlinkModules.convention(
+                detectedModules.zip(extension.additionalModules) { detected, extra -> (detected + extra).distinct() },
+            )
             extension.jlinkOptions.convention(
                 javaFeature.map { feature ->
                     listOf("--strip-debug", "--no-man-pages", "--no-header-files") +
@@ -77,51 +105,75 @@ abstract class JavaAppPlugin
             }
         }
 
-        /** Resolves the target (and, for a cross build, host) JDK and links the app's runtime. */
+        /** Links the trimmed runtime for [target] with this machine's jlink, from [target]'s JDK. */
         private fun registerJlink(
             project: Project,
             extension: JavaAppExtension,
             wiring: AppWiring,
+            jdks: Jdks,
+            target: Target,
         ): TaskProvider<JlinkRuntime> {
-            val jdk = extension.jdkVersion.map(::JdkVersion)
-            val sources = JdkSources.from(project.providers)
-            val targetJdkArchive =
-                wiring.runtimeArchive(
-                    "targetJdk",
-                    jdk.zip(wiring.target) { v, t -> sources.artifact(v, t) },
-                )
-            val hostJdkArchive =
-                wiring.runtimeArchive(
-                    "hostJdk",
-                    jdk.map { v -> sources.artifact(v, wiring.host) },
-                )
-            val extractTarget =
-                wiring.extractRuntime(
-                    "extractTargetJdk",
-                    targetJdkArchive,
-                    wiring.workDir.zip(wiring.target) { d, t -> d.dir("jdk/${t.id}") },
-                )
-            val extractHost =
-                wiring.extractRuntime(
-                    "extractHostJdk",
-                    hostJdkArchive,
-                    wiring.workDir.map { it.dir("jdk/${wiring.host.id}") },
-                )
-
-            return project.tasks.register("jlink", JlinkRuntime::class.java) {
+            val hostHome = jdks.forTarget(wiring.host)
+            val targetHome = jdks.forTarget(target)
+            return project.tasks.register("jlink${target.taskSuffix}", JlinkRuntime::class.java) {
                 group = ECOSYSTEM.taskGroup
-                description = "Links the trimmed Java runtime for the target"
-                // Same platform: one JDK serves as both jlink tool and jmods source.
-                val toolTask = wiring.cross.flatMap { cross -> if (cross) extractHost else extractTarget }
-                toolJdk.set(project.layout.dir(toolTask.map { it.destinationDir }))
-                targetJdk.set(project.layout.dir(extractTarget.map { it.destinationDir }))
-                dependsOn(extractTarget, toolTask)
+                description = "Links the trimmed Java runtime for ${target.id}"
+                toolJdk.set(hostHome.dir)
+                targetJdk.set(targetHome.dir)
+                dependsOn(listOfNotNull(hostHome.builtBy, targetHome.builtBy))
                 jdkVersion.set(extension.jdkVersion)
                 host.set(wiring.host)
-                target.set(wiring.target)
+                this.target.set(target)
                 modules.set(extension.jlinkModules)
                 options.set(extension.jlinkOptions)
-                outputDir.set(wiring.workDir.zip(wiring.target) { d, t -> d.dir("jlink/${t.id}") })
+                outputDir.set(wiring.workDir.map { it.dir("jlink/${target.id}") })
+            }
+        }
+
+        private fun registerJdeps(
+            project: Project,
+            extension: JavaAppExtension,
+            hostJdk: JdkHome,
+        ) = project.tasks.register("jdeps", JdepsModules::class.java) {
+            group = ECOSYSTEM.taskGroup
+            description = "Finds the JDK modules the app and its dependencies use, with jdeps"
+            jdk.set(hostJdk.dir)
+            hostJdk.builtBy?.let { dependsOn(it) }
+            jdkVersion.set(extension.jdkVersion)
+            javaFeature.set(extension.javaVersion)
+            appJar.from(project.tasks.named("jar", Jar::class.java))
+            classpath.from(project.configurations.named("runtimeClasspath"))
+            outputFile.set(project.layout.buildDirectory.file("app-work/jdeps/modules.txt"))
+        }
+
+        private fun registerFindModules(
+            project: Project,
+            extension: JavaAppExtension,
+            wiring: AppWiring,
+            hostJdk: JdkHome,
+        ) {
+            val assembleName = "appAssemble${wiring.host.taskSuffix}"
+            project.tasks.register("jlinkFindModules", JlinkFindModules::class.java) {
+                group = ECOSYSTEM.taskGroup
+                description = "Runs the app, adding each JDK module it turns out to need, until it is healthy"
+                jdk.set(hostJdk.dir)
+                hostJdk.builtBy?.let { dependsOn(it) }
+                if (assembleName in project.tasks.names) {
+                    val assemble = project.tasks.named(assembleName, Sync::class.java)
+                    dependsOn(assemble)
+                    appDir.set(project.layout.dir(assemble.map { it.destinationDir }))
+                } else {
+                    val message = "jlinkFindModules runs the app, so javaApp.targets must include this machine (${wiring.host})"
+                    doFirst { throw GradleException(message) }
+                }
+                appName.set(extension.appName)
+                expectedVersion.set(project.provider { project.version.toString() })
+                windows.set(wiring.host.isWindows)
+                modules.set(extension.jlinkModules)
+                options.set(extension.jlinkOptions)
+                healthTimeout.set(extension.smokeTestTimeout)
+                maxAttempts.set(MAX_FIND_ATTEMPTS)
+                reportFile.set(project.layout.buildDirectory.file("app-work/jlink-find-modules.txt"))
             }
         }
 
@@ -193,5 +245,60 @@ abstract class JavaAppPlugin
                     extensionName = "javaApp",
                     settingsPluginId = JavaAppSettingsPlugin.ID,
                 )
+
+            private const val MAX_FIND_ATTEMPTS = 15
         }
     }
+
+/** A JDK on disk: its directory, and the task that puts it there, if any. */
+internal class JdkHome(
+    val dir: Provider<Directory>,
+    val builtBy: TaskProvider<Sync>?,
+)
+
+/**
+ * The JDK for each target, set up once: a directory configured by path is used as it is, an archive
+ * configured by path is extracted, and otherwise the pinned JDK is resolved from [JdkSources].
+ * Called once the build script has run, when the Java release is final.
+ */
+internal class Jdks(
+    private val project: Project,
+    private val extension: JavaAppExtension,
+    private val wiring: AppWiring,
+) {
+    private val homes = mutableMapOf<Target, JdkHome>()
+
+    fun forTarget(target: Target): JdkHome = homes.getOrPut(target) { setUp(target) }
+
+    private fun setUp(target: Target): JdkHome {
+        val feature = JdkCatalog.requireSupported(extension.javaVersion.get())
+        val local = JdkSources.localJdk(project.providers, feature, target)
+        val destination = wiring.workDir.map { it.dir("jdk/${target.id}") }
+        val extractName = "extractJdk${target.taskSuffix}"
+        return when {
+            local == null -> {
+                val sources = JdkSources.from(project.providers)
+                val archive =
+                    wiring.runtimeArchive(
+                        "jdk${target.taskSuffix}",
+                        extension.jdkVersion.map { sources.artifact(JdkVersion(it), target) },
+                    )
+                extracted(wiring.extractRuntime(extractName, wiring.singleFile(archive), destination))
+            }
+
+            local.isDirectory -> {
+                JdkHome(project.layout.dir(project.provider { local }), builtBy = null)
+            }
+
+            local.isFile -> {
+                extracted(wiring.extractRuntime(extractName, project.provider { local }, destination))
+            }
+
+            else -> {
+                throw GradleException("${JdkSources.pathProperty(feature, target)} is $local, which does not exist")
+            }
+        }
+    }
+
+    private fun extracted(task: TaskProvider<Sync>) = JdkHome(project.layout.dir(task.map { it.destinationDir }), task)
+}

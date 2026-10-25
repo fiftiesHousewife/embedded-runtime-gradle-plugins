@@ -18,7 +18,7 @@ class JdkSourcesTest {
         distribution: JdkDistribution,
         jdkUrl: String? = null,
         jdkPattern: String? = null,
-    ) = JdkSources(distribution, artifactory = null, publicUrl = jdkUrl, publicPattern = jdkPattern)
+    ) = JdkSources(distribution, JdkLocation.Public(jdkUrl, jdkPattern))
 
     private fun uri(
         sources: JdkSources,
@@ -190,7 +190,7 @@ class JdkSourcesTest {
         fun artifactory(jdkPattern: String?) =
             JdkSources(
                 JdkDistribution.ORACLE,
-                artifactory =
+                JdkLocation.artifactory(
                     Artifactory(
                         baseUrl = "https://artifactory.example.com/artifactory",
                         mavenRepo = "maven-virtual",
@@ -200,7 +200,8 @@ class JdkSourcesTest {
                         snapshotsRepo = "libs-snapshot-local",
                         allowInsecureProtocol = false,
                     ),
-                artifactoryPattern = jdkPattern,
+                    jdkPattern,
+                ),
             )
 
         assertEquals(

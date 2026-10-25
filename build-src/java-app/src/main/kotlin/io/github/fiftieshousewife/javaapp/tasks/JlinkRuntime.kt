@@ -13,7 +13,6 @@ import org.gradle.api.tasks.Internal
 import org.gradle.api.tasks.OutputDirectory
 import org.gradle.api.tasks.TaskAction
 import org.gradle.process.ExecOperations
-import java.io.File
 import javax.inject.Inject
 
 /**
@@ -58,31 +57,15 @@ abstract class JlinkRuntime
             val modules = modules.get()
             if (modules.isEmpty()) throw GradleException("javaApp.jlinkModules is empty; add at least java.base")
 
-            val tool = jdkHome(toolJdk.get().asFile)
-            val targetHome = jdkHome(targetJdk.get().asFile)
+            val tool = JdkTools.home(toolJdk.get().asFile)
+            val targetHome = JdkTools.home(targetJdk.get().asFile)
             val cross = host.get() != target.get()
-            val jmods = targetHome.resolve("jmods")
-            if (cross && !jmods.isDirectory) {
+            if (cross && !targetHome.resolve("jmods").isDirectory) {
                 throw GradleException(
                     "Cross-linking for ${target.get()} needs the target JDK's jmods/ directory, which " +
                         "$targetHome lacks (JEP 493 builds). Use a JDK distribution that ships jmods, or build on ${target.get()}.",
                 )
             }
-
-            val jlink = tool.resolve(if (host.get().isWindows) "bin/jlink.exe" else "bin/jlink")
-            exec.exec {
-                executable = jlink.absolutePath
-                if (jmods.isDirectory) args("--module-path", jmods.absolutePath)
-                args("--add-modules", modules.joinToString(","))
-                args(options.get())
-                args("--output", out.absolutePath)
-            }
-        }
-
-        companion object {
-            /** Finds the JDK home in an extracted archive (macOS archives nest it under `Contents/Home`). */
-            fun jdkHome(extracted: File): File =
-                listOf(extracted, extracted.resolve("Contents/Home")).firstOrNull { it.resolve("release").isFile }
-                    ?: throw GradleException("No JDK found in $extracted (expected a 'release' file)")
+            JdkTools.link(exec, tool, targetHome, modules, options.get(), out)
         }
     }

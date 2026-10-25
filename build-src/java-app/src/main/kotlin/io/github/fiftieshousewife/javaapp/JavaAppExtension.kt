@@ -13,10 +13,17 @@ abstract class JavaAppExtension : AppExtension() {
     abstract val jdkVersion: Property<String>
 
     /**
-     * Modules linked into the runtime. Keep this explicit and reviewed: `jdeps` misses reflectively
-     * loaded modules such as `jdk.crypto.ec`, `java.naming` and `jdk.localedata`.
+     * Modules linked into the runtime. Defaults to what `jdeps` finds in the app and its
+     * dependencies, plus [additionalModules]. Set it to take full control of the list.
      */
     abstract val jlinkModules: ListProperty<String>
+
+    /**
+     * Modules `jdeps` cannot see because they are loaded by name at runtime, such as
+     * `jdk.crypto.ec` (TLS), `java.naming` (JNDI, LDAP) or `jdk.localedata`. `jlinkFindModules`
+     * reports which ones an app needs.
+     */
+    abstract val additionalModules: ListProperty<String>
 
     /** Extra `jlink` options; defaults strip debug info, man pages and headers. */
     abstract val jlinkOptions: ListProperty<String>

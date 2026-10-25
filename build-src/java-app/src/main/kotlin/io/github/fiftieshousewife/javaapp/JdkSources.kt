@@ -6,51 +6,52 @@ import io.github.fiftieshousewife.appcore.RuntimeRepository
 import io.github.fiftieshousewife.appcore.Target
 import io.github.fiftieshousewife.appcore.setting
 import org.gradle.api.provider.ProviderFactory
+import java.io.File
 import java.net.URI
 
 /**
- * Where JDK archives come from: the chosen [distribution] from its own site, or from the curated
- * Artifactory tree when one is configured.
+ * Where JDK archives come from, first match wins: a JDK configured by path for one feature release
+ * and target ([localJdk]); a shared local directory ([LOCAL_PATH]); the curated Artifactory tree;
+ * the chosen [distribution]'s own site.
  *
  * The compile toolchain resolver and the archive's runtime both ask this class, so compilation and
  * packaging can never disagree about where a JDK comes from.
  */
 class JdkSources(
     val distribution: JdkDistribution,
-    private val artifactory: Artifactory?,
-    /** Overrides of the distribution's own site; null means its default. */
-    private val publicUrl: String? = null,
-    private val publicPattern: String? = null,
-    /** Override of [RuntimeRepository.CURATED_PATTERN]; null means the default curated layout. */
-    private val artifactoryPattern: String? = null,
+    private val location: JdkLocation = JdkLocation.Public(),
 ) {
     val repository: RuntimeRepository
         get() =
-            if (artifactory == null) {
-                RuntimeRepository(
-                    name = "${distribution.id}Jdks",
-                    baseUrl = RuntimeRepository.slash(publicUrl ?: distribution.defaultBaseUrl),
-                    artifactPattern = publicPattern ?: distribution.defaultPattern,
-                    group = distribution.group,
-                )
-            } else {
-                RuntimeRepository(
-                    name = "artifactoryJdks",
-                    baseUrl = artifactory.runtimesUrl,
-                    artifactPattern = artifactoryPattern ?: RuntimeRepository.CURATED_PATTERN,
-                    group = distribution.group,
-                )
+            when (location) {
+                is JdkLocation.Public -> {
+                    RuntimeRepository(
+                        name = "${distribution.id}Jdks",
+                        baseUrl = RuntimeRepository.slash(location.url ?: distribution.defaultBaseUrl),
+                        artifactPattern = location.pattern ?: distribution.defaultPattern,
+                        group = distribution.group,
+                    )
+                }
+
+                is JdkLocation.Curated -> {
+                    RuntimeRepository(
+                        name = location.name,
+                        baseUrl = location.baseUrl,
+                        artifactPattern = location.pattern ?: RuntimeRepository.CURATED_PATTERN,
+                        group = distribution.group,
+                    )
+                }
             }
 
     fun artifact(
         version: JdkVersion,
         target: Target,
     ): RuntimeArtifact =
-        if (artifactory == null) {
-            distribution.artifact(version, target)
-        } else {
+        when (location) {
+            is JdkLocation.Public -> distribution.artifact(version, target)
+
             // Renamed on upload, so the vendor's own naming is irrelevant here.
-            RuntimeArtifact.curated(distribution.group, "jdk", version.underscored, target)
+            is JdkLocation.Curated -> RuntimeArtifact.curated(distribution.group, "jdk", version.underscored, target)
         }
 
     fun downloadUri(
@@ -75,13 +76,72 @@ class JdkSources(
         /** Ivy pattern for the curated Artifactory tree, when it cannot use the default layout. */
         const val ARTIFACTORY_PATTERN = "javaApp.jdk.artifactoryPattern"
 
-        fun from(providers: ProviderFactory) =
-            JdkSources(
-                distribution = providers.setting(DISTRIBUTION)?.let(JdkDistribution::parse) ?: JdkDistribution.DEFAULT,
-                artifactory = Artifactory.from(providers),
-                publicUrl = providers.setting(PUBLIC_URL),
-                publicPattern = providers.setting(PUBLIC_PATTERN),
-                artifactoryPattern = providers.setting(ARTIFACTORY_PATTERN),
-            )
+        /** An absolute path to a shared directory of JDK archives, laid out like the curated Artifactory tree. */
+        const val LOCAL_PATH = "javaApp.jdk.localPath"
+        const val LOCAL_PATTERN = "javaApp.jdk.localPattern"
+
+        /**
+         * `javaApp.jdk.21.linux-x64.path`: one JDK, as an installed directory or an archive. It wins
+         * over every other source for that feature release and target.
+         */
+        fun pathProperty(
+            feature: Int,
+            target: Target,
+        ) = "$VERSION_PREFIX$feature.${target.id}.path"
+
+        /** The JDK configured at [pathProperty], if any. */
+        fun localJdk(
+            providers: ProviderFactory,
+            feature: Int,
+            target: Target,
+        ): File? = providers.setting(pathProperty(feature, target))?.let(::File)
+
+        fun from(providers: ProviderFactory): JdkSources {
+            val localPath = providers.setting(LOCAL_PATH)
+            val artifactory = Artifactory.from(providers)
+            val location =
+                when {
+                    localPath != null -> {
+                        JdkLocation.Curated(
+                            "localJdks",
+                            RuntimeRepository.slash(File(localPath).absoluteFile.toURI().toString()),
+                            providers.setting(LOCAL_PATTERN),
+                        )
+                    }
+
+                    artifactory != null -> {
+                        JdkLocation.artifactory(artifactory, providers.setting(ARTIFACTORY_PATTERN))
+                    }
+
+                    else -> {
+                        JdkLocation.Public(providers.setting(PUBLIC_URL), providers.setting(PUBLIC_PATTERN))
+                    }
+                }
+            return JdkSources(providers.setting(DISTRIBUTION)?.let(JdkDistribution::parse) ?: JdkDistribution.DEFAULT, location)
+        }
+    }
+}
+
+/** Where a distribution's JDK archives are read from. */
+sealed interface JdkLocation {
+    /** The vendor's own site, or a mirror of it: the vendor's file names, under an optional URL and pattern override. */
+    data class Public(
+        val url: String? = null,
+        val pattern: String? = null,
+    ) : JdkLocation
+
+    /** A tree of archives renamed to the curated layout: Artifactory's runtimes repository, or a local directory. */
+    data class Curated(
+        val name: String,
+        val baseUrl: URI,
+        /** Override of [RuntimeRepository.CURATED_PATTERN]. */
+        val pattern: String? = null,
+    ) : JdkLocation
+
+    companion object {
+        fun artifactory(
+            artifactory: Artifactory,
+            pattern: String? = null,
+        ) = Curated("artifactoryJdks", artifactory.runtimesUrl, pattern)
     }
 }

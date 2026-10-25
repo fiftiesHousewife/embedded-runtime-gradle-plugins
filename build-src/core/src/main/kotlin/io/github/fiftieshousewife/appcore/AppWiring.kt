@@ -7,6 +7,7 @@ import io.github.fiftieshousewife.appcore.tasks.GenerateSbom
 import io.github.fiftieshousewife.appcore.tasks.GitCommitValueSource
 import io.github.fiftieshousewife.appcore.tasks.RunApp
 import io.github.fiftieshousewife.appcore.tasks.WriteTextFile
+import org.gradle.api.GradleException
 import org.gradle.api.NamedDomainObjectProvider
 import org.gradle.api.Project
 import org.gradle.api.artifacts.ExternalModuleDependency
@@ -23,6 +24,7 @@ import org.gradle.api.tasks.TaskProvider
 import org.gradle.api.tasks.bundling.AbstractArchiveTask
 import org.gradle.api.tasks.bundling.Compression
 import org.gradle.api.tasks.bundling.Tar
+import java.io.File
 import java.time.Duration
 
 /** The names that tell the Java and Node plugins apart wherever they share code. */
@@ -39,7 +41,7 @@ data class Ecosystem(
     fun property(name: String) = "$extensionName.$name"
 }
 
-/** What an ecosystem plugin contributes to the shared archive pipeline. */
+/** What an ecosystem plugin contributes to the shared archive pipeline for one target. */
 class EcosystemSpec(
     val runtimeName: String,
     val runtimeVersion: Provider<String>,
@@ -51,14 +53,28 @@ class EcosystemSpec(
     val sbom: GenerateSbom.() -> Unit,
 )
 
+/** The tasks built for one target. */
+class TargetTasks(
+    val target: Target,
+    val assemble: TaskProvider<Sync>,
+    val tar: TaskProvider<Tar>,
+    val sbom: TaskProvider<GenerateSbom>,
+)
+
 /**
- * The pipeline the Java and Node plugins share; not a public API.
+ * The pipeline the Java and Node plugins share; not a public API. Once per target:
  *
  * ```
- * appLaunchers ─┐
- * appManifest  ─┼─► appAssemble ─► appTar ─► appSmokeTest ─► publish
- * appSbom      ─┘                     └────► appDockerContext
+ * appLaunchers<T> ─┐
+ * appManifest<T>  ─┼─► appAssemble<T> ─► appTar<T> ──► publish
+ * appSbom<T>      ─┘
  * ```
+ *
+ * plus, for this machine's archive only, `appSmokeTest` and `runApp`, and for a Linux archive
+ * `appDockerContext`. `appTar` builds every target's archive.
+ *
+ * Targets are set in the build script, so per-target tasks are registered once it has run. The
+ * tasks a build script may refer to by name are registered up front and wired to their target then.
  *
  * Every archive, whatever the target, is a `.tar.gz` with one top-level directory
  * `<app>-<version>/`. Windows 10+ extracts it with the built-in `tar.exe`.
@@ -76,27 +92,28 @@ class AppWiring(
 
     val artifactory: Artifactory? = Artifactory.from(providers)
     val host: Target = Target.host()
-    val target: Provider<Target> get() = extension.target
-    val cross: Provider<Boolean> get() = target.map { it != host }
-    val windowsTarget: Provider<Boolean> get() = target.map { it.isWindows }
     val workDir: Provider<Directory> = layout.buildDirectory.dir("app-work")
     val taskGroup: String get() = ecosystem.taskGroup
 
     private val appName: Provider<String> get() = extension.appName
-    private val versionString: Provider<String> = providers.provider { project.version.toString() }
-    private val groupString: Provider<String> = providers.provider { project.group.toString() }
-    private val targetId: Provider<String> get() = target.map { it.id }
-
-    /** `<app>-<version>`: the archive's single top-level directory. */
-    private val topDirectory: Provider<String> get() = appName.zip(versionString) { n, v -> "$n-$v" }
 
     fun applyConventions() {
         AppSettings.requireApplied(project, ecosystem.settingsPluginId)
         extension.appName.convention(project.name)
-        extension.target.convention(
-            providers.gradleProperty(ecosystem.property("target")).map(Target::parse).orElse(host),
+        extension.targets.convention(
+            providers.gradleProperty(ecosystem.property("targets")).map(Target::parseList).orElse(listOf(host)),
         )
-        extension.configDefaults.convention(layout.projectDirectory.dir("src/deploy/conf"))
+        val projectDir = layout.projectDirectory
+        extension.dockerfile.convention(
+            layout.file(
+                providers.provider {
+                    listOf(projectDir.file("Dockerfile"), projectDir.file("src/deploy/docker/Dockerfile"))
+                        .map { it.asFile }
+                        .firstOrNull(File::isFile)
+                },
+            ),
+        )
+        extension.configDefaults.convention(projectDir.dir("src/deploy/conf"))
         extension.smokeTestEnabled.convention(true)
         extension.smokeTestTimeout.convention(DEFAULT_SMOKE_TEST_TIMEOUT)
         extension.allowUntestedPublish.convention(
@@ -129,10 +146,10 @@ class AppWiring(
             )
         }
 
-    /** Extracts the archive in [configuration], dropping its single top-level directory. */
+    /** Extracts the single runtime archive in [archive], dropping its top-level directory. */
     fun extractRuntime(
         name: String,
-        configuration: NamedDomainObjectProvider<ResolvableConfiguration>,
+        archive: Provider<File>,
         destination: Provider<Directory>,
     ): TaskProvider<Sync> =
         tasks.register(name, Sync::class.java) {
@@ -141,59 +158,33 @@ class AppWiring(
             // Lambdas stored in tasks must not capture this class: it holds the Project, which the
             // configuration cache cannot serialise. Hence the local copies here and below.
             val archiveOps = archives
-            val archive = configuration.flatMap { it.elements }.map { it.single().asFile }
             from(archive.map { file -> if (file.name.endsWith(".zip")) archiveOps.zipTree(file) else archiveOps.tarTree(file) })
             into(destination)
             dropTopLevelDirectory(this)
         }
 
-    fun register(spec: EcosystemSpec) {
-        val launchers = registerLaunchers(spec)
-        val manifest = registerManifest(spec)
-        val sbom = registerSbom(spec)
-        val appDir =
-            layout.buildDirectory
-                .zip(target) { dir, t -> dir.dir("app/${t.id}") }
-                .zip(topDirectory) { dir, top -> dir.dir(top) }
+    /** The single file a [runtimeArchive] configuration resolves to. */
+    fun singleFile(configuration: NamedDomainObjectProvider<ResolvableConfiguration>): Provider<File> =
+        configuration.flatMap { it.elements }.map { it.single().asFile }
 
-        val assembleApp =
-            tasks.register("appAssemble", Sync::class.java) {
+    /**
+     * Registers the whole pipeline. [contribute] is called once per target, after the build script
+     * has run, to register that target's ecosystem-specific tasks.
+     */
+    fun register(contribute: (Target) -> EcosystemSpec) {
+        val allTars =
+            tasks.register("appTar") {
                 group = taskGroup
-                description = "Assembles the self-contained app directory for the target"
-                into(appDir)
-                duplicatesStrategy = DuplicatesStrategy.FAIL
-                into("bin") { from(launchers) }
-                into("META-INF") {
-                    from(manifest)
-                    from(sbom)
-                }
-                into("conf.defaults") { from(extension.configDefaults) }
-                spec.contents(this)
-                executableBits(this)
+                description = "Builds the archive for every target"
             }
+        val smoke = registerSmokeTest()
+        val runApp = registerRunApp()
+        val dockerContext = DockerContext(project, this, archives)
+        val publishing = AppPublishing(project, this, components)
+        publishing.register(smoke)
 
-        val tar =
-            tasks.register("appTar", Tar::class.java) {
-                group = taskGroup
-                description = "Archives the app as <app>-<version>-<target>.tar.gz"
-                from(assembleApp)
-                into(topDirectory)
-                compression = Compression.GZIP
-                // Named the way every Gradle archive task names itself —
-                // <base>-<version>-<classifier>.<ext> in build/distributions — rather than by
-                // assembling the file name by hand. The classifier is then also what the Maven
-                // publication uses, so the two can never disagree.
-                archiveBaseName.set(appName)
-                archiveVersion.set(versionString)
-                archiveClassifier.set(targetId)
-                archiveExtension.set("tar.gz")
-                destinationDirectory.set(layout.buildDirectory.dir("distributions"))
-                executableBits(this)
-            }
-
-        val smoke = registerSmokeTest(tar)
-        registerRunApp(assembleApp, appDir)
-        registerDockerContext(tar)
+        tasks.named("assemble") { dependsOn(allTars) }
+        tasks.named("check") { dependsOn(smoke) }
 
         // Every archive feeding the app (the application jar included) must be byte-reproducible,
         // so rebuilding a commit yields an identical archive checksum. Gradle 9 does this by default.
@@ -202,125 +193,49 @@ class AppWiring(
             isReproducibleFileOrder = true
         }
 
-        tasks.named("assemble") { dependsOn(tar) }
-        tasks.named("check") { dependsOn(smoke) }
+        project.afterEvaluate {
+            extension.targets.finalizeValue()
+            val targets = extension.targets.get()
+            if (targets.isEmpty()) throw GradleException("${ecosystem.extensionName}.targets is empty; name at least one target")
+            val pipeline = TargetPipeline(project, this@AppWiring)
+            val built = targets.map { pipeline.register(it, contribute(it)) }
+            allTars.configure { dependsOn(built.map { it.tar }) }
 
-        AppPublishing(project, this, components).register(tar, sbom, smoke)
+            val hostTasks = built.firstOrNull { it.target == host }
+            if (hostTasks != null) {
+                smoke.configure { archiveFiles.from(hostTasks.tar.flatMap { it.archiveFile }) }
+                runApp.configure {
+                    dependsOn(hostTasks.assemble)
+                    appDir.set(layout.dir(hostTasks.assemble.map { it.destinationDir }))
+                }
+            }
+            dockerContext.useLinuxArchive(built)
+            publishing.addTargets(built, untested = targets.filter { it != host || !extension.smokeTestEnabled.get() })
+        }
     }
 
-    private fun registerLaunchers(spec: EcosystemSpec) =
-        tasks.register("appLaunchers", GenerateLaunchers::class.java) {
-            group = taskGroup
-            description = "Generates the bin/ launcher for the target"
-            appName.set(this@AppWiring.appName)
-            windows.set(windowsTarget)
-            posixExec.set(spec.posixExec)
-            windowsExec.set(spec.windowsExec)
-            outputDir.set(workDir.map { it.dir("launchers") })
-        }
-
-    private fun registerManifest(spec: EcosystemSpec) =
-        tasks.register("appManifest", GenerateAppManifest::class.java) {
-            group = taskGroup
-            description = "Generates META-INF/app.json"
-            appGroup.set(groupString)
-            appName.set(this@AppWiring.appName)
-            version.set(versionString)
-            target.set(targetId)
-            ecosystem.set(this@AppWiring.ecosystem.id)
-            runtimeName.set(spec.runtimeName)
-            runtimeVersion.set(spec.runtimeVersion)
-            gitCommit.set(
-                providers.gradleProperty(this@AppWiring.ecosystem.property("gitCommit")).orElse(
-                    providers.of(GitCommitValueSource::class.java) {
-                        parameters.workingDirectory.set(layout.projectDirectory)
-                    },
-                ),
-            )
-            outputFile.set(workDir.map { it.file("meta/app.json") })
-        }
-
-    private fun registerSbom(spec: EcosystemSpec) =
-        tasks.register("appSbom", GenerateSbom::class.java) {
-            group = taskGroup
-            description = "Generates a CycloneDX SBOM including the runtime"
-            appGroup.set(groupString)
-            appName.set(this@AppWiring.appName)
-            version.set(versionString)
-            target.set(targetId)
-            runtimeName.set(spec.runtimeName)
-            runtimeVersion.set(spec.runtimeVersion)
-            val runtime = spec.runtimeName
-            runtimePurl.set(spec.runtimeVersion.map { "pkg:generic/$runtime@${it.replace("+", "%2B")}" })
-            mavenComponents.convention(emptyList())
-            spec.sbom(this)
-            outputFile.set(workDir.map { it.file("meta/sbom.cdx.json") })
-        }
-
-    private fun registerSmokeTest(tar: TaskProvider<Tar>) =
+    private fun registerSmokeTest() =
         tasks.register("appSmokeTest", AppSmokeTest::class.java) {
             group = VERIFICATION_GROUP
-            description = "Extracts the archive, starts it and waits for its healthcheck"
-            archive.set(tar.flatMap { it.archiveFile })
-            appName.set(this@AppWiring.appName)
-            expectedVersion.set(versionString)
-            windows.set(windowsTarget)
+            description = "Extracts this machine's archive, starts it and waits for its healthcheck"
             healthTimeout.set(extension.smokeTestTimeout)
             resultFile.set(workDir.map { it.file("smoke-test.txt") })
-            val crossBuild = cross
             val enabled = extension.smokeTestEnabled
-            onlyIf("the archive targets this build host") { !crossBuild.get() }
             onlyIf("${this@AppWiring.ecosystem.extensionName}.smokeTestEnabled is true") { enabled.get() }
         }
 
-    private fun registerRunApp(
-        assembleApp: TaskProvider<Sync>,
-        appDir: Provider<Directory>,
-    ) {
+    private fun registerRunApp() =
         tasks.register("runApp", RunApp::class.java) {
             group = APPLICATION_GROUP
-            description = "Runs the assembled app in the foreground (bin/<app> run)"
-            dependsOn(assembleApp)
-            this.appDir.set(appDir)
+            description = "Runs this machine's assembled app in the foreground (bin/<app> run)"
             appName.set(this@AppWiring.appName)
-            windows.set(windowsTarget)
+            windows.set(host.isWindows)
             args.convention(
                 providers.gradleProperty("args").map { it.split(" ").filter(String::isNotBlank) }.orElse(emptyList()),
             )
-            val crossBuild = cross
-            onlyIf("the app targets this build host") { !crossBuild.get() }
+            val dir = appDir
+            onlyIf("an archive is built for this machine") { dir.isPresent }
         }
-    }
-
-    private fun registerDockerContext(tar: TaskProvider<Tar>) {
-        val template =
-            AppWiring::class.java.getResource("/io/github/fiftieshousewife/appcore/docker/Dockerfile")?.readText()
-                ?: error("Dockerfile template missing from the app-core jar")
-        val archiveOps = archives
-        val dockerfile =
-            tasks.register("appDockerfile", WriteTextFile::class.java) {
-                group = taskGroup
-                description = "Writes the container Dockerfile (override with src/deploy/docker/Dockerfile)"
-                text.set(
-                    providers
-                        .fileContents(layout.projectDirectory.file("src/deploy/docker/Dockerfile"))
-                        .asText
-                        .orElse(appName.map { name -> template.replace("@APP_NAME@", name) }),
-                )
-                outputFile.set(workDir.map { it.file("docker/Dockerfile") })
-            }
-        tasks.register("appDockerContext", Sync::class.java) {
-            group = taskGroup
-            description = "Prepares a container build context from the archive: Dockerfile + app/"
-            from(dockerfile)
-            // Not `into("app")`: inside a child spec the path already starts with `app/`, so dropping
-            // the first segment would drop that instead of the archive's `<app>-<version>/`.
-            from(tar.flatMap { it.archiveFile }.map { archiveOps.tarTree(it) }) {
-                dropTopLevelDirectory(this, replacement = "app")
-            }
-            into(layout.buildDirectory.dir("docker-context"))
-        }
-    }
 
     companion object {
         const val VERIFICATION_GROUP = "verification"
@@ -345,7 +260,7 @@ class AppWiring(
          * Strips an archive's single top-level directory (`node-v24.../`, `<app>-<version>/`) while
          * copying, or renames it to [replacement].
          */
-        private fun dropTopLevelDirectory(
+        fun dropTopLevelDirectory(
             spec: CopySpec,
             replacement: String? = null,
         ) {

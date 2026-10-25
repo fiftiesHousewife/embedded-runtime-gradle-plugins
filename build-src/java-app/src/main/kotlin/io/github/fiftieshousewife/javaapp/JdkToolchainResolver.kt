@@ -38,7 +38,16 @@ abstract class JdkToolchainResolver : JavaToolchainResolver {
         val target = targetOf(request)
         if (version == null || target == null) return Optional.empty()
 
-        return Optional.of(JavaToolchainDownload.fromUri(sources.downloadUri(version, target)))
+        // A JDK configured by path: Gradle provisions from archives only, so an installed directory
+        // is left to Gradle's own detection (org.gradle.java.installations.paths).
+        val local = JdkSources.localJdk(providers, version.feature, target)
+        val uri =
+            when {
+                local == null -> sources.downloadUri(version, target)
+                local.isFile -> local.toURI()
+                else -> null
+            }
+        return Optional.ofNullable(uri).map(JavaToolchainDownload::fromUri)
     }
 
     private fun targetOf(request: JavaToolchainRequest): Target? {

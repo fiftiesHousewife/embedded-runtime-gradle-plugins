@@ -5,6 +5,7 @@ import io.github.fiftieshousewife.appcore.Artifactory
 import io.github.fiftieshousewife.appcore.Ecosystem
 import io.github.fiftieshousewife.appcore.EcosystemSpec
 import io.github.fiftieshousewife.appcore.Os
+import io.github.fiftieshousewife.appcore.Target
 import io.github.fiftieshousewife.appcore.tasks.GenerateLaunchers.Companion.cmdQuote
 import io.github.fiftieshousewife.appcore.tasks.GenerateLaunchers.Companion.shQuote
 import io.github.fiftieshousewife.nodeapp.tasks.GenerateNpmrc
@@ -47,7 +48,7 @@ abstract class NodeAppPlugin
             wiring.applyConventions()
             applyConventions(project, extension)
 
-            val (extractTarget, extractHost) = registerRuntimeArchives(extension, wiring, sources)
+            val extractHost = registerNodeDistribution(extension, wiring, sources, wiring.host)
             val node =
                 PinnedNode(
                     home = project.layout.dir(extractHost.map { it.destinationDir }),
@@ -56,36 +57,21 @@ abstract class NodeAppPlugin
                     npmrc = registerNpmrc(project, wiring, sources),
                 )
             val npmBuild = registerNpmTasks(project, extension, node)
-            val productionInstall = registerProductionInstall(project, extension, wiring, node)
-            val prodModules = productionInstall.flatMap { it.outputDir }.map { it.dir("node_modules") }
-
-            val verifyModules =
-                project.tasks.register("verifyNodeModules", VerifyNodeModules::class.java) {
-                    group = AppWiring.VERIFICATION_GROUP
-                    description = "Checks production node_modules for host-specific install-script output"
-                    dependsOn(productionInstall)
-                    nodeModules.set(prodModules)
-                    crossBuild.set(wiring.cross)
-                    ignoredScripts.set(extension.ignoreInstallScripts)
-                    portable.set(extension.portableInstallScripts)
-                    reportFile.set(wiring.workDir.map { it.file("node-modules-report.txt") })
-                }
-
-            val runtime =
-                project.tasks.register("nodeRuntime", Sync::class.java) {
-                    group = ECOSYSTEM.taskGroup
-                    description = "Selects the node binary and licence from the target distribution"
-                    // Same target: the build-time distribution is also the runtime, extracted once.
-                    val source = wiring.cross.flatMap { cross -> if (cross) extractTarget else extractHost }
-                    dependsOn(source)
-                    from(project.layout.dir(source.map { it.destinationDir })) {
-                        include("bin/node", "node.exe", "LICENSE")
-                    }
-                    into(wiring.workDir.zip(wiring.target) { d, t -> d.dir("node-runtime/${t.id}") })
-                }
-
             val packageJsonFile = project.layout.projectDirectory.file("package.json")
-            wiring.register(
+
+            wiring.register { target ->
+                // This machine's distribution drives npm; for its own target it is also the runtime.
+                val distribution = if (target == wiring.host) extractHost else registerNodeDistribution(extension, wiring, sources, target)
+                val productionInstall = registerProductionInstall(project, extension, wiring, node, target)
+                val prodModules = productionInstall.flatMap { it.outputDir }.map { it.dir("node_modules") }
+                val verifyModules = registerVerifyNodeModules(project, extension, wiring, target, prodModules)
+                val runtime =
+                    project.tasks.register("nodeRuntime${target.taskSuffix}", Sync::class.java) {
+                        group = ECOSYSTEM.taskGroup
+                        description = "Selects the node binary and licence from the ${target.id} distribution"
+                        from(distribution) { include("bin/node", "node.exe", "LICENSE") }
+                        into(wiring.workDir.map { it.dir("node-runtime/${target.id}") })
+                    }
                 ecosystemSpec(extension, prodModules) {
                     into("runtime") { from(runtime) }
                     dependsOn(npmBuild, verifyModules)
@@ -96,8 +82,8 @@ abstract class NodeAppPlugin
                     into("app/node_modules") {
                         from(prodModules) { exclude(".bin/**", ".package-lock.json") }
                     }
-                },
-            )
+                }
+            }
         }
 
         private fun applyConventions(
@@ -119,35 +105,36 @@ abstract class NodeAppPlugin
             extension.portableInstallScripts.convention(emptyList())
         }
 
-        /** The target and build-host Node.js distributions, each extracted; the same task twice for a host build. */
-        private fun registerRuntimeArchives(
+        /** Resolves and extracts the pinned Node.js distribution for [target]. */
+        private fun registerNodeDistribution(
             extension: NodeAppExtension,
             wiring: AppWiring,
             sources: NodeSources,
-        ): Pair<TaskProvider<Sync>, TaskProvider<Sync>> {
-            val targetNodeArchive =
-                wiring.runtimeArchive(
-                    "targetNode",
-                    extension.nodeVersion.zip(wiring.target) { v, t -> sources.artifact(v, t) },
-                )
-            val hostNodeArchive =
-                wiring.runtimeArchive(
-                    "hostNode",
-                    extension.nodeVersion.map { v -> sources.artifact(v, wiring.host) },
-                )
-            val extractTarget =
-                wiring.extractRuntime(
-                    "extractTargetNode",
-                    targetNodeArchive,
-                    wiring.workDir.zip(wiring.target) { d, t -> d.dir("node/${t.id}") },
-                )
-            val extractHost =
-                wiring.extractRuntime(
-                    "extractHostNode",
-                    hostNodeArchive,
-                    wiring.workDir.map { it.dir("node/${wiring.host.id}") },
-                )
-            return extractTarget to extractHost
+            target: Target,
+        ): TaskProvider<Sync> {
+            val archive =
+                wiring.runtimeArchive("node${target.taskSuffix}", extension.nodeVersion.map { v -> sources.artifact(v, target) })
+            return wiring.extractRuntime(
+                "extractNode${target.taskSuffix}",
+                wiring.singleFile(archive),
+                wiring.workDir.map { it.dir("node/${target.id}") },
+            )
+        }
+
+        private fun registerVerifyNodeModules(
+            project: Project,
+            extension: NodeAppExtension,
+            wiring: AppWiring,
+            target: Target,
+            prodModules: Provider<Directory>,
+        ) = project.tasks.register("verifyNodeModules${target.taskSuffix}", VerifyNodeModules::class.java) {
+            group = AppWiring.VERIFICATION_GROUP
+            description = "Checks the ${target.id} production node_modules for host-specific install-script output"
+            nodeModules.set(prodModules)
+            crossBuild.set(target != wiring.host)
+            ignoredScripts.set(extension.ignoreInstallScripts)
+            portable.set(extension.portableInstallScripts)
+            reportFile.set(wiring.workDir.map { it.file("node-modules-report/${target.id}.txt") })
         }
 
         private fun registerNpmrc(
@@ -219,9 +206,10 @@ abstract class NodeAppPlugin
             extension: NodeAppExtension,
             wiring: AppWiring,
             node: PinnedNode,
-        ) = project.tasks.register("npmInstallProduction", NpmProductionInstall::class.java) {
+            target: Target,
+        ) = project.tasks.register("npmInstallProduction${target.taskSuffix}", NpmProductionInstall::class.java) {
             group = ECOSYSTEM.taskGroup
-            description = "npm ci --omit=dev for the target, isolated from the working tree"
+            description = "npm ci --omit=dev for ${target.id}, isolated from the working tree"
             dependsOn(node.extracted, node.npmrc)
             nodeHome.set(node.home)
             nodeVersion.set(node.version)
@@ -230,7 +218,7 @@ abstract class NodeAppPlugin
             packageLock.set(project.layout.projectDirectory.file("package-lock.json"))
             val host = wiring.host
             npmArgs.set(
-                extension.ignoreInstallScripts.zip(wiring.target) { ignore, target ->
+                extension.ignoreInstallScripts.map { ignore ->
                     val args = mutableListOf<String>()
                     if (ignore) args += "--ignore-scripts"
                     if (target != host) {
@@ -242,7 +230,7 @@ abstract class NodeAppPlugin
                     args
                 },
             )
-            outputDir.set(wiring.workDir.zip(wiring.target) { d, t -> d.dir("npm-production/${t.id}") })
+            outputDir.set(wiring.workDir.map { it.dir("npm-production/${target.id}") })
         }
 
         private fun ecosystemSpec(

@@ -31,6 +31,9 @@ data class Target(
     val isWindows: Boolean get() = os == Os.WINDOWS
     val archiveExtension: String get() = if (isWindows) "zip" else "tar.gz"
 
+    /** `LinuxX64`, `MacAarch64`: appended to the names of tasks built once per target. */
+    val taskSuffix: String get() = os.id.replaceFirstChar(Char::uppercase) + arch.id.replaceFirstChar(Char::uppercase)
+
     override fun toString(): String = id
 
     companion object {
@@ -43,6 +46,9 @@ data class Target(
         val MAC_AARCH64 = Target(Os.MAC, Arch.AARCH64)
 
         val SUPPORTED = listOf(LINUX_X64, LINUX_AARCH64, WINDOWS_X64, MAC_X64, MAC_AARCH64)
+
+        /** A comma-separated list, as given on the command line: `linux-x64,windows-x64`. */
+        fun parseList(ids: String): List<Target> = ids.split(',').filter(String::isNotBlank).map(::parse)
 
         fun parse(id: String): Target =
             SUPPORTED.firstOrNull { it.id == id.trim().lowercase() }

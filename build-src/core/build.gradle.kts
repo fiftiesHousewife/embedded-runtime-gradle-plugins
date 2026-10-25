@@ -1,15 +1,22 @@
 plugins {
-    id("embedded-runtime.kotlin")
+    id("embedded-runtime.gradle-plugin")
     `java-test-fixtures`
 }
 
-description = "Shared machinery of the java-app and node-app plugins; not a public API"
+description = "Shared machinery of the java-app and node-app plugins, and the app-smoke-test plugin for consuming builds"
 
-// Published to Maven Central for the plugins to depend on: a plain library, not a plugin, so it
-// needs its own sources and javadoc jars (plugin-publish adds them only to plugin modules).
-java {
-    withSourcesJar()
-    withJavadocJar()
+gradlePlugin {
+    plugins {
+        register("appSmokeTest") {
+            id = "io.github.fiftieshousewife.app-smoke-test"
+            implementationClass = "io.github.fiftieshousewife.appcore.AppSmokeTestPlugin"
+            displayName = "Smoke-test published app archives"
+            description =
+                "Resolves the java-app or node-app archive built for this machine's OS and CPU, starts it and " +
+                "waits for its health check"
+            tags = listOf("smoke-test", "deployment", "verification")
+        }
+    }
 }
 
 // The settings plugins align project-plugin versions with their own, read from this resource.

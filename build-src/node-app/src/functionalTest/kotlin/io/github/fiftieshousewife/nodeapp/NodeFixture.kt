@@ -21,9 +21,7 @@ object NodeFixture {
 
     fun publish(project: TestProject) {
         val node = File(nodeExecutable()).canonicalFile
-        val prefix = node.parentFile.parentFile
-        val npm = prefix.resolve("lib/node_modules/npm")
-        assumeTrue(npm.isDirectory, "npm must sit next to node at $npm")
+        val npm = npmPackage(node)
         val classifier = TestProject.hostTarget().replace("mac", "darwin").replace("aarch64", "arm64")
         val top = "node-v$nodeVersion-$classifier"
         val stage =
@@ -37,13 +35,31 @@ object NodeFixture {
         TestProject.run("tar", "-czf", out.absolutePath, "-C", stage.parentFile.absolutePath, top)
     }
 
-    private fun nodeExecutable(): String =
+    /**
+     * The npm package directory. nodejs.org archives keep it next to node (`lib/node_modules/npm`);
+     * Homebrew installs it under its own prefix, reachable by following the `npm` on PATH to
+     * `…/node_modules/npm/bin/npm-cli.js`.
+     */
+    private fun npmPackage(node: File): File {
+        val besideNode = node.parentFile.parentFile.resolve("lib/node_modules/npm")
+        val onPath =
+            onPath("npm")
+                ?.canonicalFile
+                ?.takeIf { it.name == "npm-cli.js" }
+                ?.parentFile
+                ?.parentFile
+        val npm = listOfNotNull(besideNode, onPath).firstOrNull { it.resolve("package.json").isFile }
+        assumeTrue(npm != null, "no npm package found beside $node or on PATH")
+        return npm!!
+    }
+
+    private fun nodeExecutable(): String = onPath("node")?.absolutePath.also { assumeTrue(it != null, "node is not on PATH") }!!
+
+    private fun onPath(name: String): File? =
         System
             .getenv("PATH")
             .orEmpty()
             .split(File.pathSeparator)
-            .map { File(it, "node") }
+            .map { File(it, name) }
             .firstOrNull { it.canExecute() }
-            ?.absolutePath
-            .also { assumeTrue(it != null, "node is not on PATH") }!!
 }

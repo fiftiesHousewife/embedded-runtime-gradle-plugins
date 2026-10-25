@@ -11,7 +11,6 @@ application {
 
 javaApp {
     javaVersion = 21
-    // Reviewed explicitly: jdeps would suggest these, but misses anything loaded reflectively.
-    jlinkModules = listOf("java.base", "jdk.httpserver")
+    // No jlinkModules: jdeps finds java.base and jdk.httpserver from the code.
     jvmArgs = listOf("-XX:+UseSerialGC", "-Xss512k")
 }

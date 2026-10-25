@@ -1,7 +1,9 @@
 package io.github.fiftieshousewife.appcore
 
 import org.gradle.api.file.DirectoryProperty
+import org.gradle.api.file.RegularFileProperty
 import org.gradle.api.provider.Property
+import org.gradle.api.provider.SetProperty
 import java.time.Duration
 
 /**
@@ -13,10 +15,20 @@ abstract class AppExtension {
     abstract val appName: Property<String>
 
     /**
-     * The OS and CPU to build for. Defaults to `-PjavaApp.target` / `-PnodeApp.target`, else the
-     * build host. A non-host target is a cross build: it is assembled but cannot be smoke-tested here.
+     * The OS and CPU combinations to build, one archive each, all published together. Defaults to
+     * `-PjavaApp.targets` / `-PnodeApp.targets` (comma-separated), else this machine. Only this
+     * machine's archive can be smoke-tested here.
      */
-    abstract val target: Property<Target>
+    abstract val targets: SetProperty<Target>
+
+    /** Replaces [targets]: `targets("linux-x64", "linux-aarch64", "windows-x64")`. */
+    fun targets(vararg ids: String) = targets.set(ids.map(Target::parse))
+
+    /**
+     * The Dockerfile `appDockerContext` copies. Defaults to the project's own `Dockerfile`, else
+     * `src/deploy/docker/Dockerfile`; with neither, a generated one is used.
+     */
+    abstract val dockerfile: RegularFileProperty
 
     /** Default configuration shipped as `conf.defaults/`. Defaults to `src/deploy/conf`. */
     abstract val configDefaults: DirectoryProperty
@@ -27,10 +39,8 @@ abstract class AppExtension {
 
     /**
      * Publishing an archive that has not passed its smoke test on this machine fails unless this is
-     * true (or `-PjavaApp.allowUntestedPublish=true` / `-PnodeApp.allowUntestedPublish=true`). Cross
-     * builds are always untested.
+     * true (or `-PjavaApp.allowUntestedPublish=true` / `-PnodeApp.allowUntestedPublish=true`).
+     * Archives for other targets are always untested.
      */
     abstract val allowUntestedPublish: Property<Boolean>
-
-    fun target(id: String): Target = Target.parse(id)
 }

@@ -8,7 +8,7 @@ Notes for anyone (human or agent) changing the plugins. The [README](README.md) 
 ```
 build-src/                  the plugin build, included by the root build
   build-logic/              convention plugins: embedded-runtime.kotlin, embedded-runtime.gradle-plugin
-  core/                     io.github.fiftieshousewife:app-core      package …appcore
+  core/                     io.github.fiftieshousewife:app-core      package …appcore (+ app-smoke-test plugin)
   java-app/                 io.github.fiftieshousewife:java-app      package …javaapp
   node-app/                 io.github.fiftieshousewife:node-app      package …nodeapp
   config/detekt/detekt.yml  deviations from detekt's defaults only
@@ -38,31 +38,54 @@ against a fake download site on disk (`TestProject` in `core/src/testFixtures`, 
 and `NodeFixture`), so they need no network except the Kotlin test, which resolves the Kotlin
 plugin from the portal.
 
+Where things are tested:
+
+- `JavaAppPluginTest`: the archive's contents and reproducibility, and `deploy/install.sh` end to
+  end (install, upgrade keeping `conf/`, status, rollback), so an installer change is tested there.
+- `JavaAppTargetsTest`: several targets in one build and one publication, the container context,
+  JDKs from a directory and from a shared local path, and the `app-smoke-test` consumer plugin.
+- `JavaAppModulesTest`: the jdeps default and `jlinkFindModules` fixing a missing module.
+- `KotlinAppTest`, `NodeAppPluginTest`, the settings plugin tests, and the URL unit tests.
+
 Known test caveats:
 
 - Fixtures use the system `tar`, so functional tests skip on Windows; CI's Windows leg still builds
   both samples natively.
-- The Node app test skips where npm does not sit next to `node` (Homebrew); CI runs it.
+- `NodeFixture` repackages the `node` on PATH with its npm, found next to node (nodejs.org layout)
+  or by following the `npm` on PATH (Homebrew).
 - `KotlinAppTest` turns the configuration cache off: under TestKit's injected plugin classloader the
   Kotlin plugin's build services fail to reload from the cache. Real builds are unaffected.
-- `JavaAppPluginTest` drives `deploy/install.sh` end to end (install, upgrade, status, rollback),
-  so a change to the installer is tested there.
 
 ## How it fits together
 
-**`app-core` is shared machinery, not a public API.** It is published only because both plugins
-depend on it, and all three are always released together at one version (`PluginVersion` reads it
-from a generated resource). `AppWiring` builds the shared pipeline:
+**`app-core` is shared machinery, not a public API,** apart from the small `app-smoke-test` plugin
+it also carries for consuming builds. It is published because both plugins depend on it, and all
+three are always released together at one version (`PluginVersion` reads it from a generated
+resource). `AppWiring` builds the shared pipeline; `TargetPipeline` the part built once per target:
 
 ```
-appLaunchers ─┐
-appManifest  ─┼─► appAssemble ─► appTar ─► appSmokeTest ─► publish
-appSbom      ─┘                     └────► appDockerContext
+appLaunchers<T> ─┐
+appManifest<T>  ─┼─► appAssemble<T> ─► appTar<T> ──► publish (one variant per target)
+appSbom<T>      ─┘
+                     this machine's ──► appSmokeTest, runApp, jlinkFindModules
+                     a Linux one   ──► appDockerContext (DockerContext)
 ```
 
-Each plugin contributes an `Ecosystem` (its names: `java`/`javaApp`/settings plugin id) and an
-`EcosystemSpec` (runtime name and version, launcher exec lines, archive contents, SBOM inputs).
-Everything Java- or Node-specific stays in its own module.
+Each plugin contributes an `Ecosystem` (its names: `java`/`javaApp`/settings plugin id) and, per
+target, an `EcosystemSpec` (runtime name and version, launcher exec lines, archive contents, SBOM
+inputs). Everything Java- or Node-specific stays in its own module.
+
+**Targets are known only after the build script runs,** so per-target tasks are registered in
+`afterEvaluate`, as are the Java plugin's JDK tasks (the Java release is final then too). Tasks a
+build script might name (`appTar`, `appSmokeTest`, `runApp`, `appDockerContext`, the publication)
+are registered up front and wired to their target afterwards. Values feeding conventions set at
+apply time but known later (the jdeps modules) go through a property set in `afterEvaluate`.
+
+**One smoke test, three users.** `SmokeRun` starts an extracted app through its launcher and waits
+for its health check. `AppSmokeTest` reads the name, version and target from each archive's
+`META-INF/app.json`, so the producing build and the consumer plugin use the same task, and
+`JlinkFindModules` reruns `SmokeRun` against freshly linked runtimes, reading the failure output for
+missing JDK classes (mapped to modules with `jimage list`).
 
 **Settings plugins exist because three things can only happen in settings:** repository
 configuration for the whole build, registering the JDK toolchain resolver, and pinning the project
@@ -79,14 +102,19 @@ to Gradle's toolchain provisioning.
 **One pin, two consumers.** `JdkCatalog.pinnedJdk` (a `javaApp.jdk.<feature>` override, else the
 catalogue in `jdks.properties`) is read by both `JdkToolchainResolver` (compile JDK) and
 `JavaAppPlugin` (embedded runtime), from the same `JdkSources`, so they can never differ.
+`JdkSources` holds a `JdkLocation`: the vendor's site (`Public`) or a renamed tree (`Curated`, for
+Artifactory or a local directory). A JDK configured by path for one release and target bypasses all
+of that (`Jdks` in `JavaAppPlugin` uses a directory as it is and extracts an archive); the resolver
+can serve such an archive but must leave a directory to Gradle's installation detection.
+`JdkTools.link` refuses a tool JDK and target JDK of different releases.
 
 **`JdkDistribution` owns everything vendor-specific:** the Gradle vendor spec, the default URL and
 Ivy pattern, how a version and target become file names, and the regex a pin must match. Versions
 are opaque strings that start with the feature release; each vendor validates its own form.
 
-**Cross builds** run `jlink` from the host's JDK against the target JDK's `jmods/`. The archive
-can't be started on the host, so `appSmokeTest` is skipped and `appVerifyPublishable` blocks
-`publish` unless explicitly allowed.
+**Cross builds** run `jlink` from the host's JDK against the target JDK's `jmods/`. Those archives
+can't be started on the host, so only the host's archive is smoke-tested and `appVerifyPublishable`
+blocks `publish` while any archive is untested, unless explicitly allowed.
 
 **Archives** are always `.tar.gz` (Windows 10+ has `tar.exe`) with one top-level directory,
 reproducible ordering and timestamps, and exec bits set explicitly (`AppWiring.EXECUTABLES`), since

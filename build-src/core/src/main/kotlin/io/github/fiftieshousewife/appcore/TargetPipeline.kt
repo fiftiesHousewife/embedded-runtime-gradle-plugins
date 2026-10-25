@@ -89,6 +89,7 @@ internal class TargetPipeline(private val project: Project, private val wiring: 
             windows.set(target.isWindows)
             posixExec.set(spec.posixExec)
             windowsExec.set(spec.windowsExec)
+            lockedOptions.set(extension.runtimeOptions.map { it == RuntimeOptions.LOCKED })
             outputDir.set(workDir.map { it.dir("launchers/${target.id}") })
         }
 

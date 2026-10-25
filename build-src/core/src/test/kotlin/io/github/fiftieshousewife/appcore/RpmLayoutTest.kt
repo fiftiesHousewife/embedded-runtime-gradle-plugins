@@ -43,7 +43,12 @@ class RpmLayoutTest {
             { assertTrue(unit.contains("Environment=APP_CONF_DIR=/etc/orders\n"), unit) },
             { assertTrue(unit.contains("ProtectSystem=strict\n"), unit) },
             { assertTrue(unit.contains("ReadWritePaths=/var/lib/orders /var/log/orders\n"), unit) },
-            { assertFalse(unit.contains("@"), unit) },
+            { assertTrue(unit.contains("Type=exec\n"), unit) },
+            { assertTrue(unit.contains("SuccessExitStatus=143\n"), unit) },
+            { assertTrue(unit.contains("Environment=APP_LOG_TARGET=stdout\n"), unit) },
+            { assertTrue(unit.contains("SystemCallFilter=@system-service\n"), unit) },
+            { assertFalse(unit.contains("MemoryDenyWriteExecute="), unit) },
+            { assertFalse(Regex("@[A-Z]+@").containsMatchIn(unit), unit) },
         )
     }
 

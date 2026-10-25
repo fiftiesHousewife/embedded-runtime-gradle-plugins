@@ -27,6 +27,9 @@ abstract class GenerateLaunchers : DefaultTask() {
     /** Batch fragment that starts the runtime; may reference `%APP_HOME%` and `%ARGS%`. */
     @get:Input abstract val windowsExec: Property<String>
 
+    /** `runtimeOptions = locked`: refuse to start while anything would add runtime options. */
+    @get:Input abstract val lockedOptions: Property<Boolean>
+
     @get:OutputDirectory abstract val outputDir: DirectoryProperty
 
     @TaskAction
@@ -39,12 +42,14 @@ abstract class GenerateLaunchers : DefaultTask() {
             val text =
                 template("launcher.bat")
                     .replace("@APP_NAME@", name)
+                    .replace("@POLICY@", if (lockedOptions.get()) LockedOptions.windows() else "")
                     .replace("@EXEC@", windowsExec.get())
             out.resolve("$name.bat").writeText(text.lines().joinToString("\r\n"))
         } else {
             val text =
                 template("launcher.sh")
                     .replace("@APP_NAME@", name)
+                    .replace("@POLICY@", if (lockedOptions.get()) LockedOptions.posix() else "")
                     .replace("@EXEC@", posixExec.get())
             out.resolve(name).apply {
                 writeText(text.replace("\r\n", "\n"))

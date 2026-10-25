@@ -143,9 +143,9 @@ class AppWiring(
             ),
         )
         extension.configDefaults.convention(projectDir.dir("src/deploy/conf"))
-        extension.archiveFormat.convention(
-            providers.gradleProperty(ecosystem.property("archiveFormat")).map(ArchiveFormat::parse)
-                .orElse(ArchiveFormat.TAR_GZ),
+        extension.archiveFormat.convention(setting("archiveFormat", ArchiveFormat::parse).orElse(ArchiveFormat.TAR_GZ))
+        extension.runtimeOptions.convention(
+            setting("runtimeOptions", RuntimeOptions::parse).orElse(RuntimeOptions.OPEN),
         )
         rpmPackages.applyConventions()
         extension.smokeTestEnabled.convention(true)
@@ -154,6 +154,10 @@ class AppWiring(
             providers.gradleProperty(ecosystem.property("allowUntestedPublish")).map(String::toBoolean).orElse(false),
         )
     }
+
+    /** `-P<ecosystem>.<name>`, parsed. */
+    private fun <T : Any> setting(name: String, parse: (String) -> T): Provider<T> =
+        providers.gradleProperty(ecosystem.property(name)).map(parse)
 
     /** A resolvable configuration holding exactly one runtime archive. */
     fun runtimeArchive(

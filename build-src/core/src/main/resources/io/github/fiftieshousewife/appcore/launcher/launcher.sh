@@ -54,4 +54,4 @@ case "$command" in
   *) usage; exit 64 ;;
 esac
 
-@EXEC@
+@POLICY@@EXEC@

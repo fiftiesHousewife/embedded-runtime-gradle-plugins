@@ -37,7 +37,7 @@ javaApp {
         trustedCertificates.from("security/certs")          // approved CAs, added to cacerts
         propertiesFiles.from("security/java.security")      // your policy, applied over the JDK's
         properties.put("networkaddress.cache.ttl", "30")
-        disabledTlsAlgorithms.addAll("TLS_RSA_WITH_AES_128_GCM_SHA256", "TLS_RSA_WITH_AES_256_GCM_SHA384")
+        disabledTlsAlgorithms.addAll("TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA384", "TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA384")
         lockProperties = true                                // no -Djava.security.properties at runtime
     }
 }
@@ -51,6 +51,10 @@ javaApp {
 | `disabledTlsAlgorithms`, `disabledCertPathAlgorithms`, `disabledJarAlgorithms` | Added to the JDK's own lists, never replacing them |
 | `lockProperties` | Sets `security.overridePropertiesFile=false` |
 | `forbiddenModules` | Modules the runtime must never contain; default `jdk.jdwp.agent`, the remote debugger |
+
+The example drops two CBC-mode suites, the kind a policy that allows only AEAD ciphers removes. Check what the pinned JDK already
+disables before adding to the lists: the static-RSA `TLS_RSA_*` suites, for example, are disabled
+by default from JDK 24, 21.0.10, 17.0.18 and 11.0.30.
 
 Properties worth considering for your policy file: `jdk.serialFilter` (which classes may be
 deserialized), `networkaddress.cache.ttl` (how long DNS answers are cached),

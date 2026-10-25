@@ -5,25 +5,50 @@ Wants=network-online.target
 After=network-online.target
 
 [Service]
-Type=simple
+# exec, not simple: start fails if the launcher cannot be executed at all.
+Type=exec
 User=@USER@
 Group=@USER@
 Environment=APP_ROOT=/var/lib/@NAME@
 Environment=APP_CONF_DIR=/etc/@NAME@
 Environment=APP_DATA_DIR=/var/lib/@NAME@
 Environment=APP_LOG_DIR=/var/log/@NAME@
+# Logs go to the journal (journalctl -u @NAME@), which rotates them.
+Environment=APP_LOG_TARGET=stdout
 EnvironmentFile=-/etc/@NAME@/env
 WorkingDirectory=/var/lib/@NAME@
 ExecStart=/opt/@NAME@/bin/@LAUNCHER@ run
 Restart=on-failure
 RestartSec=5
 TimeoutStopSec=30
+# A JVM ends with 143 (128 + SIGTERM) when systemd stops it.
+SuccessExitStatus=143
+LimitNOFILE=65536
 UMask=0027
+
+# Sandboxing; systemd-analyze security @NAME@ scores it.
 NoNewPrivileges=true
 PrivateTmp=true
+PrivateDevices=true
 ProtectSystem=strict
 ProtectHome=true
 ReadWritePaths=/var/lib/@NAME@ /var/log/@NAME@
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+CapabilityBoundingSet=
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+# Not MemoryDenyWriteExecute: the JVM's and V8's JIT compilers need writable, executable memory.
 
 [Install]
 WantedBy=multi-user.target

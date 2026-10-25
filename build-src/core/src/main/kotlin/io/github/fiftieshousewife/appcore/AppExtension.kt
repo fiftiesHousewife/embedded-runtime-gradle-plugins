@@ -48,6 +48,15 @@ abstract class AppExtension {
 
     fun rpm(action: Action<RpmPackaging>) = action.execute(rpm)
 
+    /**
+     * `open` (default) lets whoever runs the app add runtime options; `locked` refuses to start
+     * while anything would. Defaults to `-PjavaApp.runtimeOptions` / `-PnodeApp.runtimeOptions`.
+     */
+    abstract val runtimeOptions: Property<RuntimeOptions>
+
+    /** Replaces [runtimeOptions]: `runtimeOptions("locked")`. */
+    fun runtimeOptions(id: String) = runtimeOptions.set(RuntimeOptions.parse(id))
+
     /** Default configuration shipped as `conf.defaults/`. Defaults to `src/deploy/conf`. */
     abstract val configDefaults: DirectoryProperty
 

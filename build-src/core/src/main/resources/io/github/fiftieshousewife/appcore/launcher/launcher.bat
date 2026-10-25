@@ -36,5 +36,5 @@ echo Usage: %APP_NAME% run [args...] ^| healthcheck ^| version 1>&2
 exit /b 64
 
 :launch
-@EXEC@
+@POLICY@@EXEC@
 exit /b %ERRORLEVEL%

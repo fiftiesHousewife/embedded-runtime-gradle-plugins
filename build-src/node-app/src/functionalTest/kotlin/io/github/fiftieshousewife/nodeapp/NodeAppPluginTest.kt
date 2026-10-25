@@ -31,6 +31,43 @@ class NodeAppPluginTest {
         assertAll(checks(outcomes + present + testsLeftOut))
     }
 
+    @Test
+    fun `trusted certificates and TLS settings reach the launcher`() {
+        val project = webApp()
+        project.file("certs/corporate-root.pem", certificate())
+        project.file(
+            "build.gradle.kts",
+            project.project.resolve("build.gradle.kts").readText() +
+                """
+                nodeApp.security {
+                    trustedCertificates.from("certs")
+                    tlsMinVersion = "1.3"
+                }
+                """.trimIndent(),
+        )
+        project.build("installDist", "appSmokeTest")
+        val home = project.project.resolve("build/install/web")
+        val launcher = home.resolve("bin/web").readText()
+        assertAll(
+            { assertTrue(home.resolve("security/trusted-cas.pem").readText().startsWith(PEM_HEADER)) },
+            { assertTrue(launcher.contains("export NODE_EXTRA_CA_CERTS"), launcher) },
+            { assertTrue(launcher.contains("'--tls-min-v1.3'"), launcher) },
+        )
+    }
+
+    /** A throwaway self-signed CA, made with the JDK's keytool. */
+    private fun certificate(): String {
+        val store = tmp.resolve("ca.p12")
+        val keytool = File(System.getProperty("java.home"), "bin/keytool").absolutePath
+        TestProject.run(
+            keytool, "-genkeypair", "-alias", "ca", "-keyalg", "EC", "-dname", "CN=Test CA",
+            "-ext", "bc:c", "-keystore", store.absolutePath, "-storepass", "changeit", "-validity", "1",
+        )
+        return TestProject.run(
+            keytool, "-exportcert", "-rfc", "-alias", "ca", "-keystore", store.absolutePath, "-storepass", "changeit",
+        )
+    }
+
     private fun webApp() = TestProject(tmp).apply {
         NodeFixture.publish(this)
         gradleProperties(*NodeFixture.properties(this))
@@ -48,6 +85,7 @@ class NodeAppPluginTest {
     private fun fixture(path: String) = NodeAppPluginTest::class.java.getResource("/fixtures/$path")!!.readText()
 
     private companion object {
+        const val PEM_HEADER = "-----BEGIN CERTIFICATE-----"
         val LAYOUT = listOf("bin/web", "runtime/bin/node", "app/server.mjs", "app/package.json")
     }
 }

@@ -25,6 +25,7 @@ orders-service-1.4.2/
   runtime/                # the embedded JDK or Node.js
   lib/                    # Java: your jar and its dependencies
   app/                    # Node: your code, package.json and production node_modules
+  security/               # Node: trusted-cas.pem, when nodeApp.security names trusted CAs
   conf.defaults/
   META-INF/app.json       # name, version, target, runtime, git commit
   META-INF/sbom.cdx.json  # CycloneDX SBOM, including the runtime
@@ -46,3 +47,24 @@ javaApp {                                                    // or nodeApp
 
 Listing the runtime matters: a JDK or Node.js inside an archive is invisible to a
 scanner that looks only at the operating system's packages.
+
+## Node.js: trusted CAs and TLS
+
+An embedded Node.js trusts only the CAs compiled into it, not the server's certificate store, so
+calls to services behind a corporate CA fail. `security {}` fixes that in the archive itself, so it
+holds wherever the archive runs (Java's equivalent is in [java.md](java.md#hardening-the-runtime)):
+
+```kotlin
+nodeApp {
+    security {
+        trustedCertificates.from("certs")   // PEM or DER files, or directories of them
+        tlsMinVersion = "1.3"               // refuse TLS 1.2 and older
+        tlsCipherList = "TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256"
+    }
+}
+```
+
+The build checks every certificate and writes them to one bundle, `security/trusted-cas.pem`. The
+launcher points `NODE_EXTRA_CA_CERTS` at it, so these CAs are trusted as well as Node's own. The TLS
+settings become `--tls-min-v1.3` and `--tls-cipher-list=…`, placed before `nodeArgs` and
+`APP_NODE_OPTS`. The smoke test starts the app with all of them in place.

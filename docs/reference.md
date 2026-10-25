@@ -45,6 +45,11 @@ nodeApp {
     ignoreInstallScripts = true                 // npm --ignore-scripts for production dependencies
     portableInstallScripts = listOf("esbuild")  // vetted packages that don't block cross builds
     nodeArgs = listOf("--enable-source-maps")   // before $APP_NODE_OPTS
+    security {
+        trustedCertificates.from("certs")       // PEM or DER CAs, added to Node's own via NODE_EXTRA_CA_CERTS
+        tlsMinVersion = "1.3"                   // --tls-min-v1.3; "1.2" or "1.3"
+        tlsCipherList = "TLS_AES_256_GCM_SHA384" // --tls-cipher-list
+    }
 }
 ```
 
@@ -68,6 +73,7 @@ nodeApp {
 | `jlinkLinuxX64`, … | Java: builds one target's trimmed runtime |
 | `customiseRuntimeLinuxX64`, … | Java: applies `security {}` and the overlay to it |
 | `npmInstall`, `npmBuild`, `npmTest` | Node: `npm ci`, your build script, your test script |
+| `nodeTrustedCertificates` | Node: bundles `security { trustedCertificates }` into `security/trusted-cas.pem`; skipped when there are none |
 
 ## Configuration
 

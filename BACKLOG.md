@@ -51,7 +51,7 @@ and `./gradlew aiSkills` to install them in a project. Prompt files were dropped
 
 - The company's RPM-packaged JDK: real file name, install path, and whether it ships `jmods/`
   (naming described as `jdk<major>_<patch>-64_linux.x86_64.rpm`).
-- Node.js has no security customisation (`NODE_EXTRA_CA_CERTS`, TLS options) and no runtime policy.
+- Node.js has no runtime policy (its trusted CAs and TLS settings are done: `nodeApp { security {} }`).
 - Publishing to Maven Central and the Gradle Plugin Portal (needs the owner's credentials).
 - Proposals awaiting a decision: Jib, SLSA provenance, CDS/AOT cache opt-in.
 - Article: the "HUFs" anecdote is unsourced; "Try it" uses version 1.0.0, which is not published.

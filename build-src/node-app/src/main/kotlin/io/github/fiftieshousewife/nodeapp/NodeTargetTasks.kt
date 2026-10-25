@@ -4,6 +4,7 @@ import io.github.fiftieshousewife.appcore.AppWiring
 import io.github.fiftieshousewife.appcore.EcosystemSpec
 import io.github.fiftieshousewife.appcore.Launchers
 import io.github.fiftieshousewife.appcore.Target
+import io.github.fiftieshousewife.nodeapp.tasks.BundleTrustedCertificates
 import io.github.fiftieshousewife.nodeapp.tasks.NpmProductionInstall
 import io.github.fiftieshousewife.nodeapp.tasks.VerifyNodeModules
 import org.gradle.api.Project
@@ -28,7 +29,7 @@ internal class NodeTargetTasks(
         val prodModules = productionInstall(target).flatMap { it.outputDir }.map { it.dir("node_modules") }
         val verified = verify(target, prodModules)
         val runtime = runtime(target, distribution)
-        val launch = extension.entryPoint.zip(extension.nodeArgs, ::NodeLaunch)
+        val launch = launch()
         return EcosystemSpec(
             runtimeName = "nodejs",
             runtimeVersion = extension.nodeVersion,
@@ -40,6 +41,7 @@ internal class NodeTargetTasks(
                 // A distribution's contents can't depend on tasks directly; an empty collection built by them can.
                 from(project.files().builtBy(npmBuild, verified))
                 into("runtime") { from(runtime) }
+                into("security") { from(trustedCertificates) }
                 into("app") {
                     from(extension.appFiles)
                     from(project.layout.projectDirectory.file("package.json"))
@@ -48,6 +50,32 @@ internal class NodeTargetTasks(
             },
             sbom = { nodeModules.set(prodModules) },
         )
+    }
+
+    /** The launcher's command: the security options first, then `nodeArgs`, and the CA bundle if there is one. */
+    private fun launch(): Provider<NodeLaunch> {
+        val security = extension.security
+        val noValue = project.provider { listOf<String>() }
+        val securityOptions =
+            security.tlsMinVersion.map { listOf(it) }.orElse(noValue)
+                .zip(security.tlsCipherList.map { listOf(it) }.orElse(noValue)) { min, ciphers ->
+                    NodeRuntimeSecurity.options(min.firstOrNull(), ciphers.firstOrNull())
+                }
+        val args = securityOptions.zip(extension.nodeArgs) { options, nodeArgs -> options + nodeArgs }
+        val hasCertificates = security.trustedCertificates.elements.map { it.isNotEmpty() }
+        return extension.entryPoint
+            .zip(args) { entry, all -> entry to all }
+            .zip(hasCertificates) { (entry, all), certificates -> NodeLaunch(entry, all, certificates) }
+    }
+
+    /** One bundle for every target: certificates don't depend on the OS. */
+    private val trustedCertificates by lazy {
+        project.tasks.register("nodeTrustedCertificates", BundleTrustedCertificates::class.java) {
+            group = this@NodeTargetTasks.group
+            description = "Bundles nodeApp.security.trustedCertificates into security/trusted-cas.pem"
+            certificates.from(extension.security.trustedCertificates)
+            bundle.set(project.layout.buildDirectory.file("app-work/node-security/trusted-cas.pem"))
+        }
     }
 
     private fun productionInstall(target: Target) =

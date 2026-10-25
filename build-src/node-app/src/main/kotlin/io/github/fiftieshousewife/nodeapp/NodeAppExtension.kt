@@ -1,9 +1,11 @@
 package io.github.fiftieshousewife.nodeapp
 
 import io.github.fiftieshousewife.appcore.AppExtension
+import org.gradle.api.Action
 import org.gradle.api.file.ConfigurableFileCollection
 import org.gradle.api.provider.ListProperty
 import org.gradle.api.provider.Property
+import org.gradle.api.tasks.Nested
 
 /** `nodeApp {}`: the Node.js application archive and the Node runtime inside it. */
 abstract class NodeAppExtension : AppExtension() {
@@ -34,4 +36,10 @@ abstract class NodeAppExtension : AppExtension() {
      * do not block cross builds. Review before adding: the check exists because most do.
      */
     abstract val portableInstallScripts: ListProperty<String>
+
+    /** Trusted CAs and TLS settings for the embedded Node.js; see [NodeRuntimeSecurity]. */
+    @get:Nested
+    abstract val security: NodeRuntimeSecurity
+
+    fun security(action: Action<NodeRuntimeSecurity>) = action.execute(security)
 }

@@ -52,7 +52,7 @@ internal class NodeTargetTasks(
         )
     }
 
-    /** The launcher's command: the security options first, then `nodeArgs`, and the CA bundle if there is one. */
+    /** The launcher's command: the security options first, then `nodeArgs`. */
     private fun launch(): Provider<NodeLaunch> {
         val security = extension.security
         val noValue = project.provider { listOf<String>() }
@@ -62,18 +62,18 @@ internal class NodeTargetTasks(
                     NodeRuntimeSecurity.options(min.firstOrNull(), ciphers.firstOrNull())
                 }
         val args = securityOptions.zip(extension.nodeArgs) { options, nodeArgs -> options + nodeArgs }
-        val hasCertificates = security.trustedCertificates.elements.map { it.isNotEmpty() }
         return extension.entryPoint
-            .zip(args) { entry, all -> entry to all }
-            .zip(hasCertificates) { (entry, all), certificates -> NodeLaunch(entry, all, certificates) }
+            .zip(args, ::NodeLaunch)
     }
 
     /** One bundle for every target: certificates don't depend on the OS. */
     private val trustedCertificates by lazy {
         project.tasks.register("nodeTrustedCertificates", BundleTrustedCertificates::class.java) {
             group = this@NodeTargetTasks.group
-            description = "Bundles nodeApp.security.trustedCertificates into security/trusted-cas.pem"
+            description =
+                "Bundles nodeApp.security.trustedCertificates and the runtime policy's into security/trusted-cas.pem"
             certificates.from(extension.security.trustedCertificates)
+            policy.from(wiring.runtimePolicy)
             bundle.set(project.layout.buildDirectory.file("app-work/node-security/trusted-cas.pem"))
         }
     }

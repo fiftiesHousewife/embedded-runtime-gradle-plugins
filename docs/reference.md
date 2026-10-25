@@ -73,7 +73,7 @@ nodeApp {
 | `jlinkLinuxX64`, … | Java: builds one target's trimmed runtime |
 | `customiseRuntimeLinuxX64`, … | Java: applies `security {}` and the overlay to it |
 | `npmInstall`, `npmBuild`, `npmTest` | Node: `npm ci`, your build script, your test script |
-| `nodeTrustedCertificates` | Node: bundles `security { trustedCertificates }` into `security/trusted-cas.pem`; skipped when there are none |
+| `nodeTrustedCertificates` | Node: bundles `security { trustedCertificates }` and the runtime policy's certificates into `security/trusted-cas.pem`; writes nothing when there are none |
 
 ## Configuration
 
@@ -91,7 +91,7 @@ Gradle properties, set in `gradle.properties`, `~/.gradle/gradle.properties` or 
 | `nodeApp.npm.registry` | registry.npmjs.org | npm registry when not using a binary repository |
 | `nodeApp.npm.caFile` | | PEM file of corporate CAs for npm |
 | `javaApp.targets`, `nodeApp.targets` | this machine | Comma-separated targets to build |
-| `javaApp.securityPolicy`, `javaApp.securityPolicyArtifact` | | The organisation's runtime policy: a directory or zip, or its `group:name:version` |
+| `javaApp.securityPolicy`, `javaApp.securityPolicyArtifact`, `nodeApp.securityPolicy`, `nodeApp.securityPolicyArtifact` | | The organisation's runtime policy: a directory or zip, or its `group:name:version` |
 | `appSmokeTest.securityPolicy`, `appSmokeTest.securityPolicyArtifact` | | In a build applying `app-smoke-test`: the policy every archive must comply with before it is started |
 | `javaApp.archiveFormat`, `nodeApp.archiveFormat` | `tar.gz` | `tar.gz`, `tar` or `zip` |
 | `javaApp.rpm`, `nodeApp.rpm` | `false` | Also build an RPM per Linux target |

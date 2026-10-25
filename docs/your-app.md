@@ -25,7 +25,7 @@ orders-service-1.4.2/
   runtime/                # the embedded JDK or Node.js
   lib/                    # Java: your jar and its dependencies
   app/                    # Node: your code, package.json and production node_modules
-  security/               # Node: trusted-cas.pem, when nodeApp.security names trusted CAs
+  security/               # Node: trusted-cas.pem, when nodeApp.security or the runtime policy names CAs
   conf.defaults/
   META-INF/app.json       # name, version, target, runtime, git commit
   META-INF/sbom.cdx.json  # CycloneDX SBOM, including the runtime
@@ -68,3 +68,28 @@ The build checks every certificate and writes them to one bundle, `security/trus
 launcher points `NODE_EXTRA_CA_CERTS` at it, so these CAs are trusted as well as Node's own. The TLS
 settings become `--tls-min-v1.3` and `--tls-cipher-list=…`, placed before `nodeArgs` and
 `APP_NODE_OPTS`. The smoke test starts the app with all of them in place.
+
+`runtimeOptions("locked")` makes the launcher refuse to start while `NODE_OPTIONS`, `APP_NODE_OPTS`
+or `NODE_TLS_REJECT_UNAUTHORIZED` is set, rather than let them load a script or turn off
+certificate checks.
+
+### The organisation's runtime policy
+
+The same runtime policy as Java's ([java.md](java.md#an-organisation-wide-runtime-policy)) covers
+Node.js apps, set per machine with `nodeApp.securityPolicy` or `nodeApp.securityPolicyArtifact`.
+One policy can hold both ecosystems' keys; these are the ones that apply to Node.js:
+
+```properties
+id=acme-node-runtime
+version=3
+tlsMinVersion=1.3                                    # the launcher must pass --tls-min-v1.3
+forbiddenNodeArgs=--inspect,--require,--import,--loader,--experimental-loader
+runtimeOptions=locked
+forbiddenLibraries=pkg:npm/request                   # package URL prefixes, matched against the SBOM
+```
+
+The policy's `certificates/` are added to `security/trusted-cas.pem` after the project's own. Every
+archive is checked first (`appVerifyPolicy<Target>`): a launcher that lets Node accept older TLS,
+passes a forbidden option or doesn't lock its options, a bundle missing a policy certificate, or a
+forbidden package in the SBOM, and the build fails before any archive exists. A deployment
+pipeline's `app-smoke-test` checks it again with `appSmokeTest.securityPolicy`.

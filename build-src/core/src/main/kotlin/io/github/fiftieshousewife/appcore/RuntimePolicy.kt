@@ -7,9 +7,10 @@ import java.util.HexFormat
 import java.util.Properties
 
 /**
- * An organisation's runtime policy: what every Java runtime it ships must contain, kept in one place
- * instead of in a repackaged JDK. A directory (or a zip of one) holding `runtime-policy.properties`
- * and, optionally, `certificates/` with CA certificates every runtime must trust:
+ * An organisation's runtime policy: what every Java or Node.js runtime it ships must contain, kept in
+ * one place instead of in a repackaged runtime. A directory (or a zip of one) holding
+ * `runtime-policy.properties` and, optionally, `certificates/` with CA certificates every runtime
+ * must trust:
  *
  * ```properties
  * id=acme-java-runtime
@@ -21,10 +22,15 @@ import java.util.Properties
  * forbiddenLibraries=pkg:maven/org.bouncycastle/bctls    # purl prefixes: no TLS stack of the app's own
  * set.networkaddress.cache.ttl=30     # a security property, exactly
  * append.jdk.tls.disabledAlgorithms=TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA384
+ * tlsMinVersion=1.3                   # Node: the launcher passes --tls-min-v1.3
+ * forbiddenNodeArgs=--inspect,--require,--import,--loader,--experimental-loader
  * ```
  *
- * `customiseRuntime` applies it after the project's own settings, so it always wins;
- * `appVerifyPolicy` and `appSmokeTest` check the actual files against it ([RuntimePolicyCheck]).
+ * The security properties, `lockProperties` and `forbiddenModules` concern Java runtimes,
+ * `tlsMinVersion` and `forbiddenNodeArgs` Node.js; the rest apply to both. Java's
+ * `customiseRuntime` and Node's `nodeTrustedCertificates` apply it after the project's own
+ * settings, so it always wins; `appVerifyPolicy` and `appSmokeTest` check the actual files against
+ * it ([RuntimePolicyCheck]).
  */
 data class RuntimePolicy(
     val id: String,
@@ -37,6 +43,10 @@ data class RuntimePolicy(
     val forbiddenJvmArgs: List<String>,
     /** Package URL prefixes no component in the app's SBOM may match. */
     val forbiddenLibraries: List<String>,
+    /** Node.js: the lowest TLS version the launcher must enforce, `1.2` or `1.3`. */
+    val tlsMinVersion: String? = null,
+    /** Node.js: option prefixes the launcher must not pass to `node`. */
+    val forbiddenNodeArgs: List<String> = emptyList(),
     val certificates: List<File>,
     /** SHA-256 over the policy file and every certificate, recorded in each runtime it is applied to. */
     val digest: String,
@@ -46,6 +56,7 @@ data class RuntimePolicy(
     companion object {
         const val FILE = "runtime-policy.properties"
         private const val DIGEST_SHOWN = 12
+        private val TLS_VERSIONS = setOf("1.2", "1.3")
 
         /** Loads the policy in [dir], which holds [FILE]. */
         fun load(dir: File): RuntimePolicy {
@@ -70,6 +81,10 @@ data class RuntimePolicy(
                 forbiddenModules = list("forbiddenModules"),
                 forbiddenJvmArgs = list("forbiddenJvmArgs"),
                 forbiddenLibraries = list("forbiddenLibraries"),
+                tlsMinVersion = props.getProperty("tlsMinVersion")?.trim()?.also { v ->
+                    if (v !in TLS_VERSIONS) throw GradleException("$file has tlsMinVersion=$v; use 1.2 or 1.3")
+                },
+                forbiddenNodeArgs = list("forbiddenNodeArgs"),
                 certificates = certificates,
                 digest = digest(listOf(file) + certificates),
             )

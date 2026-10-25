@@ -55,6 +55,25 @@ class NodeAppPluginTest {
         )
     }
 
+    @Test
+    fun `the runtime policy's certificates are trusted and its TLS floor is enforced`() {
+        val project = webApp()
+        val policy = tmp.resolve("policy").apply { resolve("certificates").mkdirs() }
+        policy.resolve("certificates/acme-root.pem").writeText(certificate())
+        policy.resolve("runtime-policy.properties").writeText("id=acme-node-runtime\nversion=3\ntlsMinVersion=1.3\n")
+        val withPolicy = "-PnodeApp.securityPolicy=${policy.absolutePath}"
+        val refused = project.buildAndFail("appArchive", withPolicy).output
+        val buildScript = project.project.resolve("build.gradle.kts")
+        buildScript.appendText("nodeApp.security.tlsMinVersion = \"1.3\"\n")
+        project.build("appArchive", "installDist", "appSmokeTest", withPolicy)
+        val home = project.project.resolve("build/install/web")
+        assertAll(
+            { assertTrue(refused.contains("breaks runtime policy acme-node-runtime 3"), refused) },
+            { assertTrue(refused.contains("accept TLS below 1.3"), refused) },
+            { assertTrue(home.resolve("security/trusted-cas.pem").readText().startsWith(PEM_HEADER)) },
+        )
+    }
+
     /** A throwaway self-signed CA, made with the JDK's keytool. */
     private fun certificate(): String {
         val store = tmp.resolve("ca.p12")

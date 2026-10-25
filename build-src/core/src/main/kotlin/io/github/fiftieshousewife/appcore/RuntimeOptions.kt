@@ -21,7 +21,11 @@ enum class RuntimeOptions(val id: String) {
     override fun toString(): String = id
 
     companion object {
-        /** Every variable through which the launcher's caller could add runtime options. */
+        /**
+         * Every variable through which the launcher's caller could add runtime options, or loosen
+         * Node's TLS: `NODE_TLS_REJECT_UNAUTHORIZED=0` turns off certificate checks. Not
+         * `NODE_EXTRA_CA_CERTS`: hosts often set it machine-wide, and Java launchers share this list.
+         */
         val VARIABLES =
             listOf(
                 "APP_JAVA_OPTS",
@@ -30,6 +34,7 @@ enum class RuntimeOptions(val id: String) {
                 "JDK_JAVA_OPTIONS",
                 "_JAVA_OPTIONS",
                 "NODE_OPTIONS",
+                "NODE_TLS_REJECT_UNAUTHORIZED",
             )
 
         fun parse(id: String): RuntimeOptions = entries.firstOrNull { it.id == id.trim().lowercase() }

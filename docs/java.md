@@ -82,7 +82,8 @@ javaApp.securityPolicyArtifact=com.acme.platform:java-runtime-policy:7      # a 
 ```
 
 The policy is a directory (or a zip of one) with `runtime-policy.properties` and, optionally,
-`certificates/`:
+`certificates/`. The same policy covers Node.js apps, through `nodeApp.securityPolicy` and the keys
+in [your-app.md](your-app.md#the-organisations-runtime-policy):
 
 ```properties
 id=acme-java-runtime

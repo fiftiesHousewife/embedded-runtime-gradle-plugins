@@ -3,7 +3,6 @@ package io.github.fiftieshousewife.nodeapp
 import org.gradle.api.GradleException
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertThrows
-import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 class NodeLaunchCommandTest {
@@ -14,7 +13,7 @@ class NodeLaunchCommandTest {
         assertEquals(
             "exec \"\$APP_HOME/runtime/bin/node\" '--enable-source-maps' \${APP_NODE_OPTS:-} " +
                 "\"\$APP_HOME/app/server/main.mjs\" \"\$@\"",
-            NodeLaunchCommand.posix(launch),
+            NodeLaunchCommand.posix(launch).lines().last(),
         )
     }
 
@@ -23,26 +22,25 @@ class NodeLaunchCommandTest {
         assertEquals(
             "\"%APP_HOME%\\runtime\\node.exe\" \"--enable-source-maps\" %APP_NODE_OPTS% " +
                 "\"%APP_HOME%\\app\\server\\main.mjs\"%ARGS%",
-            NodeLaunchCommand.windows(launch),
+            NodeLaunchCommand.windows(launch).lines().last(),
         )
     }
 
     @Test
-    fun `a CA bundle is exported before the POSIX launcher starts node`() {
-        assertTrue(
-            NodeLaunchCommand.posix(launch.copy(extraCaCerts = true)).startsWith(
-                "NODE_EXTRA_CA_CERTS=\"\$APP_HOME/security/trusted-cas.pem\"; export NODE_EXTRA_CA_CERTS\n" +
-                    "exec ",
-            ),
+    fun `the POSIX launcher trusts the CA bundle only when the archive has one`() {
+        assertEquals(
+            "if [ -f \"\$APP_HOME/security/trusted-cas.pem\" ]; then " +
+                "NODE_EXTRA_CA_CERTS=\"\$APP_HOME/security/trusted-cas.pem\"; export NODE_EXTRA_CA_CERTS; fi",
+            NodeLaunchCommand.posix(launch).lines().first(),
         )
     }
 
     @Test
-    fun `a CA bundle is set before the Windows launcher starts node`() {
-        assertTrue(
-            NodeLaunchCommand.windows(launch.copy(extraCaCerts = true)).startsWith(
-                "set \"NODE_EXTRA_CA_CERTS=%APP_HOME%\\security\\trusted-cas.pem\"\n\"%APP_HOME%",
-            ),
+    fun `the Windows launcher trusts the CA bundle only when the archive has one`() {
+        assertEquals(
+            "if exist \"%APP_HOME%\\security\\trusted-cas.pem\" " +
+                "set \"NODE_EXTRA_CA_CERTS=%APP_HOME%\\security\\trusted-cas.pem\"",
+            NodeLaunchCommand.windows(launch).lines().first(),
         )
     }
 

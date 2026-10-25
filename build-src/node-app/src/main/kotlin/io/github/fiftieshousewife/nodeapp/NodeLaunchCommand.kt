@@ -3,19 +3,23 @@ package io.github.fiftieshousewife.nodeapp
 import io.github.fiftieshousewife.appcore.tasks.LauncherTemplate.cmdQuote
 import io.github.fiftieshousewife.appcore.tasks.LauncherTemplate.shQuote
 
+/** What the launcher starts: the script under `app/` and the fixed Node options. */
+internal data class NodeLaunch(val entryPoint: String, val nodeArgs: List<String>)
+
 /**
- * What the launcher starts: the script under `app/` and the fixed Node options, and whether the
- * archive carries `security/trusted-cas.pem` for `NODE_EXTRA_CA_CERTS`.
+ * The lines in `bin/<app>` that start Node.js: trust `security/trusted-cas.pem` when the archive has
+ * one (from `nodeApp.security` or the runtime policy), then run the entry point.
  */
-internal data class NodeLaunch(val entryPoint: String, val nodeArgs: List<String>, val extraCaCerts: Boolean = false)
-
-/** The line in `bin/<app>` that starts Node.js. */
 internal object NodeLaunchCommand {
+    const val CA_BUNDLE = "security/trusted-cas.pem"
     private const val POSIX_CA_CERTS =
-        "NODE_EXTRA_CA_CERTS=\"\$APP_HOME/security/trusted-cas.pem\"; export NODE_EXTRA_CA_CERTS\n"
-    private const val WINDOWS_CA_CERTS = "set \"NODE_EXTRA_CA_CERTS=%APP_HOME%\\security\\trusted-cas.pem\"\n"
+        "if [ -f \"\$APP_HOME/$CA_BUNDLE\" ]; then NODE_EXTRA_CA_CERTS=\"\$APP_HOME/$CA_BUNDLE\"; " +
+            "export NODE_EXTRA_CA_CERTS; fi\n"
+    private const val WINDOWS_CA_CERTS =
+        "if exist \"%APP_HOME%\\security\\trusted-cas.pem\" " +
+            "set \"NODE_EXTRA_CA_CERTS=%APP_HOME%\\security\\trusted-cas.pem\"\n"
 
-    fun posix(launch: NodeLaunch) = (if (launch.extraCaCerts) POSIX_CA_CERTS else "") + listOf(
+    fun posix(launch: NodeLaunch) = POSIX_CA_CERTS + listOf(
         "exec \"\$APP_HOME/runtime/bin/node\"",
         launch.nodeArgs.joinToString(" ") { shQuote(it) },
         "\${APP_NODE_OPTS:-}",
@@ -24,7 +28,7 @@ internal object NodeLaunchCommand {
     ).filter(String::isNotEmpty).joinToString(" ")
 
     /** `%ARGS%` already starts with a space when it holds anything; see the launcher template. */
-    fun windows(launch: NodeLaunch) = (if (launch.extraCaCerts) WINDOWS_CA_CERTS else "") + listOf(
+    fun windows(launch: NodeLaunch) = WINDOWS_CA_CERTS + listOf(
         "\"%APP_HOME%\\runtime\\node.exe\"",
         launch.nodeArgs.joinToString(" ") { cmdQuote(it) },
         "%APP_NODE_OPTS%",

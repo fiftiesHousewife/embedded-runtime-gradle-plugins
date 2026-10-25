@@ -54,7 +54,7 @@ Changing `javaApp { javaVersion = N }` changes the compile toolchain and the emb
 together. Gradle then refuses any library published for a newer JVM than N (the
 `org.gradle.jvm.version` attribute), and some libraries need a minimum version for N. After
 raising it, run `./gradlew build`; if the smoke test reports a missing JDK class, use the
-`jlink-modules` skill.
+`embedded-runtime-jlink-modules` skill.
 
 ## 5. Finish
 

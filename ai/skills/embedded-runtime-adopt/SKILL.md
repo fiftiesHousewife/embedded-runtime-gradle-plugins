@@ -1,6 +1,6 @@
 ---
-name: adopt
-description: Set up the java-app or node-app Gradle plugin in an existing project so it ships as one archive with its own JDK or Node.js runtime - settings plugin, build configuration, the run/healthcheck contract, configuration defaults, targets and Artifactory. Use when asked to add, adopt, or migrate to the embedded runtime plugins, or to package an app with its own runtime.
+name: embedded-runtime-adopt
+description: Set up the java-app or node-app Gradle plugin in an existing project so it ships as one archive with its own JDK or Node.js runtime - settings plugin, build configuration, the run/healthcheck contract, configuration defaults, targets and the corporate binary repository. Use when asked to add, adopt, or migrate to the embedded runtime plugins, or to package an app with its own runtime.
 ---
 
 # Adopt the embedded runtime plugins
@@ -34,7 +34,7 @@ Move default config files to `src/deploy/conf/`.
 ## 3. Build and fix modules
 
 Run `./gradlew build`. It packages the archive, starts it and waits for the health check. If the
-smoke test fails on a missing JDK class, use the `jlink-modules` skill.
+smoke test fails on a missing JDK class, use the `embedded-runtime-jlink-modules` skill.
 
 ## 4. Targets, packaging and the corporate network
 

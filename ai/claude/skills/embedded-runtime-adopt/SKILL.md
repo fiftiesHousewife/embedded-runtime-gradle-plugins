@@ -1,6 +1,6 @@
 ---
 name: embedded-runtime-adopt
-description: Set up the java-app or node-app Gradle plugin in an existing project so it ships as one archive with its own JDK or Node.js runtime - settings plugin, build configuration, the run/healthcheck contract, configuration defaults, targets and Artifactory. Use when asked to add, adopt, or migrate to the embedded runtime plugins, or to package an app with its own runtime.
+description: Set up the java-app or node-app Gradle plugin in an existing project so it ships as one archive with its own JDK or Node.js runtime - settings plugin, build configuration, the run/healthcheck contract, configuration defaults, targets and the corporate binary repository. Use when asked to add, adopt, or migrate to the embedded runtime plugins, or to package an app with its own runtime.
 ---
 
 # Adopt the embedded runtime plugins

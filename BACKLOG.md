@@ -16,7 +16,7 @@ installs this machine's app with its runtime, and the custom installer is gone.
 
 | Item | Notes |
 |---|---|
-| **Java with Docker sample** | Builds the image from `appDockerContext` and runs it. Runs only when Docker is reachable (skipped, not failed, otherwise); locally colima can be started for it |
+| **Docker sample: a real run** | `samples/docker-service` builds the image and smoke-tests the container, skipping cleanly without a Linux Docker daemon (verified). Its container run is unverified until CI's Ubuntu job runs it, or colima is started locally |
 
 
 ## AI tooling

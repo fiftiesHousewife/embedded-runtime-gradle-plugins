@@ -60,7 +60,8 @@ The result is `build/distributions/orders-service-1.4.2-linux-x64.tar.gz`, named
 built on. `build` only passes if the packaged app started and reported healthy. Your app needs to
 read `APP_PORT` and answer `--healthcheck`; see [What your app needs to do](docs/your-app.md).
 
-The [samples](samples) are a plain Java HTTP service, a Spring Boot service and a Node.js service.
+The [samples](samples) are a plain Java HTTP service, a Spring Boot service, a Node.js service, and a
+service built and run as a container image when Docker is available.
 
 ## Documentation
 

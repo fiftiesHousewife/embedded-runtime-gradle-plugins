@@ -93,7 +93,17 @@ javaApp.jdk.21=21.0.13+9
 ```
 
 A version in the wrong form for its distribution is rejected before anything is downloaded.
-SapMachine 25 has no Intel Mac (`mac-x64`) build.
+
+Not every distribution covers every release and target:
+
+| Distribution | Gap |
+|---|---|
+| `microsoft` | Long-term-support releases only: 11, 17, 21 and 25 |
+| `temurin` | No Intel Mac (`mac-x64`) build of 27. From 24, `jmods/` is a separate download, which the plugin fetches beside the JDK |
+| `sapmachine` | No Intel Mac build from 25. From 24 it ships no `jmods/` at all, so each target's runtime can only be linked on that target's own OS and CPU: build it there, or use another distribution |
+
+A Java 24 or later JDK without `jmods/` (JEP 493) can still link a runtime for the machine it runs
+on, but not for another one, which is why a cross build needs the jmods.
 
 > **Oracle licensing.** Whether you may redistribute an Oracle runtime inside your archive is
 > decided by Oracle's licence, not by these plugins. Recent releases under the NFTC allow it;

@@ -199,6 +199,8 @@ enum class JdkDistribution(
     ) {
         override fun artifact(version: JdkVersion, target: Target) =
             archive(ArchiveName("microsoft-jdk", "microsoft-jdk", Spelling.MACOS), version, target)
+
+        override val coverage = "Microsoft builds long-term-support releases only (11, 17, 21, 25)."
     },
 
     /**
@@ -236,6 +238,9 @@ enum class JdkDistribution(
             )
         }
     }
+
+    /** Which feature releases the vendor builds, when that is not every one; shown when a pin is missing. */
+    open val coverage: String = ""
 
     /** Whether [feature]'s JDK archives lack `jmods/`, which this vendor publishes separately. */
     open fun separateJmods(feature: Int): Boolean = false

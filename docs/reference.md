@@ -25,7 +25,7 @@ javaApp {                                       // nodeApp {} has the same first
     smokeTestTimeout = Duration.ofSeconds(60)
     allowUntestedPublish = false
 
-    javaVersion = 21                            // 11 to 25
+    javaVersion = 21                            // 11 to 27
     jdkVersion = "21.0.13+9"                    // default: the plugin's pin
     additionalModules = listOf("jdk.crypto.ec") // added to what jdeps finds
     jlinkModules = listOf("java.base")          // instead: exactly these modules

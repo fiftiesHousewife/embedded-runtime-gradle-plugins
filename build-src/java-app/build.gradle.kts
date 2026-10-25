@@ -39,7 +39,7 @@ gradlePlugin {
             implementationClass = "io.github.fiftieshousewife.javaapp.JavaAppPlugin"
             displayName = "Java app with embedded runtime"
             description =
-                "Packages a Java 11 to 25 application with a pinned, jlink-trimmed runtime from " +
+                "Packages a Java 11 to 27 application with a pinned, jlink-trimmed runtime from " +
                 "Temurin, Oracle, Corretto, Zulu, Liberica, Microsoft or SapMachine"
             tags = listOf("jlink", "packaging", "deployment")
         }

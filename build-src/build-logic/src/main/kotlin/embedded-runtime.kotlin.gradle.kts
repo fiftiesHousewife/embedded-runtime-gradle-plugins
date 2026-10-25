@@ -29,7 +29,7 @@ version = providers.gradleProperty("releaseVersion").getOrElse("1.0.0-SNAPSHOT")
  * compiler and the bytecode level together, so the jar is identical wherever it is built.
  *
  * Applications *packaged* by these plugins are a separate matter: they run on their own embedded
- * runtime, and Java apps are supported from Java 11 to 25 (see `JdkCatalog.SUPPORTED_FEATURES`).
+ * runtime, and Java apps are supported from Java 11 to 27 (see `JdkCatalog.SUPPORTED_FEATURES`).
  */
 val gradleMinimumJvm = libs.findVersion("plugin-jvm").get().requiredVersion.toInt()
 

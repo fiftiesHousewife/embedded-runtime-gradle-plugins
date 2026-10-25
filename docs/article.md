@@ -162,7 +162,7 @@ The build tests the archive it is about to publish; servers, containers and a de
 
 A Gradle toolchain request names only a feature release, "21". The plugin answers it with an exact build, such as Temurin 21.0.12.1+1, and links the archive's runtime from that same build. The compiler and the runtime come from one pin, read in one place, so they cannot drift apart.
 
-Each plugin release carries a catalogue of tested pins, one per distribution and Java release from 11 to 25. Releasing the plugin is how a quarterly security update reaches every repository at once. A team that cannot wait overrides one line, `javaApp.jdk.21=21.0.13+9`, until the next release.
+Each plugin release carries a catalogue of tested pins, one per distribution and Java release from 11 to 27. Releasing the plugin is how a quarterly security update reaches every repository at once. A team that cannot wait overrides one line, `javaApp.jdk.21=21.0.13+9`, until the next release.
 
 Seven distributions are supported, and each spells its versions and file names its own way:
 

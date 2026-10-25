@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/fiftiesHousewife/embedded-runtime-gradle-plugins/actions/workflows/ci.yml/badge.svg)](https://github.com/fiftiesHousewife/embedded-runtime-gradle-plugins/actions/workflows/ci.yml)
 [![Licence](https://img.shields.io/badge/licence-Apache%202.0-blue.svg)](LICENSE)
-[![Java](https://img.shields.io/badge/Java-11%E2%80%9325-orange.svg)](docs/java.md)
+[![Java](https://img.shields.io/badge/Java-11%E2%80%9327-orange.svg)](docs/java.md)
 [![Gradle](https://img.shields.io/badge/Gradle-9.8%2B-02303A.svg)](https://gradle.org)
 
 Package a Java or Node.js application **with its own runtime**: your code, its libraries, and a
@@ -18,7 +18,7 @@ installed, and the archive that passes CI is the archive that runs in production
 The first two each come with a settings plugin (`….java-app.settings`, `….node-app.settings`) that
 sets up every repository the build needs, so projects declare none of their own.
 
-**Requirements:** Gradle 9.8 or newer. Java apps can target Java 11 to 25, whatever JDK Gradle
+**Requirements:** Gradle 9.8 or newer. Java apps can target Java 11 to 27, whatever JDK Gradle
 itself runs on.
 
 ## Quick start

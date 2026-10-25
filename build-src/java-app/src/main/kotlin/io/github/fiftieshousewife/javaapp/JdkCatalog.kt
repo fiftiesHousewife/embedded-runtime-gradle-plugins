@@ -31,7 +31,7 @@ object JdkCatalog {
      */
     val SUPPORTED_FEATURES = MIN_JAVA_FEATURE..MAX_JAVA_FEATURE
     private const val MIN_JAVA_FEATURE = 11
-    private const val MAX_JAVA_FEATURE = 25
+    private const val MAX_JAVA_FEATURE = 27
 
     /** `--compress` took named levels in Java 21 and deprecated the numeric ones. */
     const val NAMED_COMPRESSION_FROM = 21
@@ -85,7 +85,7 @@ object JdkCatalog {
     fun unknownJdk(distribution: JdkDistribution, feature: Int) = GradleException(
         "No ${distribution.id} JDK $feature pin in the java-app catalogue. Set " +
             "${JdkSources.VERSION_PREFIX}$feature to an exact ${distribution.id} version, " +
-            "in the form ${distribution.versionForm.example}.",
+            "in the form ${distribution.versionForm.example}. ${distribution.coverage}".trimEnd(),
     )
 }
 

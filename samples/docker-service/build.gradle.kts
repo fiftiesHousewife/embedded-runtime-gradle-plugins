@@ -23,13 +23,11 @@ javaApp {
 // regardless, so a missing daemon fails the build: CI's Linux job uses it to prove the image runs.
 val image = "docker-service:$version"
 val dockerRequired = providers.gradleProperty("dockerRequired").map(String::toBoolean).orElse(false)
-val dockerRunning =
-    dockerRequired.zip(
-        providers.exec {
-            commandLine("docker", "info", "--format", "{{.OSType}}")
-            isIgnoreExitValue = true
-        }.standardOutput.asText,
-    ) { required, osType -> required || osType.trim() == "linux" }
+val dockerOsType =
+    providers.exec {
+        commandLine("docker", "info", "--format", "{{.OSType}}")
+        isIgnoreExitValue = true
+    }.standardOutput.asText // fails to start without a docker command (GitHub's macOS runners): no daemon
 
 val dockerImage =
     tasks.register<Exec>("dockerImage") {
@@ -38,8 +36,11 @@ val dockerImage =
         val context = tasks.named<Sync>("appDockerContext").map { it.destinationDir }
         inputs.dir(context)
         commandLine("docker", "build", "--tag", image, context.get().path)
-        val running = dockerRunning // a local: the configuration cache can't hold the build script
-        onlyIf("a Docker daemon running Linux containers is reachable, or dockerRequired is set") { running.get() }
+        val required = dockerRequired // locals: the configuration cache can't hold the build script
+        val osType = dockerOsType
+        onlyIf("a Docker daemon running Linux containers is reachable, or dockerRequired is set") {
+            required.get() || runCatching { osType.get().trim() == "linux" }.getOrDefault(false)
+        }
     }
 
 val dockerSmokeTest =
@@ -48,8 +49,11 @@ val dockerSmokeTest =
         description = "Starts $image and waits for the container's own healthcheck"
         dependsOn(dockerImage)
         commandLine("sh", "src/docker/smoke-test.sh", image)
-        val running = dockerRunning // a local: the configuration cache can't hold the build script
-        onlyIf("a Docker daemon running Linux containers is reachable, or dockerRequired is set") { running.get() }
+        val required = dockerRequired // locals: the configuration cache can't hold the build script
+        val osType = dockerOsType
+        onlyIf("a Docker daemon running Linux containers is reachable, or dockerRequired is set") {
+            required.get() || runCatching { osType.get().trim() == "linux" }.getOrDefault(false)
+        }
     }
 
 tasks.named("check") { dependsOn(dockerSmokeTest) }

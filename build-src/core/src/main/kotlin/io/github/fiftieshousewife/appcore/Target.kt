@@ -27,6 +27,9 @@ data class Target(val os: Os, val arch: Arch) : Serializable {
     /** `LinuxX64`, `MacAarch64`: appended to the names of tasks built once per target. */
     val taskSuffix: String get() = os.id.replaceFirstChar(Char::uppercase) + arch.id.replaceFirstChar(Char::uppercase)
 
+    /** The distribution plugin's install task for this target's distribution, `installLinuxX64Dist`. */
+    val installTaskName: String get() = "install${taskSuffix}Dist"
+
     override fun toString(): String = id
 
     companion object {

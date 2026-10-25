@@ -74,7 +74,7 @@ class JavaAppSecurityTest {
     @Test
     fun `an operator's jvm options file reaches the JVM unless runtime options are locked`() {
         val open = javaService(tmp.resolve("open"))
-        open.build("appAssemble${hostSuffix()}")
+        open.build(Target.parse(TestProject.hostTarget()).installTaskName)
         val conf = tmp.resolve("conf").apply { mkdirs() }
         conf.resolve("jvm.options").writeText("-XX:+NoSuchOptionAnywhere\n")
         val fromFile = launch(open, conf)
@@ -84,7 +84,7 @@ class JavaAppSecurityTest {
                 tmp.resolve("locked"),
                 JavaServiceOptions(javaApp = "$FIXTURE_MODULES\nruntimeOptions(\"locked\")"),
             )
-        locked.build("appAssemble${hostSuffix()}")
+        locked.build(Target.parse(TestProject.hostTarget()).installTaskName)
         val emptyConf = tmp.resolve("empty-conf").apply { mkdirs() }
         val refused = launch(locked, emptyConf, "APP_JAVA_OPTS" to "-agentlib:jdwp=transport=dt_socket")
         assertAll(
@@ -93,8 +93,6 @@ class JavaAppSecurityTest {
             { assertTrue(refused.second.contains("APP_JAVA_OPTS is set"), refused.second) },
         )
     }
-
-    private fun hostSuffix() = Target.parse(TestProject.hostTarget()).taskSuffix
 
     /** Runs the assembled app's launcher with [conf] as its configuration directory. */
     private fun launch(project: TestProject, conf: File, vararg env: Pair<String, String>): Pair<Int, String> {

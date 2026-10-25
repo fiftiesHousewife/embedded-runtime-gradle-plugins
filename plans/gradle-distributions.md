@@ -113,6 +113,18 @@ Each step ends with `./gradlew check` green and a commit.
 
 About a day of work after the spike, plus the spike itself (half a day).
 
+## Progress
+
+- Step 2 done (`840fca1`): Java launchers come from `startScripts` with `EmbeddedRuntimeScriptGenerator`.
+- Steps 3 and 4 done: every target, Java and Node, is a Gradle distribution; `install<Target>Dist`
+  and `<target>DistTar`/`DistZip` replace `appAssemble<T>`/`appArchive<T>`. Two findings on the way:
+  archive tasks need `archiveClassifier`/`archiveExtension` (not `archiveFileName`), or the
+  publication loses the classifier and the top directory takes the file name; and Gradle 9
+  normalises file modes in archives, so the archive tasks call `useFileSystemPermissions()` to keep
+  `runtime/lib/jspawnhelper` executable.
+- Not done: making `main` the host target (so plain `installDist` installs this machine's app with
+  its runtime). Deferred: the default `main` distribution would need its own contents replaced.
+
 ## Spike findings (2026-10-25)
 
 Run in a throwaway project on Gradle 9.8.2 with only Gradle's own `application` and `distribution`

@@ -5,6 +5,7 @@ import io.github.fiftieshousewife.appcore.tasks.GenerateLaunchers
 import io.github.fiftieshousewife.appcore.tasks.GenerateSbom
 import io.github.fiftieshousewife.appcore.tasks.VerifyRuntimePolicy
 import org.gradle.api.Project
+import org.gradle.api.distribution.DistributionContainer
 import org.gradle.api.file.DuplicatesStrategy
 import org.gradle.api.provider.Provider
 import org.gradle.api.tasks.Sync
@@ -27,15 +28,21 @@ internal class TargetPipeline(private val project: Project, private val wiring: 
     private val versionString: Provider<String> = wiring.version
     private val groupString: Provider<String> = providers.provider { project.group.toString() }
 
-    /** `<app>-<version>`: the archive's single top-level directory. */
+    /** `<app>-<version>`: the installed app directory's name. */
     private val topDirectory: Provider<String> get() = appName.zip(versionString) { n, v -> "$n-$v" }
 
     fun register(target: Target, spec: EcosystemSpec): TargetTasks {
         val parts = Parts(registerLaunchers(target, spec), registerManifest(target, spec), registerSbom(target, spec))
-        val assemble = registerAssemble(target, spec, parts)
-        val verified = registerPolicyCheck(target, assemble)
-        val archive = registerArchive(target, assemble).apply { configure { dependsOn(verified) } }
-        return TargetTasks(target, assemble, archive, parts.sbom)
+        val name = distributionName(target)
+        registerDistribution(name, spec, parts)
+        val install = tasks.named(target.installTaskName, Sync::class.java) {
+            group = taskGroup
+            description = "Installs the self-contained ${target.id} app into build/app/${target.id}"
+            destinationDir = layout.buildDirectory.dir("app/${target.id}").get().asFile.resolve(topDirectory.get())
+        }
+        val verified = registerPolicyCheck(target, install)
+        val archive = archiveTask(name, target).apply { configure { dependsOn(verified) } }
+        return TargetTasks(target, install, archive, parts.sbom)
     }
 
     /** The generated pieces every target's directory holds besides the ecosystem's own content. */
@@ -46,44 +53,63 @@ internal class TargetPipeline(private val project: Project, private val wiring: 
         val sbom: TaskProvider<GenerateSbom>,
     )
 
-    private fun registerAssemble(target: Target, spec: EcosystemSpec, parts: Parts) =
-        tasks.register("appAssemble${target.taskSuffix}", Sync::class.java) {
-            group = taskGroup
-            description = "Assembles the self-contained app directory for ${target.id}"
-            into(layout.buildDirectory.zip(topDirectory) { dir, top -> dir.dir("app/${target.id}/$top") })
-            duplicatesStrategy = DuplicatesStrategy.FAIL
-            into("bin") { from(parts.launchers) }
-            into("META-INF") {
-                from(parts.manifest)
-                from(parts.sbom)
+    /**
+     * One Gradle distribution per target, named after it (`linuxX64`, `macAarch64`), so each gets the
+     * distribution plugin's `install…Dist`, `…DistTar` and `…DistZip`.
+     */
+    private fun registerDistribution(name: String, spec: EcosystemSpec, parts: Parts) {
+        val app = appName
+        project.extensions.getByType(DistributionContainer::class.java).register(name) {
+            distributionBaseName.set(app)
+            contents {
+                duplicatesStrategy = DuplicatesStrategy.FAIL
+                into("bin") {
+                    from(parts.launchers)
+                    filePermissions { unix("rwxr-xr-x") }
+                }
+                into("META-INF") {
+                    from(parts.manifest)
+                    from(parts.sbom)
+                }
+                into("conf.defaults") { from(extension.configDefaults) }
+                spec.contents(this)
+                AppCopySpecs.executableBits(this)
             }
-            into("conf.defaults") { from(extension.configDefaults) }
-            spec.contents(this)
-            AppCopySpecs.executableBits(this)
         }
+    }
 
     /**
-     * Named the way every Gradle archive task names itself — `<base>-<version>-<classifier>.<ext>` in
-     * `build/distributions` — so the classifier is also what the Maven publication uses, and the two
-     * can never disagree.
+     * The archive of [archiveFormat][AppExtension.archiveFormat], named `<app>-<version>-<target>.<ext>`
+     * in `build/distributions`, the classifier the Maven publication uses; the other format's task is
+     * disabled.
      */
-    private fun registerArchive(target: Target, assemble: TaskProvider<Sync>): TaskProvider<out AbstractArchiveTask> {
+    private fun archiveTask(name: String, target: Target): TaskProvider<out AbstractArchiveTask> {
         val format = extension.archiveFormat.get()
-        val type = if (format == ArchiveFormat.ZIP) Zip::class.java else Tar::class.java
-        return tasks.register("appArchive${target.taskSuffix}", type) {
+        val tar = tasks.named("${name}DistTar", Tar::class.java) {
+            enabled = format != ArchiveFormat.ZIP
+            compression = if (format == ArchiveFormat.TAR_GZ) Compression.GZIP else Compression.NONE
+        }
+        val zip = tasks.named("${name}DistZip", Zip::class.java) {
+            enabled = format == ArchiveFormat.ZIP
+        }
+        val chosen = if (format == ArchiveFormat.ZIP) zip else tar
+        chosen.configure {
             group = taskGroup
             description = "Archives the app for ${target.id} as <app>-<version>-${target.id}.$format"
-            from(assemble)
-            into(topDirectory)
-            if (this is Tar) compression = if (format == ArchiveFormat.TAR_GZ) Compression.GZIP else Compression.NONE
+            // Classifier and extension, not a file name: the publication reads both from the task,
+            // and the distribution names the archive's top-level directory <app>-<version>-<target>.
             archiveBaseName.set(appName)
             archiveVersion.set(versionString)
             archiveClassifier.set(target.id)
             archiveExtension.set(format.extension)
             destinationDirectory.set(layout.buildDirectory.dir("distributions"))
-            AppCopySpecs.executableBits(this)
+            // Gradle 9 normalises modes in archives; keep the runtime's own exec bits (jspawnhelper).
+            useFileSystemPermissions()
         }
+        return chosen
     }
+
+    private fun distributionName(target: Target) = target.taskSuffix.replaceFirstChar(Char::lowercase)
 
     /** No archive breaking the organisation's runtime policy is built. */
     private fun registerPolicyCheck(target: Target, assemble: TaskProvider<Sync>) =

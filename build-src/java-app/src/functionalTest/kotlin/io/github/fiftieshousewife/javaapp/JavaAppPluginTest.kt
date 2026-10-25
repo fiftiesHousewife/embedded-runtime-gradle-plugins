@@ -32,7 +32,7 @@ class JavaAppPluginTest {
         val entries = TestProject.run("tar", "-tvzf", archive(project).absolutePath).lines()
         val smokeTested = { assertEquals(TaskOutcome.SUCCESS, result.task(":appSmokeTest")?.outcome) }
         val present = LAYOUT.map { path ->
-            { assertTrue(entries.any { it.endsWith("svc-2.0.0/$path") }, "missing $path") }
+            { assertTrue(entries.any { it.endsWith("svc-2.0.0-${TestProject.hostTarget()}/$path") }, "missing $path") }
         }
         val executable =
             EXECUTABLES.map { path ->
@@ -123,6 +123,6 @@ class JavaAppPluginTest {
                 "META-INF/app.json",
                 "META-INF/sbom.cdx.json",
             )
-        val EXECUTABLES = listOf("svc-2.0.0/bin/svc", "runtime/lib/jspawnhelper")
+        val EXECUTABLES = listOf("bin/svc", "runtime/lib/jspawnhelper")
     }
 }

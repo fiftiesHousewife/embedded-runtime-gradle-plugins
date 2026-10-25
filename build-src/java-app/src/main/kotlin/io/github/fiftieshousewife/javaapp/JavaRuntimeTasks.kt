@@ -95,7 +95,7 @@ internal class JavaRuntimeTasks(
 
     /** The module search runs this machine's assembled app, so it needs a target for this machine. */
     private fun useThisMachinesApp(task: JlinkFindModules) {
-        val assembleName = "appAssemble${wiring.host.taskSuffix}"
+        val assembleName = wiring.host.installTaskName
         if (assembleName !in project.tasks.names) {
             val message = "jlinkFindModules runs the app, so javaApp.targets must include this machine (${wiring.host})"
             task.doFirst { throw GradleException(message) }

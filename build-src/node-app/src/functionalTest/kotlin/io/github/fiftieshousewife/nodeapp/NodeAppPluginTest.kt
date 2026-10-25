@@ -24,7 +24,9 @@ class NodeAppPluginTest {
         val outcomes = listOf(":npmTest", ":appSmokeTest").map { task ->
             { assertEquals(TaskOutcome.SUCCESS, result.task(task)?.outcome) }
         }
-        val present = LAYOUT.map { path -> { assertTrue(entries.contains("web-3.1.0/$path"), "missing $path") } }
+        val present = LAYOUT.map { path ->
+            { assertTrue(entries.contains("web-3.1.0-${TestProject.hostTarget()}/$path"), "missing $path") }
+        }
         val testsLeftOut = { assertFalse(entries.any { it.contains("server.test.mjs") }, "tests must not be packaged") }
         assertAll(checks(outcomes + present + testsLeftOut))
     }

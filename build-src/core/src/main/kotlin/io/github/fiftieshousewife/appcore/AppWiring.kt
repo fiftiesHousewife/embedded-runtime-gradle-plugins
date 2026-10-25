@@ -13,6 +13,7 @@ import org.gradle.api.artifacts.ExternalModuleDependency
 import org.gradle.api.artifacts.ResolvableConfiguration
 import org.gradle.api.component.SoftwareComponentFactory
 import org.gradle.api.file.ArchiveOperations
+import org.gradle.api.file.CopySpec
 import org.gradle.api.file.Directory
 import org.gradle.api.file.DuplicatesStrategy
 import org.gradle.api.file.FileCollection
@@ -55,7 +56,7 @@ data class EcosystemSpec(
     /** Where `bin/` comes from for a target. */
     val launchers: Launchers,
     /** Adds the ecosystem's own content (`runtime/`, plus `lib/` or `app/`) to the assembled directory. */
-    val contents: Sync.() -> Unit,
+    val contents: CopySpec.() -> Unit,
     /** Feeds library components into the SBOM task. */
     val sbom: GenerateSbom.() -> Unit,
 )
@@ -223,6 +224,8 @@ class AppWiring(
      * has run, to register that target's ecosystem-specific tasks.
      */
     fun register(contribute: (Target) -> EcosystemSpec) {
+        // Each target becomes a distribution of its own (TargetPipeline).
+        project.pluginManager.apply("distribution")
         val lifecycle = registerLifecycle()
         project.afterEvaluate { registerTargets(lifecycle, contribute) }
     }

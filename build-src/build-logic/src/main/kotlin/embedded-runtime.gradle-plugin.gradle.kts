@@ -17,6 +17,13 @@ testing {
                 implementation(gradleTestKit())
                 implementation(testFixtures(project(":app-core")))
             }
+            targets.configureEach {
+                testTask.configure {
+                    // Each test runs whole Gradle builds; separate forks run them side by side. Capped,
+                    // because every fork starts TestKit daemons of its own.
+                    maxParallelForks = (Runtime.getRuntime().availableProcessors() / 2).coerceIn(1, 4)
+                }
+            }
         }
     }
 }

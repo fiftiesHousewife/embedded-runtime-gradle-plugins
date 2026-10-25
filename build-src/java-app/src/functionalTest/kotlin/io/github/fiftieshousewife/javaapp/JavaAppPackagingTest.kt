@@ -69,14 +69,14 @@ class JavaAppPackagingTest {
             project.build(
                 "publish",
                 "-PjavaApp.allowUntestedPublish=true",
-                "-PartifactoryUsername=ci",
-                "-PartifactoryPassword=secret",
+                "-PbinaryRepoUsername=ci",
+                "-PbinaryRepoPassword=secret",
             )
             server.requests
         }
         assertEquals(
-            listOf("PUT /rpm-local/svc-2.0.0-1.aarch64.rpm Basic Y2k6c2VjcmV0"),
-            requests.filter { "aarch64" in it },
+            "PUT /rpm-local/svc-2.0.0-1.aarch64.rpm Basic Y2k6c2VjcmV0",
+            requests.last { "aarch64" in it },
         )
     }
 

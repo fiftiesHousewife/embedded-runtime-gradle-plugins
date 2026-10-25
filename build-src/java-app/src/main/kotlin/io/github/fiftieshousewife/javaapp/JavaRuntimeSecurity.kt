@@ -9,7 +9,7 @@ import org.gradle.api.provider.Property
  * `javaApp { security { … } }`: an organisation's changes to the JDK it was given, applied to every
  * target's runtime after `jlink` by `customiseRuntime<Target>`. Every setting takes any Gradle file
  * source, so certificates and policy can come from the repository, a shared directory, or a
- * dependency resolved from Artifactory.
+ * dependency resolved from BinaryRepository.
  */
 abstract class JavaRuntimeSecurity {
     /**

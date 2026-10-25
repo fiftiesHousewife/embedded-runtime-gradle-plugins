@@ -10,7 +10,7 @@ com/example/orders-service/1.4.2/orders-service-1.4.2-windows-x64.tar.gz   # or 
 …
 ```
 
-With Artifactory configured, releases go to `libs-release-local` and `-SNAPSHOT` versions to
+With a binary repository configured, releases go to `libs-release-local` and `-SNAPSHOT` versions to
 `libs-snapshot-local`. To publish under other coordinates:
 
 ```kotlin
@@ -35,7 +35,7 @@ out, with the same smoke test the app's own build runs:
 plugins {
     id("io.github.fiftieshousewife.app-smoke-test") version "1.0.0"
 }
-repositories { maven("https://artifactory.example.com/artifactory/libs-release-local") }
+repositories { maven("https://repo.example.com/libs-release-local") }
 dependencies { smokeTest("com.example:orders-service:1.4.2") }
 ```
 

@@ -62,7 +62,7 @@ deserialized), `networkaddress.cache.ttl` (how long DNS answers are cached),
 default leaves them out), `ocsp.enable` (certificate revocation checking) and `securerandom.source`.
 
 Every setting takes any Gradle file source, so certificates and policy can come from the repository,
-a shared directory, or a versioned artifact in Artifactory. Anything not modelled here goes in
+a shared directory, or a versioned artifact in your binary repository. Anything not modelled here goes in
 `src/deploy/runtime/`, which is copied over the runtime as it is (`runtimeOverlay` to change it).
 Each runtime records what was changed, with every certificate's SHA-256 fingerprint, in
 `runtime/conf/security/java-app-customisations.txt`.
@@ -170,7 +170,7 @@ To download from a mirror instead, see `javaApp.jdk.url` under [Configuration](r
 ### JDKs already on disk
 
 To use JDKs you already have instead of downloading them, point at a shared directory of archives,
-laid out like the [Artifactory runtimes repository](artifactory.md#repositories-to-create):
+laid out like the [binary repository's runtimes repository](binary-repository.md#repositories-to-create):
 
 ```properties
 javaApp.jdk.localPath=/shared/jdks     # /shared/jdks/temurin/jdk/21.0.12.1_1/jdk-21.0.12.1_1-linux-x64.tar.gz

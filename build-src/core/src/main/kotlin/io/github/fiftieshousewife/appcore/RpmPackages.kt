@@ -39,7 +39,7 @@ internal class RpmPackages(private val project: Project, private val wiring: App
         rpm.license.convention("LicenseRef-Proprietary")
         rpm.user.convention(rpm.packageName)
         rpm.systemd.convention(true)
-        wiring.artifactory?.let { rpm.repositoryUrl.convention(it.rpmUrl) }
+        wiring.binaryRepo?.let { rpm.repositoryUrl.convention(it.rpmUrl) }
     }
 
     /** Registers the RPM tasks for [built], once targets and settings are final. */

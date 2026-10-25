@@ -1,5 +1,6 @@
 package io.github.fiftieshousewife.nodeapp.tasks
 
+import io.github.fiftieshousewife.appcore.ProxySettings
 import org.gradle.api.DefaultTask
 import org.gradle.api.credentials.PasswordCredentials
 import org.gradle.api.file.RegularFileProperty
@@ -16,8 +17,9 @@ import java.nio.file.attribute.PosixFilePermissions
 import java.util.Base64
 
 /**
- * Writes the npm user config pointing at the configured registry, with Artifactory credentials
- * when present. It is never up to date or cached because it carries a secret; the file is written
+ * Writes the npm user config pointing at the configured registry, with the binary repository's
+ * credentials and the JVM's proxy settings when present. It is never up to date or cached because it
+ * carries a secret; the file is written
  * owner-readable only and lives under `build/`.
  */
 @UntrackedTask(because = "Contains credentials that must not be cached or fingerprinted")
@@ -36,7 +38,8 @@ abstract class GenerateNpmrc : DefaultTask() {
         val user = credentials.orNull?.let { NpmUser(it.username.orEmpty(), it.password.orEmpty()) }
         val path = outputFile.get().asFile.toPath()
         Files.createDirectories(path.parent)
-        Files.writeString(path, Npmrc.lines(registry.get(), caFile.orNull, user).joinToString("\n", postfix = "\n"))
+        val lines = Npmrc.lines(registry.get(), caFile.orNull, user) + ProxySettings.fromSystem().npmrcLines()
+        Files.writeString(path, lines.joinToString("\n", postfix = "\n"))
         runCatching { Files.setPosixFilePermissions(path, PosixFilePermissions.fromString("rw-------")) }
     }
 }

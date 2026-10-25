@@ -23,7 +23,7 @@ javaApp {                                       // nodeApp {} has the same first
         url = "https://example.com/orders"
         user = "orders-service"                 // service account; default: packageName
         systemd = true                          // install and manage a systemd unit
-        repositoryUrl = uri("https://…/rpm-local") // default: artifactory.repo.rpm on Artifactory
+        repositoryUrl = uri("https://…/rpm-local") // default: binaryRepo.repo.rpm
     }
     dockerfile = file("docker/Dockerfile")      // default: Dockerfile, else src/deploy/docker/Dockerfile
     configDefaults = file("src/deploy/conf")    // shipped as conf.defaults/
@@ -86,7 +86,7 @@ Gradle properties, set in `gradle.properties`, `~/.gradle/gradle.properties` or 
 | `javaApp.jdk.<feature>.<target>.path` | | One JDK, as a directory or archive, e.g. `javaApp.jdk.21.linux-x64.path` |
 | `nodeApp.node.version` | the plugin's pin | Exact Node.js version |
 | `nodeApp.node.url`, `nodeApp.node.pattern` | nodejs.org/dist | Download Node.js from a mirror |
-| `nodeApp.npm.registry` | registry.npmjs.org | npm registry when not using Artifactory |
+| `nodeApp.npm.registry` | registry.npmjs.org | npm registry when not using a binary repository |
 | `nodeApp.npm.caFile` | | PEM file of corporate CAs for npm |
 | `javaApp.targets`, `nodeApp.targets` | this machine | Comma-separated targets to build |
 | `javaApp.securityPolicy`, `javaApp.securityPolicyArtifact` | | The organisation's runtime policy: a directory or zip, or its `group:name:version` |
@@ -96,12 +96,12 @@ Gradle properties, set in `gradle.properties`, `~/.gradle/gradle.properties` or 
 | `javaApp.installDir`, `nodeApp.installDir`, `appDeploy.installDir` | `build/install` | Where `appInstall` installs |
 | `javaApp.runtimeOptions`, `nodeApp.runtimeOptions` | `open` | `locked` refuses to start while anything would add runtime options |
 | `javaApp.allowUntestedPublish`, `nodeApp.allowUntestedPublish` | `false` | Allow publishing an archive that was never started |
-| `artifactory.url` | | Download everything through this Artifactory |
-| `artifactory.repo.maven` | `maven-virtual` | |
-| `artifactory.repo.gradlePlugins` | `gradle-plugins-virtual` | |
-| `artifactory.repo.npm` | `api/npm/npm-virtual` | |
-| `artifactory.repo.runtimes` | `runtimes` | |
-| `artifactory.repo.releases`, `artifactory.repo.snapshots` | `libs-release-local`, `libs-snapshot-local` | |
-| `artifactory.repo.rpm` | `rpm-local` | Where `appPublishRpm` uploads |
-| `javaApp.jdk.artifactoryPattern`, `nodeApp.node.artifactoryPattern` | the layout above | Layout of an existing runtimes tree |
-| `artifactory.allowInsecureProtocol` | `false` | Allow `http://` (test instances only) |
+| `binaryRepo.url` | | Download everything through this binary repository (Artifactory, Nexus, …) |
+| `binaryRepo.repo.maven` | `maven-virtual` | |
+| `binaryRepo.repo.gradlePlugins` | `gradle-plugins-virtual` | |
+| `binaryRepo.repo.npm` | `api/npm/npm-virtual` | |
+| `binaryRepo.repo.runtimes` | `runtimes` | |
+| `binaryRepo.repo.releases`, `binaryRepo.repo.snapshots` | `libs-release-local`, `libs-snapshot-local` | |
+| `binaryRepo.repo.rpm` | `rpm-local` | Where `appPublishRpm` uploads |
+| `javaApp.jdk.binaryRepoPattern`, `nodeApp.node.binaryRepoPattern` | the layout above | Layout of an existing runtimes tree |
+| `binaryRepo.allowInsecureProtocol` | `false` | Allow `http://` (test instances only) |

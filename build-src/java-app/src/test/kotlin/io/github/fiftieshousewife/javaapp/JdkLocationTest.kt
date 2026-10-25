@@ -1,6 +1,6 @@
 package io.github.fiftieshousewife.javaapp
 
-import io.github.fiftieshousewife.appcore.Artifactory
+import io.github.fiftieshousewife.appcore.BinaryRepository
 import io.github.fiftieshousewife.appcore.Target
 import org.junit.jupiter.api.Assertions.assertAll
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -14,9 +14,9 @@ class JdkLocationTest {
     @TempDir
     lateinit var shared: File
 
-    private val artifactory =
-        Artifactory(
-            baseUrl = "https://artifactory.example.com/artifactory",
+    private val binaryRepo =
+        BinaryRepository(
+            baseUrl = "https://repo.example.com",
             mavenRepo = "maven-virtual",
             gradlePluginsRepo = "gradle-plugins-virtual",
             runtimesRepo = "runtimes",
@@ -55,24 +55,24 @@ class JdkLocationTest {
     }
 
     @Test
-    fun `the curated Artifactory layout names every vendor's archive the same way`() {
-        val curated = JdkSources(JdkDistribution.ORACLE, JdkLocation.artifactory(artifactory))
+    fun `the curated BinaryRepository layout names every vendor's archive the same way`() {
+        val curated = JdkSources(JdkDistribution.ORACLE, JdkLocation.binaryRepo(binaryRepo))
         val reshaped =
             JdkSources(
                 JdkDistribution.ORACLE,
-                JdkLocation.artifactory(artifactory, "[module]/[revision]-[classifier].[ext]"),
+                JdkLocation.binaryRepo(binaryRepo, "[module]/[revision]-[classifier].[ext]"),
             )
         assertAll(
             {
                 assertEquals(
-                    "https://artifactory.example.com/artifactory/runtimes/oracle/jdk/25.0.3/" +
+                    "https://repo.example.com/runtimes/oracle/jdk/25.0.3/" +
                         "jdk-25.0.3-linux-x64.tar.gz",
                     uri(curated, "25.0.3"),
                 )
             },
             {
                 assertEquals(
-                    "https://artifactory.example.com/artifactory/runtimes/jdk/25.0.3-linux-x64.tar.gz",
+                    "https://repo.example.com/runtimes/jdk/25.0.3-linux-x64.tar.gz",
                     uri(reshaped, "25.0.3"),
                 )
             },

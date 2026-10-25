@@ -70,7 +70,7 @@ read `APP_PORT` and answer `--healthcheck`; see [What your app needs to do](docs
 | [Java: modules, hardening and JDKs](docs/java.md) | jdeps and jlink, certificates and security policy, choosing a JDK distribution |
 | [Packaging and deploying](docs/packaging.md) | tar.gz, tar, zip, RPM and container images; `appInstall` and rollback |
 | [Publishing](docs/publishing.md) | Maven repositories, signing, smoke-testing a published app |
-| [Behind a corporate Artifactory](docs/artifactory.md) | One setting per machine; the repositories to create |
+| [Behind a corporate binary repository](docs/binary-repository.md) | One setting per machine; the repositories to create |
 | [Reference](docs/reference.md) | Every setting, task and Gradle property |
 | [Packaging standards](docs/packaging-standards.md) | The conventions each format follows, and the formats not built |
 | [Ship the runtime with the app](docs/article.md) | The article: why runtimes belong in the release, and how these plugins do it |

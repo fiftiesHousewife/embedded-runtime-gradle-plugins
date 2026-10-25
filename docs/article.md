@@ -251,7 +251,7 @@ Many build machines cannot reach GitHub or nodejs.org. One machine-level setting
 
 ```properties
 # ~/.gradle/gradle.properties
-artifactory.url=https://artifactory.example.com/artifactory
+binaryRepo.url=https://repo.example.com
 ```
 
 With it set, Maven libraries, Gradle plugins, JDKs, Node.js and npm packages all resolve from Artifactory, and projects change nothing. The same project builds on a laptop at home against the public internet and on a locked-down CI agent against Artifactory.

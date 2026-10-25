@@ -30,7 +30,7 @@ data class RuntimeRepository(
 
     companion object {
         /**
-         * Default curated (Artifactory) layout: one generic repository with files renamed on upload,
+         * Default curated (BinaryRepository) layout: one generic repository with files renamed on upload,
          * so every runtime, whatever vendor it came from, sits at a predictable path:
          * ```
          * runtimes/temurin/jdk/21.0.12.1_1/jdk-21.0.12.1_1-linux-x64.tar.gz

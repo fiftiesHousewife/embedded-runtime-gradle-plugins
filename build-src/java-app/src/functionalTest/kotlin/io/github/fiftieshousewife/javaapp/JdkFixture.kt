@@ -37,7 +37,7 @@ object JdkFixture {
             )
         }
 
-    /** Lays the test JDK out under [root] the way a curated Artifactory tree (or a shared local directory) holds it. */
+    /** Lays the test JDK out under [root] the way a curated binary repository tree (or a shared directory) holds it. */
     fun publishCurated(project: TestProject, root: File, target: String = TestProject.hostTarget()) {
         val version = jdkVersion.replace('+', '_')
         archive(project, root.resolve("temurin/jdk/$version/jdk-$version-$target.tar.gz"))

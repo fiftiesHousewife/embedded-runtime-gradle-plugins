@@ -1,6 +1,6 @@
 package io.github.fiftieshousewife.javaapp
 
-import io.github.fiftieshousewife.appcore.Artifactory
+import io.github.fiftieshousewife.appcore.BinaryRepository
 import io.github.fiftieshousewife.appcore.RuntimeArtifact
 import io.github.fiftieshousewife.appcore.RuntimeRepository
 import io.github.fiftieshousewife.appcore.Target
@@ -11,7 +11,7 @@ import java.net.URI
 
 /**
  * Where JDK archives come from, first match wins: a JDK configured by path for one feature release
- * and target ([localJdk]); a shared local directory ([LOCAL_PATH]); the curated Artifactory tree;
+ * and target ([localJdk]); a shared local directory ([LOCAL_PATH]); the curated BinaryRepository tree;
  * the chosen [distribution]'s own site.
  *
  * The compile toolchain resolver and the archive's runtime both ask this class, so compilation and
@@ -67,16 +67,16 @@ class JdkSources(val distribution: JdkDistribution, private val location: JdkLoc
         const val VERSION_PREFIX = "javaApp.jdk."
 
         /**
-         * Where JDK archives live without Artifactory, and how they are laid out under that root.
+         * Where JDK archives live without BinaryRepository, and how they are laid out under that root.
          * Together these reach any tree — a mirror, an internal build server — without a plugin release.
          */
         const val PUBLIC_URL = "javaApp.jdk.url"
         const val PUBLIC_PATTERN = "javaApp.jdk.pattern"
 
-        /** Ivy pattern for the curated Artifactory tree, when it cannot use the default layout. */
-        const val ARTIFACTORY_PATTERN = "javaApp.jdk.artifactoryPattern"
+        /** Ivy pattern for the curated BinaryRepository tree, when it cannot use the default layout. */
+        const val BINARY_REPO_PATTERN = "javaApp.jdk.binaryRepoPattern"
 
-        /** An absolute path to a shared directory of JDK archives, laid out like the curated Artifactory tree. */
+        /** An absolute path to a shared directory of JDK archives, laid out like the curated BinaryRepository tree. */
         const val LOCAL_PATH = "javaApp.jdk.localPath"
         const val LOCAL_PATTERN = "javaApp.jdk.localPattern"
 
@@ -95,13 +95,13 @@ class JdkSources(val distribution: JdkDistribution, private val location: JdkLoc
             location(providers),
         )
 
-        /** First match wins: a shared local directory, then Artifactory, then the vendor's own site. */
+        /** First match wins: a shared local directory, then BinaryRepository, then the vendor's own site. */
         private fun location(providers: ProviderFactory): JdkLocation {
             val localPath = providers.setting(LOCAL_PATH)
-            val artifactory = Artifactory.from(providers)
+            val binaryRepo = BinaryRepository.from(providers)
             return when {
                 localPath != null -> JdkLocation.local(File(localPath), providers.setting(LOCAL_PATTERN))
-                artifactory != null -> JdkLocation.artifactory(artifactory, providers.setting(ARTIFACTORY_PATTERN))
+                binaryRepo != null -> JdkLocation.binaryRepo(binaryRepo, providers.setting(BINARY_REPO_PATTERN))
                 else -> JdkLocation.Public(providers.setting(PUBLIC_URL), providers.setting(PUBLIC_PATTERN))
             }
         }
@@ -113,7 +113,7 @@ sealed interface JdkLocation {
     /** The vendor's own site, or a mirror of it: the vendor's file names, under an optional URL and pattern. */
     data class Public(val url: String? = null, val pattern: String? = null) : JdkLocation
 
-    /** Archives renamed to the curated layout: Artifactory's runtimes repository, or a local directory. */
+    /** Archives renamed to the curated layout: the binary repository's runtimes repository, or a local directory. */
     data class Curated(
         val name: String,
         val baseUrl: URI,
@@ -122,8 +122,8 @@ sealed interface JdkLocation {
     ) : JdkLocation
 
     companion object {
-        fun artifactory(artifactory: Artifactory, pattern: String? = null) =
-            Curated("artifactoryJdks", artifactory.runtimesUrl, pattern)
+        fun binaryRepo(binaryRepo: BinaryRepository, pattern: String? = null) =
+            Curated("binaryRepoJdks", binaryRepo.runtimesUrl, pattern)
 
         fun local(directory: File, pattern: String? = null) =
             Curated("localJdks", RuntimeRepository.slash(directory.absoluteFile.toURI().toString()), pattern)

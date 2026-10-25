@@ -7,8 +7,9 @@ import java.util.Collections
 import kotlin.concurrent.thread
 
 /**
- * An HTTP repository on the loopback interface that accepts every upload with `201 Created` and
- * records each request as `<method> <path> <Authorization header>`. Plain sockets rather than the
+ * An HTTP repository on the loopback interface that, like Artifactory and Nexus, answers a request
+ * without credentials with a Basic challenge and accepts any other upload with `201 Created`. Each
+ * request is recorded as `<method> <path> <Authorization header>`. Plain sockets rather than the
  * JDK's HTTP server keep the test fixtures on portable APIs.
  */
 class RecordingRepository : AutoCloseable {
@@ -30,7 +31,8 @@ class RecordingRepository : AutoCloseable {
         val headers = lines.drop(1).associate { it.substringBefore(':').lowercase() to it.substringAfter(':').trim() }
         input.readNBytes(headers["content-length"]?.toInt() ?: 0)
         requests += "${lines.first().split(' ').take(2).joinToString(" ")} ${headers["authorization"]}"
-        client.getOutputStream().write(RESPONSE.toByteArray())
+        val response = if (headers["authorization"] == null) CHALLENGE else CREATED
+        client.getOutputStream().write(response.toByteArray())
     }
 
     /** One CRLF-terminated header line, read byte by byte so the body stays in the stream. */
@@ -48,6 +50,9 @@ class RecordingRepository : AutoCloseable {
 
     private companion object {
         const val BACKLOG = 16
-        const val RESPONSE = "HTTP/1.1 201 Created\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+        const val CREATED = "HTTP/1.1 201 Created\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+        const val CHALLENGE =
+            "HTTP/1.1 401 Unauthorized\r\nWWW-Authenticate: Basic realm=\"repo\"\r\n" +
+                "Content-Length: 0\r\nConnection: close\r\n\r\n"
     }
 }

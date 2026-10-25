@@ -31,8 +31,8 @@ gradlePlugin {
             displayName = "Java app repositories and JDK toolchains"
             description =
                 "Routes Maven, plugin and JDK resolution to the public internet or a corporate " +
-                "Artifactory, and provisions compile JDKs at the exact version that gets embedded"
-            tags = listOf("toolchains", "jdk", "artifactory")
+                "BinaryRepository, and provisions compile JDKs at the exact version that gets embedded"
+            tags = listOf("toolchains", "jdk", "binaryRepo")
         }
         register("javaApp") {
             id = "io.github.fiftieshousewife.java-app"

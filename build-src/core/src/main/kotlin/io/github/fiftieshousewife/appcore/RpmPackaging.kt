@@ -41,9 +41,9 @@ abstract class RpmPackaging {
     abstract val systemd: Property<Boolean>
 
     /**
-     * The YUM repository `appPublishRpm` uploads to with an HTTP PUT, e.g. an Artifactory RPM
-     * repository, which then rebuilds its own `repodata/`. Defaults to `artifactory.repo.rpm` on the
-     * configured Artifactory.
+     * The YUM repository `appPublishRpm` uploads to with an HTTP PUT, e.g. an BinaryRepository RPM
+     * repository, which then rebuilds its own `repodata/`. Defaults to `binaryRepo.repo.rpm` on the
+     * configured BinaryRepository.
      */
     abstract val repositoryUrl: Property<URI>
 }

@@ -1,7 +1,7 @@
 package io.github.fiftieshousewife.nodeapp
 
 import io.github.fiftieshousewife.appcore.AppWiring
-import io.github.fiftieshousewife.appcore.Artifactory
+import io.github.fiftieshousewife.appcore.BinaryRepository
 import io.github.fiftieshousewife.nodeapp.tasks.GenerateNpmrc
 import io.github.fiftieshousewife.nodeapp.tasks.NodeLayout
 import io.github.fiftieshousewife.nodeapp.tasks.NpmTask
@@ -80,16 +80,19 @@ internal class NpmTasks(
     }
 
     companion object {
-        /** The npm user config: the configured registry, a corporate CA, and Artifactory credentials. */
+        /** The npm user config: the configured registry, a corporate CA, and BinaryRepository credentials. */
         fun npmrc(project: Project, wiring: AppWiring, sources: NodeSources) =
             project.tasks.register("npmrc", GenerateNpmrc::class.java) {
                 group = NodeAppPlugin.ECOSYSTEM.taskGroup
                 description = "Writes the npm user config for the configured npm registry"
                 registry.set(sources.npmRegistry.toString())
                 caFile.set(project.providers.gradleProperty(NodeSources.NPM_CA_FILE))
-                if (sources.usesArtifactory) {
+                if (sources.usesBinaryRepo) {
                     credentials.set(
-                        project.providers.credentials(PasswordCredentials::class.java, Artifactory.CREDENTIALS_NAME),
+                        project.providers.credentials(
+                            PasswordCredentials::class.java,
+                            BinaryRepository.CREDENTIALS_NAME,
+                        ),
                     )
                 }
                 outputFile.set(wiring.workDir.map { it.file("npm/npmrc") })

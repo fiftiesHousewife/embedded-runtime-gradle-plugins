@@ -65,8 +65,8 @@ without systemd.
 
 ### Publishing RPMs
 
-With Artifactory configured, `./gradlew publish` also uploads each RPM to the RPM repository
-`artifactory.repo.rpm` (default `rpm-local`) using the same credentials, and Artifactory rebuilds the
+With a binary repository configured, `./gradlew publish` also uploads each RPM to the RPM repository
+`binaryRepo.repo.rpm` (default `rpm-local`) using the same credentials, and the repository (Artifactory, Nexus) rebuilds the
 repository's `repodata/`. Any other repository that accepts an HTTP PUT works too:
 
 ```kotlin
@@ -78,7 +78,7 @@ Servers then need a `.repo` file pointing dnf at it, such as `/etc/yum.repos.d/a
 ```ini
 [apps]
 name=Our apps
-baseurl=https://artifactory.example.com/artifactory/rpm-local
+baseurl=https://repo.example.com/rpm-local
 # gpgcheck=1 and gpgkey=… once the RPMs or the repository metadata are signed
 gpgcheck=0
 ```
@@ -130,7 +130,7 @@ javaApp {                                            // or nodeApp
 ```kotlin
 // build.gradle.kts of the deployment build
 plugins { id("io.github.fiftieshousewife.app-deploy") version "1.0.0" }
-repositories { maven("https://artifactory.example.com/artifactory/libs-release-local") }
+repositories { maven("https://repo.example.com/libs-release-local") }
 dependencies { app("com.example:orders-service:1.4.2") }
 appDeploy {
     dir = file("/srv/orders")

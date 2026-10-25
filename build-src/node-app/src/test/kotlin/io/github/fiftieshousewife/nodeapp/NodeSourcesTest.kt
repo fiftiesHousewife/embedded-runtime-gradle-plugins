@@ -5,7 +5,7 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 
 class NodeSourcesTest {
-    private val public = NodeSources(artifactory = null)
+    private val public = NodeSources(binaryRepo = null)
 
     @Test
     fun `every supported target has a nodejs-org classifier`() {

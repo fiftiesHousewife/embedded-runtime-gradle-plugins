@@ -13,7 +13,7 @@ import org.gradle.authentication.http.BasicAuthentication
 /**
  * The `settings.gradle.kts` wiring the Java and Node settings plugins share:
  *
- * | Input            | public                | artifactory                       |
+ * | Input            | public                | binaryRepo                       |
  * |------------------|-----------------------|-----------------------------------|
  * | Maven libraries  | Maven Central         | `<url>/<repo.maven>`              |
  * | Project plugins  | Gradle Plugin Portal  | `<url>/<repo.gradlePlugins>`      |
@@ -26,22 +26,22 @@ object AppSettings {
     private const val REPOSITORIES_CONFIGURED = "io.github.fiftieshousewife.appcore.repositories"
 
     /** Maven and plugin repositories: configured by whichever settings plugin is applied first. */
-    fun configureRepositories(settings: Settings, artifactory: Artifactory?) {
+    fun configureRepositories(settings: Settings, binaryRepo: BinaryRepository?) {
         val extra = settings.gradle.extensions.extraProperties
         if (extra.has(REPOSITORIES_CONFIGURED)) return
         extra.set(REPOSITORIES_CONFIGURED, true)
 
-        configurePluginRepositories(settings.pluginManagement.repositories, artifactory)
+        configurePluginRepositories(settings.pluginManagement.repositories, binaryRepo)
         val drm = settings.dependencyResolutionManagement
         drm.repositoriesMode.convention(RepositoriesMode.PREFER_SETTINGS)
         drm.repositories {
-            if (artifactory == null) {
+            if (binaryRepo == null) {
                 mavenCentral()
             } else {
                 maven {
-                    name = Artifactory.CREDENTIALS_NAME
-                    url = artifactory.mavenUrl
-                    isAllowInsecureProtocol = artifactory.allowInsecureProtocol
+                    name = BinaryRepository.CREDENTIALS_NAME
+                    url = binaryRepo.mavenUrl
+                    isAllowInsecureProtocol = binaryRepo.allowInsecureProtocol
                     authenticate(this)
                 }
             }
@@ -49,7 +49,7 @@ object AppSettings {
     }
 
     /** An Ivy repository serving exactly one runtime's archives, and nothing else. */
-    fun addRuntimeRepository(settings: Settings, runtime: RuntimeRepository, artifactory: Artifactory?) {
+    fun addRuntimeRepository(settings: Settings, runtime: RuntimeRepository, binaryRepo: BinaryRepository?) {
         settings.dependencyResolutionManagement.repositories {
             exclusiveContent {
                 forRepository {
@@ -59,8 +59,8 @@ object AppSettings {
                         patternLayout { artifact(runtime.artifactPattern) }
                         // Plain file tree: no ivy.xml, the artifact itself is the module.
                         metadataSources { artifact() }
-                        if (artifactory != null) {
-                            isAllowInsecureProtocol = artifactory.allowInsecureProtocol
+                        if (binaryRepo != null) {
+                            isAllowInsecureProtocol = binaryRepo.allowInsecureProtocol
                             authenticateExplicitly(this, settings)
                         }
                     }
@@ -99,8 +99,8 @@ object AppSettings {
     }
 
     /**
-     * Gradle resolves `artifactoryUsername` / `artifactoryPassword` lazily from the repository
-     * name, keeping them out of the configuration cache. The name must be `artifactory`, and Gradle
+     * Gradle resolves `binaryRepoUsername` / `binaryRepoPassword` lazily from the repository
+     * name, keeping them out of the configuration cache. The name must be `binaryRepo`, and Gradle
      * makes names unique within one repository container, so this is used for at most one
      * repository per container.
      */
@@ -115,8 +115,8 @@ object AppSettings {
      * configuration cache entry.
      */
     private fun authenticateExplicitly(repo: AuthenticationSupported, settings: Settings) {
-        val user = settings.providers.gradleProperty("${Artifactory.CREDENTIALS_NAME}Username")
-        val password = settings.providers.gradleProperty("${Artifactory.CREDENTIALS_NAME}Password")
+        val user = settings.providers.gradleProperty("${BinaryRepository.CREDENTIALS_NAME}Username")
+        val password = settings.providers.gradleProperty("${BinaryRepository.CREDENTIALS_NAME}Password")
         repo.credentials {
             username = user.orNull
             this.password = password.orNull
@@ -124,22 +124,22 @@ object AppSettings {
         repo.authentication { create("basic", BasicAuthentication::class.java) }
     }
 
-    private fun configurePluginRepositories(handler: RepositoryHandler, artifactory: Artifactory?) {
-        if (artifactory == null) {
+    private fun configurePluginRepositories(handler: RepositoryHandler, binaryRepo: BinaryRepository?) {
+        if (binaryRepo == null) {
             handler.gradlePluginPortal()
             return
         }
         // The corporate init script usually registered this already, to resolve this very plugin.
-        val url = artifactory.gradlePluginsUrl
+        val url = binaryRepo.gradlePluginsUrl
         val present =
             handler.filterIsInstance<MavenArtifactRepository>().any {
                 it.url.toString().trimEnd('/') == url.toString().trimEnd('/')
             }
         if (!present) {
             handler.maven {
-                name = Artifactory.CREDENTIALS_NAME
+                name = BinaryRepository.CREDENTIALS_NAME
                 this.url = url
-                isAllowInsecureProtocol = artifactory.allowInsecureProtocol
+                isAllowInsecureProtocol = binaryRepo.allowInsecureProtocol
                 authenticate(this)
             }
         }

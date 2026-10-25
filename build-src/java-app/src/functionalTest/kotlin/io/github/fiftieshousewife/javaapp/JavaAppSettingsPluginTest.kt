@@ -26,7 +26,7 @@ class JavaAppSettingsPluginTest {
     }
 
     @Test
-    fun `without Artifactory it uses Maven Central, the plugin portal and the vendor's own site`() {
+    fun `without BinaryRepository it uses Maven Central, the plugin portal and the vendor's own site`() {
         val repos = repositories("")
         assertAll(
             { assertTrue(repos.contains("REPO MavenRepo https://repo.maven.apache.org/maven2/"), repos.toString()) },
@@ -36,25 +36,25 @@ class JavaAppSettingsPluginTest {
     }
 
     @Test
-    fun `Artifactory routes everything through the configured instance`() {
+    fun `BinaryRepository routes everything through the configured instance`() {
         val repos =
             repositories(
-                "artifactory.url=https://artifactory.example.com/artifactory\nartifactory.repo.maven=maven-remote",
+                "binaryRepo.url=https://repo.example.com\nbinaryRepo.repo.maven=maven-remote",
             )
         assertAll(
             {
                 assertTrue(
-                    repos.contains("REPO artifactoryJdks https://artifactory.example.com/artifactory/runtimes/"),
+                    repos.contains("REPO binaryRepoJdks https://repo.example.com/runtimes/"),
                     repos.toString(),
                 )
             },
             {
                 assertTrue(
-                    repos.contains("REPO artifactory https://artifactory.example.com/artifactory/maven-remote/"),
+                    repos.contains("REPO binaryRepo https://repo.example.com/maven-remote/"),
                     repos.toString(),
                 )
             },
-            { assertTrue(repos.contains("PLUGINS artifactory"), repos.toString()) },
+            { assertTrue(repos.contains("PLUGINS binaryRepo"), repos.toString()) },
             { assertFalse(repos.any { it.contains("repo.maven.apache.org") }, repos.toString()) },
         )
     }

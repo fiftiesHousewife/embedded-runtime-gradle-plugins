@@ -154,13 +154,13 @@ signing {
 publishing {
     repositories {
         // ./gradlew publish -PreleaseVersion=1.2.0 publishes to the corporate Gradle plugin repository.
-        providers.gradleProperty("artifactory.url").orNull?.let { base ->
+        providers.gradleProperty("binaryRepo.url").orNull?.let { base ->
             maven {
-                name = "artifactory"
+                name = "binaryRepo"
                 url =
                     uri(
                         "${base.trimEnd('/')}/" +
-                            providers.gradleProperty("artifactory.repo.pluginsLocal").getOrElse("gradle-plugins-local"),
+                            providers.gradleProperty("binaryRepo.repo.pluginsLocal").getOrElse("gradle-plugins-local"),
                     )
                 credentials(PasswordCredentials::class)
             }

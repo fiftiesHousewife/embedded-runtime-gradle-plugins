@@ -22,7 +22,7 @@ class NodeAppSettingsPluginTest {
     }
 
     @Test
-    fun `without Artifactory Node comes from nodejs-org and no JDK repository is added`() {
+    fun `without BinaryRepository Node comes from nodejs-org and no JDK repository is added`() {
         val repos = repositories("")
         assertAll(
             { assertTrue(repos.contains("REPO MavenRepo https://repo.maven.apache.org/maven2/"), repos.toString()) },
@@ -32,12 +32,12 @@ class NodeAppSettingsPluginTest {
     }
 
     @Test
-    fun `Artifactory serves Node from the curated runtimes repository`() {
-        val repos = repositories("artifactory.url=https://artifactory.example.com/artifactory")
+    fun `BinaryRepository serves Node from the curated runtimes repository`() {
+        val repos = repositories("binaryRepo.url=https://repo.example.com")
         assertAll(
             {
                 assertTrue(
-                    repos.contains("REPO artifactoryNode https://artifactory.example.com/artifactory/runtimes/"),
+                    repos.contains("REPO binaryRepoNode https://repo.example.com/runtimes/"),
                     repos.toString(),
                 )
             },

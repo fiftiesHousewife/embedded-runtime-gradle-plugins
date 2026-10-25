@@ -13,12 +13,12 @@ build-src/                  the plugin build, included by the root build
   java-app/                 io.github.fiftieshousewife:java-app      package …javaapp
   node-app/                 io.github.fiftieshousewife:node-app      package …nodeapp
   config/detekt/detekt.yml  deviations from detekt's defaults only
-deploy/                     curate-runtimes.sh (mirrors approved runtimes into Artifactory)
+deploy/                     curate-runtimes.sh (mirrors approved runtimes into the binary repository)
 docs/                       user documentation, linked from the README; article.md is the article's home
 .github/scripts/            verify-rpm.sh: CI installs the sample's RPM in a Rocky Linux container
 .claude-plugin/, claude-plugin/   Claude Code marketplace and the embedded-runtime plugin's skills; keep the
                             skills in step with the tasks and properties they name
-gradle/init.d/              init script for machines behind Artifactory
+gradle/init.d/              init script for machines behind a binary repository
 gradle/libs.versions.toml   the one version catalogue, shared by every build here
 samples/                    a Java and a Node service, built in CI end to end
 ```
@@ -116,7 +116,7 @@ to Gradle's toolchain provisioning.
 catalogue in `jdks.properties`, generated from `gradle/libs.versions.toml`) is read by both `JdkToolchainResolver` (compile JDK) and
 `JavaAppPlugin` (embedded runtime), from the same `JdkSources`, so they can never differ.
 `JdkSources` holds a `JdkLocation`: the vendor's site (`Public`) or a renamed tree (`Curated`, for
-Artifactory or a local directory). A JDK configured by path for one release and target bypasses all
+a binary repository or a local directory). A JDK configured by path for one release and target bypasses all
 of that (`Jdks` in `JavaAppPlugin` uses a directory as it is and extracts an archive); the resolver
 can serve such an archive but must leave a directory to Gradle's installation detection.
 `JdkTools.link` refuses a tool JDK and target JDK of different releases.
@@ -159,7 +159,7 @@ intact; disabled-algorithm lists are extended, never replaced), copies the overl
 the CycloneDX reference model and package-url's purl builder (no timestamp, so rebuilds are
 byte-identical); `DockerfileTemplate` fills in the OCI `org.opencontainers.image.*` annotations.
 
-**Artifactory credentials** come from Gradle's `artifactoryUsername`/`artifactoryPassword` by
+**Binary repository credentials** come from Gradle's `binaryRepoUsername`/`binaryRepoPassword` by
 repository *name*, which must be `artifactory` and is unique per container. Other repositories in
 the same container (the runtime Ivy repositories) set credentials explicitly instead.
 
@@ -225,6 +225,6 @@ And by hand, since no tool checks them:
 - Names say what things are: "app" and "archive", "target" for OS and CPU. Avoid "bundle" and
   "platform", which were too general.
 - Gradle properties are prefixed by their plugin (`javaApp.`, `nodeApp.`) or by `artifactory.` for
-  machine-wide Artifactory settings, which both plugins read.
+  machine-wide binary repository settings, which both plugins read.
 - KDoc explains *why*; the code already says what.
 - The README describes behaviour a user sees; design notes live here.

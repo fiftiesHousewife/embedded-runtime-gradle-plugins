@@ -40,7 +40,7 @@ smoke test fails on a missing JDK class, use the `jlink-modules` skill.
 
 - Every OS/CPU deployed to: `targets("linux-x64", "linux-aarch64", "windows-x64")`.
 - An RPM for Linux servers: `rpm { enabled = true }`; a zip instead of tar.gz: `archiveFormat("zip")`.
-- Behind Artifactory: set `artifactory.url` (and credentials) once per machine in
+- Behind a corporate binary repository (Artifactory, Nexus): set `binaryRepo.url` (and credentials) once per machine in
   `~/.gradle/gradle.properties`, never in the project.
 - An existing Dockerfile at the project root is used as-is by `appDockerContext`; otherwise one is
   generated. Its `COPY` should take the extracted archive from `app/`.

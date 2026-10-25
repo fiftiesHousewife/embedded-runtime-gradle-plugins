@@ -1,7 +1,7 @@
 package io.github.fiftieshousewife.nodeapp
 
 import io.github.fiftieshousewife.appcore.Arch
-import io.github.fiftieshousewife.appcore.Artifactory
+import io.github.fiftieshousewife.appcore.BinaryRepository
 import io.github.fiftieshousewife.appcore.Os
 import io.github.fiftieshousewife.appcore.RuntimeArtifact
 import io.github.fiftieshousewife.appcore.RuntimeRepository
@@ -12,12 +12,12 @@ import java.net.URI
 
 /**
  * Where Node.js archives and npm packages come from: nodejs.org and the public npm registry, or the
- * curated Artifactory tree and its npm repository when one is configured.
+ * curated BinaryRepository tree and its npm repository when one is configured.
  */
-class NodeSources(private val artifactory: Artifactory?, private val overrides: NodeOverrides = NodeOverrides()) {
+class NodeSources(private val binaryRepo: BinaryRepository?, private val overrides: NodeOverrides = NodeOverrides()) {
     val repository: RuntimeRepository
         get() =
-            if (artifactory == null) {
+            if (binaryRepo == null) {
                 RuntimeRepository(
                     "nodejsDist",
                     RuntimeRepository.slash(overrides.publicUrl),
@@ -26,14 +26,14 @@ class NodeSources(private val artifactory: Artifactory?, private val overrides: 
                 )
             } else {
                 RuntimeRepository(
-                    "artifactoryNode",
-                    artifactory.runtimesUrl,
-                    overrides.artifactoryPattern ?: RuntimeRepository.CURATED_PATTERN,
+                    "binaryRepoNode",
+                    binaryRepo.runtimesUrl,
+                    overrides.binaryRepoPattern ?: RuntimeRepository.CURATED_PATTERN,
                     GROUP,
                 )
             }
 
-    fun artifact(version: String, target: Target): RuntimeArtifact = if (artifactory == null) {
+    fun artifact(version: String, target: Target): RuntimeArtifact = if (binaryRepo == null) {
         RuntimeArtifact(GROUP, "node", version, "node", distClassifier(target), target.archiveExtension)
     } else {
         // Renamed on upload to the archive's own target ids, as for JDKs.
@@ -41,9 +41,9 @@ class NodeSources(private val artifactory: Artifactory?, private val overrides: 
     }
 
     val npmRegistry: URI
-        get() = artifactory?.repo(overrides.artifactoryNpmRepo) ?: RuntimeRepository.slash(overrides.publicNpmRegistry)
+        get() = binaryRepo?.repo(overrides.binaryRepoNpm) ?: RuntimeRepository.slash(overrides.publicNpmRegistry)
 
-    val usesArtifactory: Boolean get() = artifactory != null
+    val usesBinaryRepo: Boolean get() = binaryRepo != null
 
     companion object {
         /** Ivy organisation of the Node.js archives. */
@@ -54,20 +54,20 @@ class NodeSources(private val artifactory: Artifactory?, private val overrides: 
         /** nodejs.org/dist layout. */
         const val DEFAULT_PATTERN = "v[revision]/[artifact]-v[revision]-[classifier].[ext]"
         const val DEFAULT_NPM_REGISTRY = "https://registry.npmjs.org/"
-        const val DEFAULT_ARTIFACTORY_NPM_REPO = "api/npm/npm-virtual"
+        const val DEFAULT_BINARY_REPO_NPM = "api/npm/npm-virtual"
 
         /** `nodeApp.node.version=24.18.1` overrides the catalogue pin. */
         const val VERSION = "nodeApp.node.version"
 
-        /** Where Node archives live without Artifactory, and how they are laid out under that root. */
+        /** Where Node archives live without BinaryRepository, and how they are laid out under that root. */
         const val PUBLIC_URL = "nodeApp.node.url"
         const val PUBLIC_PATTERN = "nodeApp.node.pattern"
 
-        /** Ivy pattern for the curated Artifactory tree, when it cannot use the default layout. */
-        const val ARTIFACTORY_PATTERN = "nodeApp.node.artifactoryPattern"
+        /** Ivy pattern for the curated BinaryRepository tree, when it cannot use the default layout. */
+        const val BINARY_REPO_PATTERN = "nodeApp.node.binaryRepoPattern"
 
         const val NPM_REGISTRY = "nodeApp.npm.registry"
-        const val ARTIFACTORY_NPM_REPO = "artifactory.repo.npm"
+        const val BINARY_REPO_NPM = "binaryRepo.repo.npm"
 
         /**
          * PEM bundle of corporate CAs for npm, which does not use the JVM trust store. Gradle itself
@@ -76,14 +76,14 @@ class NodeSources(private val artifactory: Artifactory?, private val overrides: 
         const val NPM_CA_FILE = "nodeApp.npm.caFile"
 
         fun from(providers: ProviderFactory) = NodeSources(
-            artifactory = Artifactory.from(providers),
+            binaryRepo = BinaryRepository.from(providers),
             overrides =
             NodeOverrides(
                 publicUrl = providers.setting(PUBLIC_URL) ?: DEFAULT_URL,
                 publicPattern = providers.setting(PUBLIC_PATTERN),
-                artifactoryPattern = providers.setting(ARTIFACTORY_PATTERN),
+                binaryRepoPattern = providers.setting(BINARY_REPO_PATTERN),
                 publicNpmRegistry = providers.setting(NPM_REGISTRY) ?: DEFAULT_NPM_REGISTRY,
-                artifactoryNpmRepo = providers.setting(ARTIFACTORY_NPM_REPO) ?: DEFAULT_ARTIFACTORY_NPM_REPO,
+                binaryRepoNpm = providers.setting(BINARY_REPO_NPM) ?: DEFAULT_BINARY_REPO_NPM,
             ),
         )
 
@@ -117,7 +117,7 @@ data class NodeOverrides(
     val publicUrl: String = NodeSources.DEFAULT_URL,
     val publicPattern: String? = null,
     /** Override of [RuntimeRepository.CURATED_PATTERN]; null means the default curated layout. */
-    val artifactoryPattern: String? = null,
+    val binaryRepoPattern: String? = null,
     val publicNpmRegistry: String = NodeSources.DEFAULT_NPM_REGISTRY,
-    val artifactoryNpmRepo: String = NodeSources.DEFAULT_ARTIFACTORY_NPM_REPO,
+    val binaryRepoNpm: String = NodeSources.DEFAULT_BINARY_REPO_NPM,
 )

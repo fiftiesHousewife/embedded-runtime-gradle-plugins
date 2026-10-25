@@ -68,11 +68,11 @@ internal class AppPublishing(
         // The publish URL depends on whether the version is a snapshot, which build scripts set
         // after plugins are applied; this is the one place an afterEvaluate is warranted.
         project.afterEvaluate {
-            val artifactory = wiring.artifactory ?: return@afterEvaluate
+            val binaryRepo = wiring.binaryRepo ?: return@afterEvaluate
             publishing.repositories.maven {
-                name = Artifactory.CREDENTIALS_NAME
-                url = artifactory.publishUrl(project.version.toString().endsWith("-SNAPSHOT"))
-                isAllowInsecureProtocol = artifactory.allowInsecureProtocol
+                name = BinaryRepository.CREDENTIALS_NAME
+                url = binaryRepo.publishUrl(project.version.toString().endsWith("-SNAPSHOT"))
+                isAllowInsecureProtocol = binaryRepo.allowInsecureProtocol
                 credentials(PasswordCredentials::class.java)
             }
         }

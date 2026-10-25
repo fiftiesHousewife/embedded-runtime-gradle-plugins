@@ -106,7 +106,7 @@ class AppWiring(
     private val layout = project.layout
     private val tasks = project.tasks
 
-    val artifactory: Artifactory? = Artifactory.from(providers)
+    val binaryRepo: BinaryRepository? = BinaryRepository.from(providers)
     val host: Target = Target.host()
     val workDir: Provider<Directory> = layout.buildDirectory.dir("app-work")
     val taskGroup: String get() = ecosystem.taskGroup

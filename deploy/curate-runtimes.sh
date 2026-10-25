@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Mirrors approved runtime archives into the curated Artifactory layout read by
-# the io.github.fiftieshousewife java-app and node-app plugins (artifactory.repo.runtimes, default
+# Mirrors approved runtime archives into the curated binary repository layout read by
+# the io.github.fiftieshousewife java-app and node-app plugins (binaryRepo.repo.runtimes, default
 # "runtimes"):
 #
 #   runtimes/temurin/jdk/<version_>/jdk-<version_>-<target>.<ext>
@@ -8,8 +8,8 @@
 #   runtimes/nodejs/node/<version>/node-<version>-<target>.<ext>
 #
 # Every archive is checked against the upstream published SHA-256 before upload, and uploaded with
-# that checksum so Artifactory verifies it too. Run it from a machine that can reach both the
-# internet and Artifactory, when a new runtime is approved (e.g. a quarterly Java CPU).
+# that checksum so the repository verifies it too (Artifactory and Nexus both do). Run it from a machine that can reach both the
+# internet and the binary repository, when a new runtime is approved (e.g. a quarterly Java CPU).
 #
 # Usage:
 #   curate-runtimes.sh jdk  21.0.12.1+1 [target ...]
@@ -17,9 +17,9 @@
 #   targets default to: linux-x64 linux-aarch64 windows-x64 mac-aarch64
 #
 # Environment:
-#   ARTIFACTORY_URL      e.g. https://artifactory.example.com/artifactory   (required)
-#   ARTIFACTORY_REPO     default runtimes
-#   ARTIFACTORY_USER / ARTIFACTORY_TOKEN   deploy credentials (passed to curl on stdin)
+#   BINARY_REPO_URL      e.g. https://repo.example.com   (required)
+#   BINARY_REPO_RUNTIMES     default runtimes
+#   BINARY_REPO_USER / BINARY_REPO_TOKEN   deploy credentials (passed to curl on stdin)
 #   TEMURIN_BASE_URL     default https://github.com/adoptium
 #   NODE_BASE_URL        default https://nodejs.org/dist
 #   CURL_CA_BUNDLE       optional corporate CA bundle
@@ -29,8 +29,8 @@ KIND=${1:?usage: curate-runtimes.sh jdk|node VERSION [target ...]}
 VERSION=${2:?version required}
 shift 2
 TARGETS=("$@"); [ ${#TARGETS[@]} -gt 0 ] || TARGETS=(linux-x64 linux-aarch64 windows-x64 mac-aarch64)
-ART=${ARTIFACTORY_URL:?ARTIFACTORY_URL is required}
-REPO=${ARTIFACTORY_REPO:-runtimes}
+ART=${BINARY_REPO_URL:?BINARY_REPO_URL is required}
+REPO=${BINARY_REPO_RUNTIMES:-runtimes}
 TEMURIN=${TEMURIN_BASE_URL:-https://github.com/adoptium}
 NODE=${NODE_BASE_URL:-https://nodejs.org/dist}
 
@@ -39,8 +39,8 @@ sha() { if command -v sha256sum >/dev/null; then sha256sum "$1" | cut -d' ' -f1;
 fetch() { curl --fail --silent --show-error --location --retry 3 --output "$2" "$1"; }
 upload() { # file path checksum
   local args=(--fail --silent --show-error -T "$1" -H "X-Checksum-Sha256: $3")
-  if [ -n "${ARTIFACTORY_USER:-}" ]; then
-    printf 'user = "%s:%s"\n' "$ARTIFACTORY_USER" "$ARTIFACTORY_TOKEN" | curl "${args[@]}" --config - "${ART%/}/$REPO/$2" >/dev/null
+  if [ -n "${BINARY_REPO_USER:-}" ]; then
+    printf 'user = "%s:%s"\n' "$BINARY_REPO_USER" "$BINARY_REPO_TOKEN" | curl "${args[@]}" --config - "${ART%/}/$REPO/$2" >/dev/null
   else
     curl "${args[@]}" --netrc-optional "${ART%/}/$REPO/$2" >/dev/null
   fi

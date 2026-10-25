@@ -1,7 +1,7 @@
 package io.github.fiftieshousewife.nodeapp
 
 import io.github.fiftieshousewife.appcore.AppSettings
-import io.github.fiftieshousewife.appcore.Artifactory
+import io.github.fiftieshousewife.appcore.BinaryRepository
 import org.gradle.api.Plugin
 import org.gradle.api.initialization.Settings
 
@@ -14,9 +14,9 @@ import org.gradle.api.initialization.Settings
  */
 abstract class NodeAppSettingsPlugin : Plugin<Settings> {
     override fun apply(settings: Settings) {
-        val artifactory = Artifactory.from(settings.providers)
-        AppSettings.configureRepositories(settings, artifactory)
-        AppSettings.addRuntimeRepository(settings, NodeSources.from(settings.providers).repository, artifactory)
+        val binaryRepo = BinaryRepository.from(settings.providers)
+        AppSettings.configureRepositories(settings, binaryRepo)
+        AppSettings.addRuntimeRepository(settings, NodeSources.from(settings.providers).repository, binaryRepo)
         AppSettings.alignPluginVersions(settings, PROJECT_PLUGIN_ID)
         AppSettings.markApplied(settings, ID)
     }

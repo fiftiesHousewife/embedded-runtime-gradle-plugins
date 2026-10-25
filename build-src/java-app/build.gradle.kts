@@ -8,6 +8,21 @@ dependencies {
     api(project(":app-core"))
 }
 
+// The JDK pins are versions in gradle/libs.versions.toml (`jdk-<distribution>-<feature>`, which the
+// catalogue spells `jdk.<distribution>.<feature>`): shipped in the jar as jdks.properties for JdkCatalog.
+val jdkPins =
+    tasks.register<WriteProperties>("jdkPins") {
+        destinationFile =
+            layout.buildDirectory.file("generated/pins/io/github/fiftieshousewife/javaapp/jdks.properties")
+        val catalog = versionCatalogs.named("libs")
+        catalog.versionAliases.filter { it.startsWith("jdk.") }.forEach {
+            property(it, catalog.findVersion(it).get().requiredVersion)
+        }
+    }
+sourceSets.main {
+    resources.srcDir(jdkPins.map { layout.buildDirectory.dir("generated/pins").get() })
+}
+
 gradlePlugin {
     plugins {
         register("javaAppSettings") {

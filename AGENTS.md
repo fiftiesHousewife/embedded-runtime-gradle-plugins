@@ -109,7 +109,7 @@ Gradle's cache, credentials, `--offline` and `verification-metadata.xml` without
 to Gradle's toolchain provisioning.
 
 **One pin, two consumers.** `JdkCatalog.pinnedJdk` (a `javaApp.jdk.<feature>` override, else the
-catalogue in `jdks.properties`) is read by both `JdkToolchainResolver` (compile JDK) and
+catalogue in `jdks.properties`, generated from `gradle/libs.versions.toml`) is read by both `JdkToolchainResolver` (compile JDK) and
 `JavaAppPlugin` (embedded runtime), from the same `JdkSources`, so they can never differ.
 `JdkSources` holds a `JdkLocation`: the vendor's site (`Public`) or a renamed tree (`Curated`, for
 Artifactory or a local directory). A JDK configured by path for one release and target bypasses all
@@ -161,13 +161,19 @@ the same container (the runtime Ivy repositories) set credentials explicitly ins
 
 ## Common changes
 
-**Bump runtime pins.** Edit `java-app/src/main/resources/…/jdks.properties` or
-`node-app/…/node.properties`. A pin must resolve on **every** supported target: vendors upload a
+**Every version lives in `gradle/libs.versions.toml`:** libraries and build plugins, the build's
+JaCoCo and bytecode level, and what the plugins embed. The JDK pins (`jdk-<distribution>-<feature>`),
+the Node.js pin (`node`) and the Dockerfile base image tag (`ubi-minimal`) are written into
+`jdks.properties`, `node.properties` and `version.properties` in the jars by `jdkPins`, `nodePin` and
+`versionResource`. Outside it by necessity: the Gradle version (`gradle-wrapper.properties`), Kotlin
+(embedded in Gradle, used by `kotlin-dsl`), and CI's setup versions (`.github/workflows/ci.yml`).
+
+**Bump runtime pins.** Edit the `jdk-…` or `node` version in `gradle/libs.versions.toml`. A pin must resolve on **every** supported target: vendors upload a
 release one platform at a time, so check all five URLs exist before pinning (the unit tests prove the
 URL shape, not that the file exists). The `every catalogue pin…` test checks each pin's form.
 
 **Add a JDK vendor.** Add a `JdkDistribution` entry (vendor spec, `JdkSite`, `VersionForm`, and an
-`artifact()` built from an `ArchiveName` and the vendor's `Spelling`), pins in `jdks.properties`,
+`artifact()` built from an `ArchiveName` and the vendor's `Spelling`), `jdk-<id>-<feature>` pins in the catalogue,
 Linux, macOS and Windows rows in `java-app/src/test/resources/jdk-download-urls.csv`, a rejected
 example in `JdkVersionFormsTest`, and a row in the README table. Then build `samples/java-service`
 with `-PjavaApp.jdk.distribution=<id>`.

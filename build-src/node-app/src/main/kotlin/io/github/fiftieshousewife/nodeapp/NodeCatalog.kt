@@ -5,8 +5,9 @@ import org.gradle.api.provider.ProviderFactory
 import java.util.Properties
 
 /**
- * The approved Node.js version, shipped inside the plugin jar. Releasing a new plugin version is how
- * a Node bump reaches every repository; `nodeApp.node.version` overrides it for an emergency patch.
+ * The approved Node.js version, shipped inside the plugin jar (written from `gradle/libs.versions.toml`).
+ * Releasing a new plugin version is how a Node bump reaches every repository; `nodeApp.node.version`
+ * overrides it for an emergency patch.
  */
 object NodeCatalog {
     private const val RESOURCE = "/io/github/fiftieshousewife/nodeapp/node.properties"

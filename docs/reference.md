@@ -56,7 +56,8 @@ nodeApp {
 | `appPublishRpm` | Uploads the RPMs to `rpm.repositoryUrl`; part of `publish` when that is set |
 | `appSmokeTest` | Starts this machine's archive and waits for its health check; part of `check` |
 | `runApp` | Runs this machine's packaged app; pass arguments with `-Pargs="…"` |
-| `appDockerContext` | Writes a container build context |
+| `appDockerfile` | Writes the Dockerfile: the project's own (`Dockerfile`, `src/deploy/docker/Dockerfile` or `dockerfile`) if there is one, else a generated one |
+| `appDockerContext` | Writes a container build context: that Dockerfile plus a Linux archive under `app/` |
 | `jdeps` | Java: lists the JDK modules the code uses |
 | `jlinkFindModules` | Java: finds the modules jdeps can't see, by running the app |
 | `jlinkLinuxX64`, … | Java: builds one target's trimmed runtime |

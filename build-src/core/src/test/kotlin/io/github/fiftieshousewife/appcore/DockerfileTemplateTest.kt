@@ -25,6 +25,7 @@ class DockerfileTemplateTest {
         assertAll(
             { assertTrue(rendered.contains("""ENTRYPOINT ["/app/bin/orders", "run"]"""), rendered) },
             { assertTrue(rendered.contains("""CMD ["/app/bin/orders", "healthcheck"]"""), rendered) },
+            { assertTrue(rendered.contains("ARG BASE_IMAGE=registry.access.redhat.com/ubi9/ubi-minimal:"), rendered) },
             { assertFalse(rendered.contains("@"), rendered) },
         )
     }

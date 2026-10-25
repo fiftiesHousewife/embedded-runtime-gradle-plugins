@@ -4,7 +4,7 @@
 #
 # The base image needs only glibc and /bin/sh — the Java or Node runtime is inside the archive,
 # so there is exactly one runtime version to track. Point BASE_IMAGE at your registry mirror.
-ARG BASE_IMAGE=registry.access.redhat.com/ubi9/ubi-minimal:9.6
+ARG BASE_IMAGE=@BASE_IMAGE@
 FROM ${BASE_IMAGE}
 
 # OCI image annotations: which app, release and commit this image holds.

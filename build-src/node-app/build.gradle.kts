@@ -8,6 +8,17 @@ dependencies {
     api(project(":app-core"))
 }
 
+// The Node.js pin is the `node` version in gradle/libs.versions.toml, shipped as node.properties.
+val nodePin =
+    tasks.register<WriteProperties>("nodePin") {
+        destinationFile =
+            layout.buildDirectory.file("generated/pins/io/github/fiftieshousewife/nodeapp/node.properties")
+        property("node.default", libs.versions.node.get())
+    }
+sourceSets.main {
+    resources.srcDir(nodePin.map { layout.buildDirectory.dir("generated/pins").get() })
+}
+
 gradlePlugin {
     plugins {
         register("nodeAppSettings") {

@@ -18,6 +18,8 @@ plugins {
 val libs = versionCatalogs.named("libs")
 val projectUrl = "https://github.com/fiftiesHousewife/embedded-runtime-gradle-plugins"
 
+jacoco { toolVersion = libs.findVersion("jacoco").get().requiredVersion }
+
 group = "io.github.fiftieshousewife"
 version = providers.gradleProperty("releaseVersion").getOrElse("1.0.0-SNAPSHOT")
 
@@ -29,7 +31,7 @@ version = providers.gradleProperty("releaseVersion").getOrElse("1.0.0-SNAPSHOT")
  * Applications *packaged* by these plugins are a separate matter: they run on their own embedded
  * runtime, and Java apps are supported from Java 11 to 25 (see `JdkCatalog.SUPPORTED_FEATURES`).
  */
-val gradleMinimumJvm = 17
+val gradleMinimumJvm = libs.findVersion("plugin-jvm").get().requiredVersion.toInt()
 
 java {
     // No vendor constraint: any JDK 17 compiles this, unlike the runtimes that get embedded, which

@@ -6,7 +6,7 @@ import org.gradle.api.provider.ProviderFactory
 import java.util.Properties
 
 /**
- * The approved JDK versions, shipped inside the plugin jar.
+ * The approved JDK versions, shipped inside the plugin jar (written from `gradle/libs.versions.toml`).
  *
  * Releasing a new plugin version is how a JDK bump (for example a quarterly Java CPU) is rolled out
  * to every repository. A machine or project can override a pin with `javaApp.jdk.<feature>` for an

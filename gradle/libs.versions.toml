@@ -16,6 +16,61 @@ commons-compress = "1.28.0"
 xz = "1.12"
 bouncycastle = "1.86"
 
+# The build's own tools.
+jacoco = "0.8.15"
+# Bytecode level of the plugins: Gradle 9 runs on Java 17 or newer.
+plugin-jvm = "17"
+
+# ---------------------------------------------------------------------------------------------------
+# What the plugins embed. Not dependencies of this build: the java-app and node-app builds write
+# these into jdks.properties and node.properties inside the plugin jars, so bumping a pin here and
+# releasing the plugins rolls a runtime patch out to every repository. Users override a pin with
+# javaApp.jdk.<feature> or nodeApp.node.version.
+#
+# A pin must resolve on every supported target: vendors upload a release one OS and CPU at a time
+# over several days, so the newest complete release can lag the newest announced one. Check for
+# newer CPU / security releases before publishing (pins as of 2026-10-24):
+#   Temurin:    https://adoptium.net/temurin/releases/
+#   Oracle:     https://www.oracle.com/java/technologies/downloads/archive/
+#   Corretto:   https://github.com/corretto/corretto-21/releases (one repository per feature)
+#   Zulu:       https://www.azul.com/downloads/?package=jdk#zulu
+#   Liberica:   https://github.com/bell-sw/Liberica/releases
+#   Microsoft:  https://learn.microsoft.com/java/openjdk/older-releases
+#   SapMachine: https://github.com/SAP/SapMachine/releases
+#   Node.js:    https://nodejs.org/en/about/previous-releases
+#
+# jdk-<distribution>-<feature>; the feature releases offered are the ones pinned (11 to 25).
+jdk-default = "21"
+jdk-temurin-11 = "11.0.32.1+1"
+jdk-temurin-17 = "17.0.20.1+1"
+jdk-temurin-21 = "21.0.12.1+1"
+jdk-temurin-25 = "25.0.4.1+1"
+jdk-oracle-17 = "17.0.12"
+jdk-oracle-21 = "21.0.12"
+jdk-oracle-25 = "25.0.3"
+jdk-corretto-11 = "11.0.33.0.9"
+jdk-corretto-17 = "17.0.21.0.10"
+jdk-corretto-21 = "21.0.13.0.10"
+jdk-corretto-25 = "25.0.5.0.9"
+jdk-zulu-11 = "11.92.109-ca-jdk11.0.33"
+jdk-zulu-17 = "17.70.111-ca-jdk17.0.21"
+jdk-zulu-21 = "21.54.107-ca-jdk21.0.13"
+jdk-zulu-25 = "25.38.107-ca-jdk25.0.5"
+jdk-liberica-11 = "11.0.33+11"
+jdk-liberica-17 = "17.0.21+11"
+jdk-liberica-21 = "21.0.13+11"
+jdk-liberica-25 = "25.0.5+11"
+jdk-microsoft-11 = "11.0.32"
+jdk-microsoft-17 = "17.0.20"
+jdk-microsoft-21 = "21.0.12"
+jdk-microsoft-25 = "25.0.4"
+jdk-sapmachine-17 = "17.0.20"
+jdk-sapmachine-21 = "21.0.13"
+jdk-sapmachine-25 = "25.0.5"
+node = "24.18.1"
+# The generated Dockerfile's default base image tag (registry.access.redhat.com/ubi9/ubi-minimal).
+ubi-minimal = "9.6"
+
 [libraries]
 cyclonedx-core = { module = "org.cyclonedx:cyclonedx-core-java", version.ref = "cyclonedx" }
 packageurl = { module = "com.github.package-url:packageurl-java", version.ref = "packageurl" }

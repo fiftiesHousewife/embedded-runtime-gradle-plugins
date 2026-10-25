@@ -77,4 +77,5 @@ internal object DockerfileTemplate {
         .replace("@APP_NAME@", identity.name)
         .replace("@APP_VERSION@", identity.version)
         .replace("@GIT_COMMIT@", identity.revision)
+        .replace("@BASE_IMAGE@", PluginVersion.dockerBaseImage)
 }

@@ -37,6 +37,9 @@ constructor(
 
     @get:Internal abstract val targetJdk: DirectoryProperty
 
+    /** The target JDK's `jmods/`, when its vendor ships them separately; else the JDK's own. */
+    @get:Internal abstract val targetJmods: DirectoryProperty
+
     @get:Input abstract val jdkVersion: Property<String>
 
     @get:Input abstract val host: Property<Target>
@@ -60,12 +63,13 @@ constructor(
         val tool = JdkTools.home(toolJdk.get().asFile)
         val targetHome = JdkTools.home(targetJdk.get().asFile)
         val cross = host.get() != target.get()
-        if (cross && !targetHome.resolve("jmods").isDirectory) {
+        val jmods = targetJmods.orNull?.asFile ?: targetHome.resolve("jmods")
+        if (cross && !jmods.isDirectory) {
             throw GradleException(
                 "Cross-linking for ${target.get()} needs the target JDK's jmods/ directory, which $targetHome lacks " +
                     "(JEP 493 builds). Use a JDK distribution that ships jmods, or build on ${target.get()}.",
             )
         }
-        JdkTools.link(exec, JlinkRequest(tool, targetHome, modules, options.get(), out))
+        JdkTools.link(exec, JlinkRequest(tool, targetHome, modules, options.get(), out, jmods))
     }
 }

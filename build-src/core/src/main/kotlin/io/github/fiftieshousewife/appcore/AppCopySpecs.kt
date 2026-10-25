@@ -25,6 +25,21 @@ object AppCopySpecs {
     }
 
     /**
+     * Adds the owner's write bit to every copied file, keeping the rest of its mode (exec bits
+     * included), so a runtime with read-only files (a JDK's `legal/`) can be replaced next build.
+     * Computed from each file's own mode: `filePermissions {}` and `permissions {}` both start from
+     * the default `rw-r--r--`, which would drop every exec bit.
+     */
+    fun ownerWritable(spec: CopySpec) {
+        spec.eachFile {
+            val mode = permissions.toUnixNumeric() or OWNER_WRITE
+            permissions { unix(mode) }
+        }
+    }
+
+    private const val OWNER_WRITE = 0b010_000_000
+
+    /**
      * Strips an archive's single top-level directory (`node-v24.../`, `<app>-<version>/`) while
      * copying, or renames it to [replacement].
      */

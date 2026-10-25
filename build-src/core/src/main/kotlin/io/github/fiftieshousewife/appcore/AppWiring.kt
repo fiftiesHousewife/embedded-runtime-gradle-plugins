@@ -191,6 +191,10 @@ class AppWiring(
             from(archive.map { archiveOps.archiveTree(it) })
             into(destination)
             AppCopySpecs.dropTopLevelDirectory(this)
+            // JDKs ship read-only files (legal/), which an in-place sync cannot overwrite when the
+            // runtime is extracted again: start empty, and keep the copies writable by their owner.
+            doFirst { destinationDir.deleteRecursively() }
+            AppCopySpecs.ownerWritable(this)
         }
 
     /** The single file a [runtimeArchive] configuration resolves to. */

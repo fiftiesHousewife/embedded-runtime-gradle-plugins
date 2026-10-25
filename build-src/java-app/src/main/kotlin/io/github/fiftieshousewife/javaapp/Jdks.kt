@@ -1,6 +1,7 @@
 package io.github.fiftieshousewife.javaapp
 
 import io.github.fiftieshousewife.appcore.AppWiring
+import io.github.fiftieshousewife.appcore.RuntimeArtifact
 import io.github.fiftieshousewife.appcore.Target
 import org.gradle.api.GradleException
 import org.gradle.api.Project
@@ -10,8 +11,18 @@ import org.gradle.api.tasks.Sync
 import org.gradle.api.tasks.TaskProvider
 import java.io.File
 
-/** A JDK on disk: its directory, and the task that puts it there, if any. */
-internal class JdkHome(val dir: Provider<Directory>, val builtBy: TaskProvider<Sync>?)
+/**
+ * A JDK on disk: its directory, a separate `jmods/` directory when the vendor publishes one
+ * ([JdkDistribution.separateJmods]), and the tasks that put them there, if any.
+ */
+internal class JdkHome(
+    val dir: Provider<Directory>,
+    val builtBy: TaskProvider<Sync>?,
+    val jmods: Provider<Directory>? = null,
+    private val jmodsBuiltBy: TaskProvider<Sync>? = null,
+) {
+    val tasks: List<TaskProvider<Sync>> get() = listOfNotNull(builtBy, jmodsBuiltBy)
+}
 
 /**
  * The JDK for each target, set up once: a directory configured by path is used as it is, an archive
@@ -31,24 +42,34 @@ internal class Jdks(
         val feature = JdkCatalog.requireSupported(extension.javaVersion.get())
         val local = JdkSources.localJdk(project.providers, feature, target)
         return when {
-            local == null -> extracted(target, downloaded(target))
+            local == null -> downloadedJdk(target, feature)
             local.isDirectory -> JdkHome(project.layout.dir(project.provider { local }), builtBy = null)
             local.isFile -> extracted(target, project.provider { local })
             else -> throw GradleException("${JdkSources.pathProperty(feature, target)} is $local, which does not exist")
         }
     }
 
-    /** The pinned JDK archive for [target], resolved like any other dependency. */
-    private fun downloaded(target: Target): Provider<File> {
+    /** The pinned JDK for [target], resolved like any other dependency, with its jmods if separate. */
+    private fun downloadedJdk(target: Target, feature: Int): JdkHome {
         val sources = JdkSources.from(project.providers)
-        val artifact = extension.jdkVersion.map { sources.artifact(JdkVersion(it), target) }
-        val configuration = wiring.runtimeArchive("jdk${target.taskSuffix}", artifact)
+        val jdk = extracted(target, resolved("jdk", target) { sources.artifact(it, target) })
+        if (!sources.distribution.separateJmods(feature)) return jdk
+        val archive = resolved("jmods", target) { sources.jmodsArtifact(it, target) }
+        val jmods = extract("extractJmods${target.taskSuffix}", archive, "jdk/${target.id}-jmods")
+        return JdkHome(jdk.dir, jdk.builtBy, project.layout.dir(jmods.map { it.destinationDir }), jmods)
+    }
+
+    private fun resolved(name: String, target: Target, artifact: (JdkVersion) -> RuntimeArtifact): Provider<File> {
+        val configuration =
+            wiring.runtimeArchive("$name${target.taskSuffix}", extension.jdkVersion.map { artifact(JdkVersion(it)) })
         return wiring.singleFile(configuration)
     }
 
     private fun extracted(target: Target, archive: Provider<File>): JdkHome {
-        val destination = wiring.workDir.map { it.dir("jdk/${target.id}") }
-        val task = wiring.extractRuntime("extractJdk${target.taskSuffix}", archive, destination)
+        val task = extract("extractJdk${target.taskSuffix}", archive, "jdk/${target.id}")
         return JdkHome(project.layout.dir(task.map { it.destinationDir }), task)
     }
+
+    private fun extract(name: String, archive: Provider<File>, path: String) =
+        wiring.extractRuntime(name, archive, wiring.workDir.map { it.dir(path) })
 }

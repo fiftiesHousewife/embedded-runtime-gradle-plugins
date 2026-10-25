@@ -31,7 +31,7 @@ object JdkTools {
                     "${request.targetHome} is $targetVersion. Point both at the same version.",
             )
         }
-        val jmods = request.targetHome.resolve("jmods")
+        val jmods = request.jmods ?: request.targetHome.resolve("jmods")
         exec.exec {
             executable = tool(request.toolHome, "jlink").absolutePath
             if (jmods.isDirectory) args("--module-path", jmods.absolutePath)
@@ -42,11 +42,16 @@ object JdkTools {
     }
 }
 
-/** One jlink run: [toolHome]'s jlink links [modules] from [targetHome]'s jmods into [output]. */
+/**
+ * One jlink run: [toolHome]'s jlink links [modules] from [targetHome]'s jmods (or [jmods], when the
+ * vendor ships them separately) into [output]. With no jmods at all, a JEP 493 JDK links from its
+ * own runtime image, which works only for the machine it runs on.
+ */
 data class JlinkRequest(
     val toolHome: File,
     val targetHome: File,
     val modules: Collection<String>,
     val options: List<String>,
     val output: File,
+    val jmods: File? = null,
 )

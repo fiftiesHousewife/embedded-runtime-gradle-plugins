@@ -47,6 +47,16 @@ class JdkSources(val distribution: JdkDistribution, private val location: JdkLoc
         is JdkLocation.Curated -> RuntimeArtifact.curated(distribution.group, "jdk", version.underscored, target)
     }
 
+    /**
+     * The separate `jmods/` archive for a release whose JDK lacks it ([JdkDistribution.separateJmods]).
+     * In a curated tree it sits beside the JDK as `jmods`:
+     * `temurin/jmods/25.0.4.1_1/jmods-25.0.4.1_1-linux-x64.tar.gz`.
+     */
+    fun jmodsArtifact(version: JdkVersion, target: Target): RuntimeArtifact = when (location) {
+        is JdkLocation.Public -> distribution.jmodsArtifact(version, target)
+        is JdkLocation.Curated -> RuntimeArtifact.curated(distribution.group, "jmods", version.underscored, target)
+    }
+
     fun downloadUri(version: JdkVersion, target: Target): URI = repository.downloadUri(artifact(version, target))
 
     companion object {

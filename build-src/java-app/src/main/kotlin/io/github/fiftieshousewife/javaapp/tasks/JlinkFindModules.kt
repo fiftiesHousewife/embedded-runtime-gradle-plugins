@@ -37,6 +37,9 @@ constructor(
     /** The full JDK for this machine: the jlink tool, the jmods, and the map of classes to modules. */
     @get:Internal abstract val jdk: DirectoryProperty
 
+    /** This machine's JDK's `jmods/`, when its vendor ships them separately. */
+    @get:Internal abstract val jmods: DirectoryProperty
+
     /** This machine's assembled app; its `runtime/` is replaced on every attempt. */
     @get:Internal abstract val appDir: DirectoryProperty
 
@@ -99,7 +102,10 @@ constructor(
     private fun run(attempt: Int, linked: Set<String>, search: Search): SmokeRun.Result {
         val runtime = search.app.resolve("runtime")
         fs.delete { delete(runtime) }
-        JdkTools.link(exec, JlinkRequest(search.home, search.home, linked, options.get(), runtime))
+        JdkTools.link(
+            exec,
+            JlinkRequest(search.home, search.home, linked, options.get(), runtime, jmods.orNull?.asFile),
+        )
         val launcher = search.app.resolve(if (windows.get()) "bin/${appName.get()}.bat" else "bin/${appName.get()}")
         val work = temporaryDir.resolve("attempt-$attempt").apply { mkdirs() }
         return SmokeRun(launcher, windows.get(), work, healthTimeout.get()).run(expectedVersion.get())

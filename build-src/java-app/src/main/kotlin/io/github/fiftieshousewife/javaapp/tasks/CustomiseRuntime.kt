@@ -1,5 +1,6 @@
 package io.github.fiftieshousewife.javaapp.tasks
 
+import io.github.fiftieshousewife.appcore.AppCopySpecs
 import org.gradle.api.DefaultTask
 import org.gradle.api.GradleException
 import org.gradle.api.file.ConfigurableFileCollection
@@ -76,7 +77,7 @@ constructor(private val fs: FileSystemOperations) : DefaultTask() {
         fs.copy {
             from(runtime)
             into(out)
-            filePermissions { user { write = true } }
+            AppCopySpecs.ownerWritable(this)
         }
         val present = ForbiddenModules.present(
             Files.readString(out.resolve("release").toPath()),

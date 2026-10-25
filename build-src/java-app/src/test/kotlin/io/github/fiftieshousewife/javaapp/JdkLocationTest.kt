@@ -4,6 +4,8 @@ import io.github.fiftieshousewife.appcore.Artifactory
 import io.github.fiftieshousewife.appcore.Target
 import org.junit.jupiter.api.Assertions.assertAll
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.io.File
@@ -83,6 +85,31 @@ class JdkLocationTest {
         assertEquals(
             shared.toURI().resolve("temurin/jdk/21.0.12.1_1/jdk-21.0.12.1_1-linux-x64.tar.gz").toString(),
             uri(local, "21.0.12.1+1"),
+        )
+    }
+
+    @Test
+    fun `Temurin 24 and later fetch jmods beside the JDK, from the vendor or the curated tree`() {
+        val version = JdkVersion("25.0.4.1+1")
+        val public = JdkSources(JdkDistribution.TEMURIN)
+        val curated = JdkSources(JdkDistribution.TEMURIN, JdkLocation.local(shared))
+        assertAll(
+            { assertTrue(JdkDistribution.TEMURIN.separateJmods(25)) },
+            { assertFalse(JdkDistribution.TEMURIN.separateJmods(21)) },
+            { assertFalse(JdkDistribution.CORRETTO.separateJmods(25)) },
+            {
+                assertEquals(
+                    "https://github.com/adoptium/temurin25-binaries/releases/download/jdk-25.0.4.1%2B1/" +
+                        "OpenJDK25U-jmods_x64_linux_hotspot_25.0.4.1_1.tar.gz",
+                    public.repository.downloadUri(public.jmodsArtifact(version, Target.LINUX_X64)).toString(),
+                )
+            },
+            {
+                assertEquals(
+                    shared.toURI().resolve("temurin/jmods/25.0.4.1_1/jmods-25.0.4.1_1-linux-x64.tar.gz").toString(),
+                    curated.repository.downloadUri(curated.jmodsArtifact(version, Target.LINUX_X64)).toString(),
+                )
+            },
         )
     }
 }

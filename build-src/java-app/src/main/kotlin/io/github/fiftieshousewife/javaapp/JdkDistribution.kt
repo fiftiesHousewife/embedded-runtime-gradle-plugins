@@ -95,17 +95,26 @@ enum class JdkDistribution(
         JdkSite("https://github.com/adoptium", "[module]/releases/download/[revision]/[artifact].[ext]"),
         VersionForm(VersionForm.WITH_BUILD, "21.0.13+9"),
     ) {
-        override fun artifact(version: JdkVersion, target: Target): RuntimeArtifact {
-            val platform = "${target.arch.id}_${target.os.id}"
-            return RuntimeArtifact(
-                group = id,
-                module = "temurin${version.feature}-binaries",
-                revision = "jdk-${version.value}",
-                artifact = "OpenJDK${version.feature}U-jdk_${platform}_hotspot_${version.underscored}",
-                classifier = null,
-                extension = target.archiveExtension,
-            )
-        }
+        override fun artifact(version: JdkVersion, target: Target) = adoptiumAsset(version, target, "jdk")
+
+        /**
+         * Temurin 24 and later are built with JEP 493 and ship without `jmods/`, which a cross link
+         * needs; Adoptium publishes them as a separate archive beside each JDK:
+         * `OpenJDK25U-jmods_x64_linux_hotspot_25.0.4.1_1.tar.gz`.
+         */
+        override fun separateJmods(feature: Int) = feature >= JEP_493_RELEASE
+
+        override fun jmodsArtifact(version: JdkVersion, target: Target) = adoptiumAsset(version, target, "jmods")
+
+        private fun adoptiumAsset(version: JdkVersion, target: Target, image: String) = RuntimeArtifact(
+            group = id,
+            module = "temurin${version.feature}-binaries",
+            revision = "jdk-${version.value}",
+            artifact =
+            "OpenJDK${version.feature}U-${image}_${target.arch.id}_${target.os.id}_hotspot_${version.underscored}",
+            classifier = null,
+            extension = target.archiveExtension,
+        )
     },
 
     /** Oracle JDK, published as a flat archive tree: `.../java/25/archive/jdk-25.0.2_linux-x64_bin.tar.gz` */
@@ -228,6 +237,13 @@ enum class JdkDistribution(
         }
     }
 
+    /** Whether [feature]'s JDK archives lack `jmods/`, which this vendor publishes separately. */
+    open fun separateJmods(feature: Int): Boolean = false
+
+    /** The separate `jmods/` archive, for a release where [separateJmods] is true. */
+    open fun jmodsArtifact(version: JdkVersion, target: Target): RuntimeArtifact =
+        throw GradleException("$id publishes jmods/ inside its JDK archives")
+
     /** The common case: the version is the revision as-is and the target goes in the classifier. */
     protected fun archive(name: ArchiveName, version: JdkVersion, target: Target) = RuntimeArtifact(
         group = group,
@@ -240,6 +256,9 @@ enum class JdkDistribution(
 
     companion object {
         val DEFAULT = TEMURIN
+
+        /** JEP 493 (JDK 24) lets a vendor ship a JDK without `jmods/`. */
+        private const val JEP_493_RELEASE = 24
 
         fun parse(value: String): JdkDistribution =
             entries.firstOrNull { it.id.equals(value.trim(), ignoreCase = true) }

@@ -1,5 +1,6 @@
 package io.github.fiftieshousewife.javaapp
 
+import io.github.fiftieshousewife.appcore.Target
 import io.github.fiftieshousewife.appcore.TestProject
 import io.github.fiftieshousewife.appcore.checks
 import org.gradle.testkit.runner.TaskOutcome
@@ -47,6 +48,22 @@ class JavaAppPluginTest {
         assertAll(
             { assertTrue(rebuilt.output.contains("Reusing configuration cache"), rebuilt.output) },
             { assertEquals(first, sha256(archive(project))) },
+        )
+    }
+
+    @Test
+    fun `a JDK with read-only files is extracted again and keeps its exec bits`() {
+        val project = javaService(tmp)
+        project.build("appArchive")
+        val suffix = Target.parse(TestProject.hostTarget()).taskSuffix
+        val jdk = project.project.resolve("build/app-work/jdk/${TestProject.hostTarget()}")
+        val readOnly = jdk.walkTopDown().first { it.isFile && it.name == "release" }.apply { setWritable(false) }
+        val again = project.build("extractJdk$suffix", "--rerun", "customiseRuntime$suffix", "--rerun")
+        val java = project.project.resolve("build/app-work/runtime/${TestProject.hostTarget()}/bin/java")
+        assertAll(
+            { assertEquals(TaskOutcome.SUCCESS, again.task(":extractJdk$suffix")?.outcome) },
+            { assertTrue(readOnly.canWrite()) },
+            { assertTrue(java.canExecute(), "$java lost its exec bit") },
         )
     }
 

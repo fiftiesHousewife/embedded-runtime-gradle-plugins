@@ -30,7 +30,8 @@ internal class JavaRuntimeTasks(
             description = "Links the trimmed Java runtime for ${target.id}"
             toolJdk.set(hostJdk.dir)
             targetJdk.set(targetHome.dir)
-            dependsOn(listOfNotNull(hostJdk.builtBy, targetHome.builtBy))
+            targetHome.jmods?.let(targetJmods::set)
+            dependsOn(hostJdk.tasks + targetHome.tasks)
             jdkVersion.set(extension.jdkVersion)
             host.set(wiring.host)
             this.target.set(target)
@@ -77,7 +78,8 @@ internal class JavaRuntimeTasks(
             group = this@JavaRuntimeTasks.group
             description = "Runs the app, adding each JDK module it turns out to need, until it is healthy"
             jdk.set(hostJdk.dir)
-            hostJdk.builtBy?.let { dependsOn(it) }
+            hostJdk.jmods?.let(jmods::set)
+            dependsOn(hostJdk.tasks)
             useThisMachinesApp(this)
             appName.set(extension.appName)
             expectedVersion.set(project.provider { project.version.toString() })

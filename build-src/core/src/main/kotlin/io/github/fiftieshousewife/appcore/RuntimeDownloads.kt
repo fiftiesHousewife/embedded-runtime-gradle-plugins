@@ -17,15 +17,22 @@ data class RuntimeRepository(
 ) {
     /** The URL Ivy resolves for [artifact]; the JDK toolchain resolver hands this to Gradle directly. */
     fun downloadUri(artifact: RuntimeArtifact): URI {
-        val path =
-            artifactPattern
-                .replace("[organisation]", artifact.group)
-                .replace("[module]", artifact.module)
-                .replace("[revision]", artifact.revision)
-                .replace("[artifact]", artifact.artifact)
-                .replace("[classifier]", artifact.classifier.orEmpty())
-                .replace("[ext]", artifact.extension)
-        return baseUrl.resolve(path.replace("+", "%2B"))
+        val tokens =
+            mapOf(
+                "organisation" to artifact.group,
+                "module" to artifact.module,
+                "revision" to artifact.revision,
+                "artifact" to artifact.artifact,
+                "classifier" to artifact.classifier.orEmpty(),
+                "ext" to artifact.extension,
+            )
+        // As Ivy does: an optional (…) segment appears only when every token inside it has a value.
+        val withOptionals = OPTIONAL.replace(artifactPattern) { segment ->
+            val inner = segment.groupValues[1]
+            if (TOKEN.findAll(inner).all { tokens[it.groupValues[1]].orEmpty().isNotEmpty() }) inner else ""
+        }
+        val path = TOKEN.replace(withOptionals) { tokens[it.groupValues[1]] ?: it.value }
+        return baseUrl.resolve(path.replace("+", "%2B").replace(" ", "%20"))
     }
 
     companion object {
@@ -40,6 +47,9 @@ data class RuntimeRepository(
         const val CURATED_PATTERN = "[organisation]/[module]/[revision]/[artifact]-[revision]-[classifier].[ext]"
 
         fun slash(url: String): URI = URI.create(url.trimEnd('/') + "/")
+
+        private val OPTIONAL = Regex("""\(([^()]*)\)""")
+        private val TOKEN = Regex("""\[([a-z]+)]""")
     }
 }
 

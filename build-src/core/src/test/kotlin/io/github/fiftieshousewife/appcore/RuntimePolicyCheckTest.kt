@@ -43,8 +43,9 @@ class RuntimePolicyCheckTest {
         app.resolve("bin").mkdirs()
         app.resolve("bin/svc").writeText(fake.launcher)
         app.resolve("META-INF").mkdirs()
-        val components = fake.purls.joinToString(",") { "{\"purl\":\"$it\"}" }
-        app.resolve("META-INF/sbom.cdx.json").writeText("{\"components\":[$components]}")
+        val components = fake.purls.joinToString(",") { "{\"type\":\"library\",\"name\":\"x\",\"purl\":\"$it\"}" }
+        app.resolve("META-INF/sbom.cdx.json")
+            .writeText("{\"bomFormat\":\"CycloneDX\",\"specVersion\":\"1.5\",\"components\":[$components]}")
         return app
     }
 

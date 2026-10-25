@@ -1,5 +1,7 @@
 package io.github.fiftieshousewife.appcore
 
+import org.cyclonedx.model.Component
+import org.cyclonedx.parsers.JsonParser
 import java.io.File
 import java.security.KeyStore
 import java.security.MessageDigest
@@ -15,6 +17,9 @@ import java.util.Properties
  */
 object RuntimePolicyCheck {
     private const val CACERTS_PASSWORD = "changeit"
+
+    /** How every launcher starts the embedded JVM: the lines whose options are checked. */
+    private val RUNTIME_STARTS = listOf("\"\$APP_HOME/runtime/bin/java\"", "\"%APP_HOME%\\runtime\\bin\\java.exe\"")
 
     fun violations(policy: RuntimePolicy, app: File): List<String> {
         val runtime = app.resolve("runtime")
@@ -73,7 +78,7 @@ object RuntimePolicyCheck {
         } else {
             emptyList()
         }
-        val starts = launchers.flatMap(String::lines).filter { "runtime" in it && ("java" in it) && "-cp" in it }
+        val starts = launchers.flatMap(String::lines).filter { line -> RUNTIME_STARTS.any { it in line } }
         val forbidden = policy.forbiddenJvmArgs.filter { arg -> starts.any { line -> arg in line } }
             .map { "the launcher passes a forbidden JVM option starting $it (javaApp.jvmArgs)" }
         return locked + forbidden
@@ -81,12 +86,16 @@ object RuntimePolicyCheck {
 
     private fun libraries(policy: RuntimePolicy, app: File): List<String> {
         if (policy.forbiddenLibraries.isEmpty()) return emptyList()
-        val sbom = app.resolve("META-INF/sbom.cdx.json").takeIf(File::isFile)?.readText().orEmpty()
-        val purls = Regex(""""purl"\s*:\s*"([^"]+)"""").findAll(sbom).map { it.groupValues[1] }.toList()
+        val sbom =
+            app.resolve("META-INF/sbom.cdx.json").takeIf(File::isFile) ?: return listOf("the app has no SBOM to check")
+        val purls = purls(JsonParser().parse(sbom).components.orEmpty())
         return policy.forbiddenLibraries.flatMap { prefix ->
             purls.filter { it.startsWith(prefix) }.map { "the app ships forbidden library $it" }
         }
     }
+
+    private fun purls(components: List<Component>): List<String> =
+        components.flatMap { listOfNotNull(it.purl) + purls(it.components.orEmpty()) }
 
     private fun fingerprint(certificate: java.security.cert.Certificate): String =
         HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(certificate.encoded))

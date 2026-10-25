@@ -41,4 +41,26 @@ class RuntimeRepositoryTest {
             { assertEquals("https://example.com/a/", RuntimeRepository.slash("https://example.com/a//").toString()) },
         )
     }
+
+    @Test
+    fun `an optional segment appears only when every token in it has a value, as in Ivy`() {
+        val optional =
+            RuntimeRepository(
+                "mirror",
+                URI("https://mirror.example.com/"),
+                "[module]/[artifact](-[classifier]).[ext]",
+                "g",
+            )
+        val withClassifier = RuntimeArtifact("g", "jdk", "21", "jdk", "linux-x64", "tar.gz")
+        val without = withClassifier.copy(classifier = null)
+        assertAll(
+            {
+                assertEquals(
+                    "https://mirror.example.com/jdk/jdk-linux-x64.tar.gz",
+                    optional.downloadUri(withClassifier).toString(),
+                )
+            },
+            { assertEquals("https://mirror.example.com/jdk/jdk.tar.gz", optional.downloadUri(without).toString()) },
+        )
+    }
 }

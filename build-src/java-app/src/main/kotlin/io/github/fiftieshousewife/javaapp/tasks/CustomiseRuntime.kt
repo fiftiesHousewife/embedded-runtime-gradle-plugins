@@ -157,7 +157,12 @@ constructor(
     private fun trustPolicyCertificates(out: File, policy: RuntimePolicy): List<String> {
         val certificates = TrustedCertificates.certificateFiles(policy.certificates.toSet())
         if (certificates.isEmpty()) return emptyList()
-        return TrustedCertificates.install(out.resolve("lib/security/cacerts"), certificates, replace = false)
+        return TrustedCertificates.install(
+            out.resolve("lib/security/cacerts"),
+            certificates,
+            replace = false,
+            prefix = TrustedCertificates.POLICY,
+        )
     }
 
     private fun load(file: File) = Properties().apply { Files.newInputStream(file.toPath()).use(::load) }

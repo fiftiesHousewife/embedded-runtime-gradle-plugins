@@ -72,4 +72,24 @@ class TrustedCertificatesTest {
             { assertTrue(Files.size(cacerts.toPath()) > 0) },
         )
     }
+
+    @Test
+    fun `two files with the same name are refused rather than one silently replacing the other`() {
+        val elsewhere = dir.resolve("other/acme-root.pem").apply { parentFile.mkdirs() }
+        resource("acme-root.pem").copyTo(elsewhere)
+        val cacerts = dir.resolve("cacerts")
+        val failure =
+            assertThrows(GradleException::class.java) {
+                TrustedCertificates.install(cacerts, listOf(resource("acme-root.pem"), elsewhere), replace = true)
+            }
+        assertTrue(failure.message!!.contains("need distinct names"), failure.message)
+    }
+
+    @Test
+    fun `policy certificates have aliases of their own`() {
+        assertEquals(
+            "policy-acme-root",
+            TrustedCertificates.alias(File("acme-root.pem"), 0, 1, TrustedCertificates.POLICY),
+        )
+    }
 }

@@ -14,4 +14,5 @@ dependencies {
     implementation(libs.gradle.spotless)
     implementation(libs.gradle.detekt)
     implementation(libs.gradle.forbiddenapis)
+    implementation(libs.gradle.dokka)
 }

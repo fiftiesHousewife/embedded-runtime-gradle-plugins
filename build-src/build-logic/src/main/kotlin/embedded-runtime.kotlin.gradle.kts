@@ -12,6 +12,8 @@ plugins {
     id("io.gitlab.arturbosch.detekt")
     id("io.github.ben-manes.versions")
     id("de.thetaphi.forbiddenapis")
+    id("org.jetbrains.dokka")
+    id("org.jetbrains.dokka-javadoc")
     jacoco
 }
 
@@ -60,7 +62,7 @@ tasks.withType<Test>().configureEach {
 }
 
 // Quality gates, following the Clean Code plugin's standards with standard tools: ktlint through
-// Spotless for formatting (120 columns, from .editorconfig), detekt for size, complexity, naming
+// Spotless for formatting (120 columns, set below to match .editorconfig), detekt for size, complexity, naming
 // and safety rules (config/detekt/detekt.yml), Forbidden APIs for unsafe JDK calls in the compiled
 // bytecode, JaCoCo for coverage, and ben-manes for dependency drift.
 val ktlintVersion = libs.findVersion("ktlint").get().requiredVersion
@@ -110,6 +112,16 @@ tasks.withType<DependencyUpdatesTask>().configureEach {
     rejectVersionIf {
         candidate.version.substringBefore(".") != currentVersion.substringBefore(".")
     }
+}
+
+// The API documentation is the KDoc: Dokka renders it as HTML (dokkaGenerate) and as the javadoc
+// jar every publication carries, which `javadoc` alone would leave empty for Kotlin sources.
+dokka {
+    // In the build's own JVM, isolated by class loader, rather than a worker process of its own.
+    dokkaGeneratorIsolation = ClassLoaderIsolation()
+}
+tasks.matching { it.name == "javadocJar" }.withType<Jar>().configureEach {
+    from(tasks.named("dokkaGeneratePublicationJavadoc"))
 }
 
 // Maven Central requires sources and javadoc jars, a POM carrying name, description, URL, licence,

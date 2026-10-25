@@ -9,6 +9,7 @@ versions = "0.66.0"
 spotless = "8.10.4"
 detekt = "1.23.8"
 forbiddenapis = "3.11"
+dokka = "2.2.0"
 cyclonedx = "13.4.0"
 packageurl = "1.5.0"
 redline = "1.2.10"
@@ -105,3 +106,4 @@ gradle-versions = { module = "io.github.ben-manes.versions:io.github.ben-manes.v
 gradle-spotless = { module = "com.diffplug.spotless:com.diffplug.spotless.gradle.plugin", version.ref = "spotless" }
 gradle-detekt = { module = "io.gitlab.arturbosch.detekt:io.gitlab.arturbosch.detekt.gradle.plugin", version.ref = "detekt" }
 gradle-forbiddenapis = { module = "de.thetaphi:forbiddenapis", version.ref = "forbiddenapis" }
+gradle-dokka = { module = "org.jetbrains.dokka:dokka-gradle-plugin", version.ref = "dokka" }

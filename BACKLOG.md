@@ -36,8 +36,7 @@ and `./gradlew aiSkills` to install them in a project. Prompt files were dropped
 
 | Item | Notes |
 |---|---|
-| **Comment review** | Delete trivial comments; prefer meaningful function and class names to comments; keep KDoc on public API |
-| **Publish API docs** | KDoc as javadoc jars (Dokka) with the publications, and browsable HTML (e.g. GitHub Pages) |
+| **GitHub Pages for the API docs** | `.github/workflows/api-docs.yml` builds and deploys them; the owner must set Pages to "GitHub Actions" in the repository settings |
 | **Build speed** | Functional tests now run in parallel forks; measure, and consider a Gradle build scan or `--profile` to find the rest |
 
 ## Verification and CI

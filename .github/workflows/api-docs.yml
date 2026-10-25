@@ -1,0 +1,58 @@
+# The plugins' API documentation (their KDoc, rendered by Dokka) on GitHub Pages.
+# Needs Pages set to "GitHub Actions" in the repository settings; until then the deploy step fails
+# and the HTML is still available as the run's artifact.
+name: api-docs
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: |
+            17
+            21
+      - uses: gradle/actions/setup-gradle@v6
+      - run: ./gradlew :build-src:app-core:dokkaGeneratePublicationHtml :build-src:java-app:dokkaGeneratePublicationHtml :build-src:node-app:dokkaGeneratePublicationHtml
+      - name: Assemble the site
+        run: |
+          mkdir -p site
+          for m in core:app-core java-app:java-app node-app:node-app; do
+            cp -R "build-src/${m%%:*}/build/dokka/html" "site/${m##*:}"
+          done
+          cat > site/index.html <<'HTML'
+          <!doctype html><meta charset="utf-8"><title>Embedded runtime Gradle plugins: API</title>
+          <h1>Embedded runtime Gradle plugins: API documentation</h1>
+          <ul>
+            <li><a href="java-app/">java-app</a>: the Java plugin and its settings plugin</li>
+            <li><a href="node-app/">node-app</a>: the Node.js plugin and its settings plugin</li>
+            <li><a href="app-core/">app-core</a>: shared machinery and the app-smoke-test plugin</li>
+          </ul>
+          HTML
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: site
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5

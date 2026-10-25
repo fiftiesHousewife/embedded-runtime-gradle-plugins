@@ -90,6 +90,9 @@ runtimes, and tune performance with Java Flight Recorder, plus a hook that check
   /plugin install embedded-runtime --marketplace fiftiesHousewife/embedded-runtime-gradle-plugins
   ```
 
+API documentation: https://fiftieshousewife.github.io/embedded-runtime-gradle-plugins/ (from each
+plugin's KDoc; also in the javadoc jar of every publication).
+
 Working on the plugins themselves: [AGENTS.md](AGENTS.md).
 
 ## Licence

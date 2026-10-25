@@ -34,7 +34,7 @@ internal class TargetPipeline(private val project: Project, private val wiring: 
     fun register(target: Target, spec: EcosystemSpec): TargetTasks {
         val parts = Parts(registerLaunchers(target, spec), registerManifest(target, spec), registerSbom(target, spec))
         val name = distributionName(target)
-        registerDistribution(name, spec, parts)
+        registerDistribution(name, target, spec, parts)
         val install = tasks.named(target.installTaskName, Sync::class.java) {
             group = taskGroup
             description = "Installs the self-contained ${target.id} app into build/app/${target.id}"
@@ -55,27 +55,44 @@ internal class TargetPipeline(private val project: Project, private val wiring: 
 
     /**
      * One Gradle distribution per target, named after it (`linuxX64`, `macAarch64`), so each gets the
-     * distribution plugin's `install…Dist`, `…DistTar` and `…DistZip`.
+     * distribution plugin's `install…Dist`, `…DistTar` and `…DistZip`. This machine's contents also
+     * go into the `main` distribution, so plain `installDist` installs this machine's app with its runtime.
      */
-    private fun registerDistribution(name: String, spec: EcosystemSpec, parts: Parts) {
+    private fun registerDistribution(name: String, target: Target, spec: EcosystemSpec, parts: Parts) {
         val app = appName
-        project.extensions.getByType(DistributionContainer::class.java).register(name) {
+        val contents = contents(spec, parts)
+        val distributions = project.extensions.getByType(DistributionContainer::class.java)
+        distributions.register(name) {
             distributionBaseName.set(app)
             contents {
                 duplicatesStrategy = DuplicatesStrategy.FAIL
-                into("bin") {
-                    from(parts.launchers)
-                    filePermissions { unix("rwxr-xr-x") }
-                }
-                into("META-INF") {
-                    from(parts.manifest)
-                    from(parts.sbom)
-                }
-                into("conf.defaults") { from(extension.configDefaults) }
-                spec.contents(this)
-                AppCopySpecs.executableBits(this)
+                with(contents)
             }
         }
+        if (target == wiring.host) {
+            distributions.named("main") {
+                // Java's main distribution already holds Gradle's bin/ and lib/ for the same files.
+                contents {
+                    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+                    with(contents)
+                }
+            }
+        }
+    }
+
+    /** What one target's app holds: launchers, metadata, default configuration and the ecosystem's own. */
+    private fun contents(spec: EcosystemSpec, parts: Parts) = project.copySpec {
+        into("bin") {
+            from(parts.launchers)
+            filePermissions { unix("rwxr-xr-x") }
+        }
+        into("META-INF") {
+            from(parts.manifest)
+            from(parts.sbom)
+        }
+        into("conf.defaults") { from(extension.configDefaults) }
+        spec.contents(this)
+        AppCopySpecs.executableBits(this)
     }
 
     /**

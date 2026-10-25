@@ -72,6 +72,24 @@ class JavaAppPluginTest {
     }
 
     @Test
+    fun `plain installDist installs this machine's app with its embedded runtime`() {
+        val project = javaService(tmp)
+        project.build("installDist")
+        val installed = project.project.resolve("build/install/svc")
+        val version = TestProject.run(installed.resolve("bin/svc").absolutePath, "version")
+        assertAll(
+            { assertTrue(installed.resolve("runtime/bin/java").canExecute()) },
+            { assertTrue(installed.resolve("META-INF/sbom.cdx.json").isFile) },
+            {
+                assertTrue(
+                    version.contains("\"version\": \"2.0.0\"") || version.contains("\"version\":\"2.0.0\""),
+                    version,
+                )
+            },
+        )
+    }
+
+    @Test
     fun `a JDK with read-only files is extracted again and keeps its exec bits`() {
         val project = javaService(tmp)
         project.build("appArchive")

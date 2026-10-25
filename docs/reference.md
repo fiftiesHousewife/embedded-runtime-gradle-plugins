@@ -53,6 +53,7 @@ nodeApp {
 |---|---|
 | `appArchive` | Builds every target's archive; part of `assemble` |
 | `install<Target>Dist`, `<target>DistTar`, `<target>DistZip` | The distribution plugin's tasks for each target's distribution, e.g. `installLinuxX64Dist` |
+| `installDist` | Installs this machine's app with its runtime into `build/install/<app>` |
 | `startScripts` | Gradle's own task; writes the Java launchers with the embedded-runtime script generator |
 | `appRpm` | Builds each Linux target's RPM (`appRpmLinuxX64`, …), when enabled; part of `assemble` |
 | `appPublishRpm` | Uploads the RPMs to `rpm.repositoryUrl`; part of `publish` when that is set |

@@ -97,6 +97,7 @@ named after it, so it has the distribution plugin's usual tasks:
 | `install<Target>Dist`, e.g. `installLinuxX64Dist` | Lays the app out in `build/app/<target>/<app>-<version>/` |
 | `<target>DistTar` / `<target>DistZip` | The archive, `build/distributions/<app>-<version>-<target>.tar.gz` (or `.zip`); only the `archiveFormat` one is enabled |
 | `appArchive` | Every target's archive |
+| `installDist` | Gradle's usual task: this machine's app with its runtime, in `build/install/<app>` |
 
 An archive's single top-level directory is `<app>-<version>-<target>/`, so archives for two targets
 unpack side by side.

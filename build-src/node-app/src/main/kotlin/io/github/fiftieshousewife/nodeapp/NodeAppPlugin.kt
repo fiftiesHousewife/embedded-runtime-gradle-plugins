@@ -28,8 +28,8 @@ constructor(
     override fun apply(project: Project) {
         project.pluginManager.apply("base")
         project.pluginManager.apply("distribution")
-        // The default distribution would be empty: every target has a distribution of its own.
-        listOf("distTar", "distZip", "installDist").forEach { name -> project.tasks.named(name) { enabled = false } }
+        // Every target has a distribution of its own; main holds this machine's, for installDist.
+        listOf("distTar", "distZip").forEach { name -> project.tasks.named(name) { enabled = false } }
         val extension = project.extensions.create(ECOSYSTEM.extensionName, NodeAppExtension::class.java)
         val wiring = AppWiring(project, ECOSYSTEM, extension, AppServices(archives, components))
         wiring.applyConventions()

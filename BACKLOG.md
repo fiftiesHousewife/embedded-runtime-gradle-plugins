@@ -8,11 +8,9 @@ Last updated 2026-10-25.
 
 ## Next: Gradle-native launchers and distributions
 
-Done on 2026-10-25 except one item: Java launchers come from Gradle's own `startScripts`, every
-target is a Gradle distribution, and the custom installer is gone (installation on servers is left to
-the RPM, container images or existing deployment tooling). Still open from
-[plans/gradle-distributions.md](plans/gradle-distributions.md): make the `main` distribution this
-machine's target, so plain `installDist` installs this machine's app with its runtime.
+Done on 2026-10-25 ([plans/gradle-distributions.md](plans/gradle-distributions.md)): Java launchers
+come from Gradle's own `startScripts`, every target is a Gradle distribution, plain `installDist`
+installs this machine's app with its runtime, and the custom installer is gone.
 
 ## Samples
 

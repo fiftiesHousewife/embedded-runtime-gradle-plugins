@@ -52,9 +52,9 @@ timelines.
 
 | Symptom in the recording | Change |
 |---|---|
-| Frequent or long GC pauses, heap near its limit | Raise the heap share: `-XX:MaxRAMPercentage=75` (the default is 25% of the machine or container) |
-| Pauses from the Serial collector | The JVM picks Serial with fewer than 2 CPUs or under about 1792 MB. Give the container 2 CPUs, or choose a collector: `-XX:+UseG1GC` (the usual default), `-XX:+UseParallelGC` for batch throughput, `-XX:+UseZGC` for low latency on large heaps |
-| Slow startup, class loading at the top | A class-data sharing archive built on the target: `-XX:+AutoCreateSharedArchive -XX:SharedArchiveFile=$APP_DATA_DIR/app.jsa` (JDK 19+). On JDK 25, an ahead-of-time cache with `-XX:AOTCacheOutput` goes further. Both are built by running on the target itself |
+| Frequent or long GC pauses, heap near its limit | Raise the heap share: `runtimeDefaults { maxRamPercentage = 85 }` (75% by default; the JVM's own default is 25%) |
+| Pauses from the Serial collector | The JVM picks Serial with fewer than 2 CPUs or under about 1792 MB. Give the container 2 CPUs, or choose a collector: `runtimeDefaults { garbageCollector = "G1" }` (the usual default), `"Parallel"` for batch throughput, `"Z"` for low latency on large heaps |
+| Slow startup, class loading at the top | A class-data sharing archive built on the target: `-XX:+AutoCreateSharedArchive -XX:SharedArchiveFile=/var/lib/orders-service/app.jsa` (JDK 19+; a full path, because `jvmArgs` are not expanded). On JDK 25, an ahead-of-time cache with `-XX:AOTCacheOutput` goes further. Both are built by running on the target itself |
 | Allocation dominated by a few classes | Fix the code; no flag helps |
 
 Change one thing at a time and record again. `./gradlew build` still runs the smoke test, so a flag

@@ -15,8 +15,11 @@ import java.io.Writer
  * first) and `defaultJvmOpts`. A build can replace it the usual way, with
  * `tasks.startScripts { unixStartScriptGenerator = … }`; the smoke test still has to pass.
  */
-class EmbeddedRuntimeScriptGenerator(private val windows: Boolean, private val lockedOptions: Boolean) :
-    ScriptGenerator,
+class EmbeddedRuntimeScriptGenerator(
+    private val windows: Boolean,
+    private val lockedOptions: Boolean,
+    private val logDirFiles: Boolean = false,
+) : ScriptGenerator,
     Serializable {
     override fun generateScript(details: JavaAppStartScriptGenerationDetails, destination: Writer) {
         val launch =
@@ -24,6 +27,7 @@ class EmbeddedRuntimeScriptGenerator(private val windows: Boolean, private val l
                 mainClass = details.mainClassName,
                 appJar = details.classpath.first().substringAfterLast('/'),
                 jvmArgs = details.defaultJvmOpts.toList(),
+                logDirFiles = logDirFiles,
             )
         val exec = if (windows) JavaLaunchCommand.windows(launch) else JavaLaunchCommand.posix(launch)
         destination.write(LauncherTemplate.render(windows, details.applicationName, lockedOptions, exec))

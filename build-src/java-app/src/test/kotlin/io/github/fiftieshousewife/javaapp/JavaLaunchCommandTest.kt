@@ -55,4 +55,39 @@ class JavaLaunchCommandTest {
             },
         )
     }
+
+    @Test
+    fun `heap dumps and crash logs go to the log directory, which the POSIX launcher creates`() {
+        val lines = JavaLaunchCommand.posix(launch.copy(logDirFiles = true)).lines()
+        assertAll(
+            {
+                assertEquals(
+                    "[ -d \"\$APP_LOG_DIR\" ] || (umask 027 && mkdir -p \"\$APP_LOG_DIR\")",
+                    lines.first(),
+                )
+            },
+            {
+                assertEquals(
+                    "exec \"\$APP_HOME/runtime/bin/java\" \"-XX:HeapDumpPath=\$APP_LOG_DIR\" " +
+                        "\"-XX:ErrorFile=\$APP_LOG_DIR/hs_err_pid%p.log\" '-Xss512k'",
+                    lines.last().substringBefore(" \${APP_JVM_OPTIONS_FILE"),
+                )
+            },
+        )
+    }
+
+    @Test
+    fun `the Windows launcher escapes the percent in the crash log name`() {
+        val lines = JavaLaunchCommand.windows(launch.copy(logDirFiles = true)).lines()
+        assertAll(
+            { assertEquals("if not exist \"%APP_LOG_DIR%\" mkdir \"%APP_LOG_DIR%\"", lines.first()) },
+            {
+                assertEquals(
+                    "\"%APP_HOME%\\runtime\\bin\\java.exe\" \"-XX:HeapDumpPath=%APP_LOG_DIR%\" " +
+                        "\"-XX:ErrorFile=%APP_LOG_DIR%\\hs_err_pid%%p.log\" \"-Xss512k\"",
+                    lines.last().substringBefore(" %APP_JVM_OPTIONS_FILE%"),
+                )
+            },
+        )
+    }
 }

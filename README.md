@@ -50,7 +50,7 @@ application { mainClass = "com.example.orders.Main" }
 
 javaApp {
     javaVersion = 21
-    jvmArgs = listOf("-XX:MaxRAMPercentage=75")
+    jvmArgs = listOf("-Xss512k")               // after the production defaults below
 }
 ```
 
@@ -103,9 +103,15 @@ javaApp {
     // (`./gradlew jlinkFindModules` finds them by running the app).
     additionalModules = listOf("jdk.crypto.ec", "java.naming", "jdk.localedata")
 
-    // How the JVM starts. With runtimeOptions("locked") the launcher refuses to start while
-    // JAVA_TOOL_OPTIONS, APP_JAVA_OPTS or a jvm.options file would add options to these.
-    jvmArgs = listOf("-XX:MaxRAMPercentage=75", "-XX:+ExitOnOutOfMemoryError")
+    // How the JVM starts. By default it gets 75% of the machine's or container's memory, exits on
+    // OutOfMemoryError and leaves a heap dump and crash logs in $APP_LOG_DIR; jvmArgs come after
+    // these. With runtimeOptions("locked") the launcher refuses to start while JAVA_TOOL_OPTIONS,
+    // APP_JAVA_OPTS or a jvm.options file would add options of their own.
+    runtimeDefaults {
+        garbageCollector = "G1"                // unset by default: the JVM chooses
+        disableAttach = true                   // no jcmd or agents attaching to the running service
+    }
+    jvmArgs = listOf("-Xss512k")
     runtimeOptions("locked")
 
     // CAs and encryption, applied to every target's runtime after jlink.
@@ -229,7 +235,7 @@ setting and its default is in the [reference](docs/reference.md).
 | `<target>DistTar`, `<target>DistZip` | One target's archive, `<app>-<version>-<target>.tar.gz` (or `.tar`, `.zip`) | as above; `configDefaults` (shipped as `conf.defaults/`) |
 | `installDist` | Lays out this machine's app with its runtime in `build/install/<app>` | as above |
 | `install<Target>Dist` | The same for one target, e.g. `installLinuxX64Dist` | as above |
-| `startScripts` | Java: writes `bin/<app>` and `bin/<app>.bat`, which start the embedded runtime | `jvmArgs`, `application { applicationDefaultJvmArgs }`, `runtimeOptions("locked")`; `-PjavaApp.runtimeOptions` |
+| `startScripts` | Java: writes `bin/<app>` and `bin/<app>.bat`, which start the embedded runtime | `runtimeDefaults { … }`, `jvmArgs`, `application { applicationDefaultJvmArgs }`, `runtimeOptions("locked")`; `-PjavaApp.runtimeOptions` |
 | `appLaunchers<Target>` | Node: writes the target's launcher | `entryPoint`, `nodeArgs`, `security { tlsMinVersion, tlsCipherList }`, `runtimeOptions("locked")`; `-PnodeApp.runtimeOptions` |
 | `appManifest<Target>` | Writes `META-INF/app.json`: name, version, target, runtime, git commit | `appName` |
 | `appSbom<Target>` | Writes `META-INF/sbom.cdx.json`, a CycloneDX SBOM including the runtime; skipped when you supply your own | `sbom = …` (your own SBOM instead) |

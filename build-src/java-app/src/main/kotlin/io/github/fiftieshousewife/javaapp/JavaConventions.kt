@@ -25,6 +25,15 @@ internal class JavaConventions(private val project: Project, private val extensi
         )
         extension.jlinkOptions.convention(javaFeature.map(::jlinkOptions))
         extension.jvmArgs.convention(emptyList())
+        JavaRuntimeDefaults.Settings().let { default ->
+            with(extension.runtimeDefaults) {
+                enabled.convention(default.enabled)
+                maxRamPercentage.convention(default.maxRamPercentage)
+                exitOnOutOfMemory.convention(default.exitOnOutOfMemory)
+                heapDumpOnOutOfMemory.convention(default.heapDumpOnOutOfMemory)
+                disableAttach.convention(default.disableAttach)
+            }
+        }
         val overlay = project.layout.projectDirectory.dir("src/deploy/runtime").asFile
         extension.runtimeOverlay.convention(project.layout.dir(project.provider { overlay.takeIf(File::isDirectory) }))
         security()

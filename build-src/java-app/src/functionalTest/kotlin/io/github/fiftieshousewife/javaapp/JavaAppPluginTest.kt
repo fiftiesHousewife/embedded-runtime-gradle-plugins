@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.io.File
 import java.nio.file.Files
+import java.nio.file.attribute.PosixFilePermissions
 import java.security.MessageDigest
 import java.util.HexFormat
 
@@ -90,6 +91,33 @@ class JavaAppPluginTest {
     }
 
     @Test
+    fun `out of memory, the app exits and leaves a private heap dump in the log directory`() {
+        val project = javaService(tmp)
+        project.file("src/main/java/test/Main.java", OUT_OF_MEMORY_APP)
+        project.build("installDist")
+        val installed = project.project.resolve("build/install/svc")
+        val (exit, output) = runWithSmallHeap(installed.resolve("bin/svc"))
+        val logs = installed.resolve("logs")
+        val dumps = logs.listFiles { f -> f.name.endsWith(".hprof") }.orEmpty()
+        fun mode(file: File) = PosixFilePermissions.toString(Files.getPosixFilePermissions(file.toPath()))
+        assertAll(
+            { assertEquals(OUT_OF_MEMORY_EXIT, exit, output) },
+            { assertEquals(1, dumps.size, output) },
+            { assertEquals("rwxr-x---", mode(logs)) },
+            { assertEquals("rw-------", mode(dumps.single())) },
+        )
+    }
+
+    private fun runWithSmallHeap(launcher: File): Pair<Int, String> {
+        val process = ProcessBuilder(launcher.absolutePath, "run")
+            .redirectErrorStream(true)
+            .apply { environment()["APP_JAVA_OPTS"] = "-Xmx16m" }
+            .start()
+        val output = process.inputStream.bufferedReader().readText()
+        return process.waitFor() to output
+    }
+
+    @Test
     fun `aiSkills writes the skills and hooks for Copilot and Devin into the project`() {
         val project = javaService(tmp)
         project.file(".agents/skills/our-own/SKILL.md", "ours")
@@ -136,6 +164,17 @@ class JavaAppPluginTest {
         HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(Files.readAllBytes(file.toPath())))
 
     private companion object {
+        /** What HotSpot exits with under -XX:+ExitOnOutOfMemoryError. */
+        const val OUT_OF_MEMORY_EXIT = 3
+        const val OUT_OF_MEMORY_APP = """
+            package test;
+            public class Main {
+                public static void main(String[] args) {
+                    java.util.List<byte[]> held = new java.util.ArrayList<>();
+                    while (true) held.add(new byte[1 << 20]);
+                }
+            }
+            """
         val LAYOUT =
             listOf(
                 "bin/svc",

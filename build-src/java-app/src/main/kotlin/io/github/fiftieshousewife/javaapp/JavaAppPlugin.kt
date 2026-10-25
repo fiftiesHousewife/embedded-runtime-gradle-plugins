@@ -70,11 +70,22 @@ constructor(
         val application = project.extensions.getByType(JavaApplication::class.java)
         project.tasks.named("startScripts", CreateStartScripts::class.java) {
             val locked = extension.runtimeOptions.get() == RuntimeOptions.LOCKED
-            unixStartScriptGenerator = EmbeddedRuntimeScriptGenerator(windows = false, lockedOptions = locked)
-            windowsStartScriptGenerator = EmbeddedRuntimeScriptGenerator(windows = true, lockedOptions = locked)
-            defaultJvmOpts = application.applicationDefaultJvmArgs + extension.jvmArgs.get()
+            val defaults = runtimeDefaults(extension.runtimeDefaults)
+            val projectOptions = application.applicationDefaultJvmArgs.toList() + extension.jvmArgs.get()
+            unixStartScriptGenerator = EmbeddedRuntimeScriptGenerator(false, locked, defaults.logDirFiles)
+            windowsStartScriptGenerator = EmbeddedRuntimeScriptGenerator(true, locked, defaults.logDirFiles)
+            defaultJvmOpts = JavaRuntimeDefaults.fixedOptions(defaults, projectOptions) + projectOptions
         }
     }
+
+    private fun runtimeDefaults(defaults: JavaRuntimeDefaults) = JavaRuntimeDefaults.Settings(
+        enabled = defaults.enabled.get(),
+        maxRamPercentage = defaults.maxRamPercentage.get(),
+        exitOnOutOfMemory = defaults.exitOnOutOfMemory.get(),
+        heapDumpOnOutOfMemory = defaults.heapDumpOnOutOfMemory.get(),
+        garbageCollector = defaults.garbageCollector.orNull,
+        disableAttach = defaults.disableAttach.get(),
+    )
 
     companion object {
         val ECOSYSTEM =

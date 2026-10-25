@@ -33,7 +33,15 @@ javaApp {                                       // nodeApp {} has the same first
     runtimeOverlay = file("src/deploy/runtime") // copied over the runtime as it is
     security { … }                              // see Hardening the runtime
     jlinkOptions = listOf("--strip-debug", "--no-man-pages", "--no-header-files", "--compress=zip-6")
-    jvmArgs = listOf("-XX:MaxRAMPercentage=75") // before $APP_JAVA_OPTS
+    runtimeDefaults {                           // production JVM options, ahead of jvmArgs
+        enabled = true
+        maxRamPercentage = 75
+        exitOnOutOfMemory = true
+        heapDumpOnOutOfMemory = true            // dumps and hs_err files in $APP_LOG_DIR
+        garbageCollector = "G1"                 // default unset: the JVM chooses
+        disableAttach = false
+    }
+    jvmArgs = listOf("-Xss512k")                // after runtimeDefaults, before $APP_JAVA_OPTS
 }
 
 nodeApp {

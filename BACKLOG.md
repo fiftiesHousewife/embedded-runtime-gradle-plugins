@@ -49,8 +49,8 @@ and `./gradlew aiSkills` to install them in a project. Prompt files were dropped
   and version from it builds and smoke-tests. Run `./gradlew publishToMavenCentral
   -PreleaseVersion=1.0.0` (needs `mavenCentralUsername`/`mavenCentralPassword`). The Gradle Plugin
   Portal is optional on top (`publishPlugins`, its own key, manual review).
-- Proposals awaiting a decision: Jib (the roadmap recommends leaving it out), SLSA provenance
-  (roadmap: High), CDS/AOT cache opt-in (roadmap: Medium).
+- The High items in ROADMAP.md: JVM production defaults, runtime end-of-life tracking, Sigstore
+  signing and SLSA provenance, the container image. In progress.
 - Article: the "HUFs" anecdote is unsourced; "Try it" uses version 1.0.0, which is not published.
 - Gradle deprecation warnings in this repository's own build: detekt 2.0.0-alpha.6 removed the
   only one due in Gradle 10 (`ReportingExtension.file`). `Configuration.setVisible`, due in Gradle 11,

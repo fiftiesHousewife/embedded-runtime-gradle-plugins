@@ -19,5 +19,4 @@ dependencies {
 
 javaApp {
     javaVersion = 21
-    jvmArgs = listOf("-XX:MaxRAMPercentage=75")
 }

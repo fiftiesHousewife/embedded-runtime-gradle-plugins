@@ -43,11 +43,11 @@ Report what dominates, with the numbers.
 
 ## 4. Change one thing
 
-| Finding | Change in `javaApp { jvmArgs }` |
+| Finding | Change in `javaApp {}` |
 |---|---|
-| Heap near its limit, frequent GC | `-XX:MaxRAMPercentage=75` |
-| Serial GC in use (under 2 CPUs or ~1.8 GB) | more CPUs for the container, or `-XX:+UseG1GC` / `-XX:+UseParallelGC` (throughput) / `-XX:+UseZGC` (latency) |
-| Startup dominated by class loading | `-XX:+AutoCreateSharedArchive -XX:SharedArchiveFile=$APP_DATA_DIR/app.jsa` |
+| Heap near its limit, frequent GC | `runtimeDefaults { maxRamPercentage = 85 }` (75 by default) |
+| Serial GC in use (under 2 CPUs or ~1.8 GB) | more CPUs for the container, or `runtimeDefaults { garbageCollector = "G1" }` / `"Parallel"` (throughput) / `"Z"` (latency) |
+| Startup dominated by class loading | `jvmArgs += listOf("-XX:+AutoCreateSharedArchive", "-XX:SharedArchiveFile=/var/lib/<app>/app.jsa")` (a full path: `jvmArgs` are not expanded) |
 | A few classes dominate allocation, or one lock dominates contention | a code change, not a flag |
 
 ## 5. Prove it

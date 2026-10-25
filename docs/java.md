@@ -117,13 +117,41 @@ its own TLS provider or trust manager, or open sockets. `forbiddenLibraries` clo
 those doors; the rest belongs at the network boundary. See the article's section on corporate
 control.
 
+## Production JVM defaults
+
+The JVM's own defaults suit few services: a quarter of the memory for the heap, the Serial
+collector on a machine or container with fewer than 2 CPUs or under about 1.8 GB, and heap dumps,
+when switched on, in whatever directory the app started in. Every launcher therefore starts the
+JVM with production defaults, ahead of the project's `jvmArgs`, so any of them can be overridden:
+
+```kotlin
+javaApp {
+    runtimeDefaults {
+        maxRamPercentage = 75        // -XX:MaxRAMPercentage
+        exitOnOutOfMemory = true     // -XX:+ExitOnOutOfMemoryError: a supervisor restarts the app
+        heapDumpOnOutOfMemory = true // a heap dump and hs_err crash logs in $APP_LOG_DIR
+        garbageCollector = "G1"      // G1, Parallel, Serial or Z; unset (the default) lets the JVM choose
+        disableAttach = false        // true refuses jcmd, jstack and agents at runtime
+        enabled = true               // false: the JVM's own defaults
+    }
+}
+```
+
+The launcher creates `$APP_LOG_DIR` with mode 750 when it is missing, and the JVM writes heap dumps
+readable by the app's user only, since they hold whatever was in memory: tokens, passwords,
+personal data. On `OutOfMemoryError` the app writes its dump and exits with code 3. The collector is
+unset by default because an operator who chooses one in `APP_JAVA_OPTS` would otherwise stop the
+JVM from starting (two collectors conflict); the build refuses one in both `garbageCollector` and
+`jvmArgs` for the same reason.
+
 ## Runtime options
 
 `runtimeOptions("locked")` (or `-PjavaApp.runtimeOptions=locked`) makes the launcher refuse to start
 while anything would add JVM options the build did not fix: `APP_JAVA_OPTS`, `JAVA_TOOL_OPTIONS`,
 `JDK_JAVA_OPTIONS`, `_JAVA_OPTIONS`, or a `jvm.options` file in the configuration directory. The
 default, `open`, adds `$APP_CONF_DIR/jvm.options` (a JVM argument file) and then `$APP_JAVA_OPTS`
-after the build's `jvmArgs`.
+after the build's `jvmArgs`. Both the build's `jvmArgs` and `jvm.options` are taken literally: a
+`$VARIABLE` in them is not expanded, so give paths in full.
 
 ## Choosing a JDK
 

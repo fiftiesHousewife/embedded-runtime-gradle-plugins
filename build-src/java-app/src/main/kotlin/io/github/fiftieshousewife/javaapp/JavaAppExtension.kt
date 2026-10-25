@@ -31,8 +31,14 @@ abstract class JavaAppExtension : AppExtension() {
     /** Extra `jlink` options; defaults strip debug info, man pages and headers. */
     abstract val jlinkOptions: ListProperty<String>
 
-    /** Fixed JVM options baked into the launcher, before `$APP_JAVA_OPTS`. */
+    /** Fixed JVM options baked into the launcher, after [runtimeDefaults] and before `$APP_JAVA_OPTS`. */
     abstract val jvmArgs: ListProperty<String>
+
+    /** Production JVM options: heap share, exit and dump on out-of-memory, collector; see [JavaRuntimeDefaults]. */
+    @get:Nested
+    abstract val runtimeDefaults: JavaRuntimeDefaults
+
+    fun runtimeDefaults(action: Action<JavaRuntimeDefaults>) = action.execute(runtimeDefaults)
 
     /**
      * Files copied over every runtime after [security] is applied, by path: anything the plugin does

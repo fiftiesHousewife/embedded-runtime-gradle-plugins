@@ -16,7 +16,7 @@ installs this machine's app with its runtime, and the custom installer is gone.
 
 | Item | Notes |
 |---|---|
-| **Docker sample: a real run** | `samples/docker-service` builds the image and smoke-tests the container, skipping cleanly without a Linux Docker daemon (verified). Its container run is unverified until CI's Ubuntu job runs it, or colima is started locally |
+| **Docker sample: a real run** | `samples/docker-service` builds the image and smoke-tests the container, skipping cleanly without a Linux Docker daemon (verified). CI's Linux job now passes `-PdockerRequired=true`, so it fails rather than skips without Docker: the first green Ubuntu run after commit 2026-10-25 "Require Docker" proves the container runs. Close this item once that run is green |
 
 
 ## AI tooling

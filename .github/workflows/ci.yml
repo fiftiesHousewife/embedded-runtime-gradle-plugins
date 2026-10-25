@@ -41,7 +41,11 @@ jobs:
       - run: ./gradlew -p samples/node-service build
       - run: ./gradlew -p samples/spring-boot-service build
       # Builds and runs the container image where Docker runs Linux containers; skipped elsewhere.
-      - run: ./gradlew -p samples/docker-service build
+      # On Linux it is required, so a green run proves the container started and passed its healthcheck.
+      - if: runner.os != 'Linux'
+        run: ./gradlew -p samples/docker-service build
+      - if: runner.os == 'Linux'
+        run: ./gradlew -p samples/docker-service build -PdockerRequired=true
       # The post-edit hook shared by Claude Code, Copilot and Devin, called as each calls it.
       - if: runner.os == 'Linux'
         run: .github/scripts/test-agent-hooks.sh

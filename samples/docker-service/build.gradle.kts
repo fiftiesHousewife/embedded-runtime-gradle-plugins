@@ -19,13 +19,17 @@ javaApp {
 
 // Builds the container image from appDockerContext and proves it: the container starts and its own
 // healthcheck passes. Skipped, not failed, unless a Docker daemon running Linux containers is
-// reachable (GitHub's Windows runners run Windows containers).
+// reachable (GitHub's Windows runners run Windows containers). -PdockerRequired=true runs them
+// regardless, so a missing daemon fails the build: CI's Linux job uses it to prove the image runs.
 val image = "docker-service:$version"
+val dockerRequired = providers.gradleProperty("dockerRequired").map(String::toBoolean).orElse(false)
 val dockerRunning =
-    providers.exec {
-        commandLine("docker", "info", "--format", "{{.OSType}}")
-        isIgnoreExitValue = true
-    }.standardOutput.asText.map { it.trim() == "linux" }
+    dockerRequired.zip(
+        providers.exec {
+            commandLine("docker", "info", "--format", "{{.OSType}}")
+            isIgnoreExitValue = true
+        }.standardOutput.asText,
+    ) { required, osType -> required || osType.trim() == "linux" }
 
 val dockerImage =
     tasks.register<Exec>("dockerImage") {
@@ -35,7 +39,7 @@ val dockerImage =
         inputs.dir(context)
         commandLine("docker", "build", "--tag", image, context.get().path)
         val running = dockerRunning // a local: the configuration cache can't hold the build script
-        onlyIf("a Docker daemon running Linux containers is reachable") { running.get() }
+        onlyIf("a Docker daemon running Linux containers is reachable, or dockerRequired is set") { running.get() }
     }
 
 val dockerSmokeTest =
@@ -45,7 +49,7 @@ val dockerSmokeTest =
         dependsOn(dockerImage)
         commandLine("sh", "src/docker/smoke-test.sh", image)
         val running = dockerRunning // a local: the configuration cache can't hold the build script
-        onlyIf("a Docker daemon running Linux containers is reachable") { running.get() }
+        onlyIf("a Docker daemon running Linux containers is reachable, or dockerRequired is set") { running.get() }
     }
 
 tasks.named("check") { dependsOn(dockerSmokeTest) }

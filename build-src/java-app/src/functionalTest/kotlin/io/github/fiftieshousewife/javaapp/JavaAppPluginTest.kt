@@ -54,6 +54,25 @@ class JavaAppPluginTest {
     }
 
     @Test
+    fun `the launchers come from Gradle's own startScripts, and a build's own generator still wins`() {
+        val own =
+            """
+            tasks.startScripts {
+                unixStartScriptGenerator = org.gradle.jvm.application.scripts.ScriptGenerator { _, out ->
+                    out.write("#!/bin/sh\necho custom\n")
+                }
+            }
+            """.trimIndent()
+        val project = javaService(tmp, JavaServiceOptions(build = own))
+        val result = project.build("appArchive")
+        val launcher = project.project.resolve("build/app/${TestProject.hostTarget()}/svc-2.0.0/bin/svc").readText()
+        assertAll(
+            { assertEquals(TaskOutcome.SUCCESS, result.task(":startScripts")?.outcome) },
+            { assertEquals("#!/bin/sh\necho custom\n", launcher) },
+        )
+    }
+
+    @Test
     fun `a JDK with read-only files is extracted again and keeps its exec bits`() {
         val project = javaService(tmp)
         project.build("appArchive")

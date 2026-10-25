@@ -3,12 +3,15 @@ package io.github.fiftieshousewife.javaapp
 import io.github.fiftieshousewife.appcore.AppServices
 import io.github.fiftieshousewife.appcore.AppWiring
 import io.github.fiftieshousewife.appcore.Ecosystem
+import io.github.fiftieshousewife.appcore.RuntimeOptions
 import io.github.fiftieshousewife.appcore.tasks.AppSmokeTest
 import io.github.fiftieshousewife.javaapp.tasks.JdepsModules
 import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.gradle.api.component.SoftwareComponentFactory
 import org.gradle.api.file.ArchiveOperations
+import org.gradle.api.plugins.JavaApplication
+import org.gradle.jvm.application.tasks.CreateStartScripts
 import javax.inject.Inject
 
 /**
@@ -43,6 +46,7 @@ constructor(
         // The archive replaces the application plugin's script-based distributions; keeping both
         // would publish two different ways to run the same app. installDist remains available.
         listOf("distTar", "distZip").forEach { name -> project.tasks.named(name) { enabled = false } }
+        useEmbeddedRuntimeScripts(project, extension)
 
         // Targets and the JDK release are final once the build script has run; the JDK tasks
         // are registered then, before the shared pipeline asks for each target's contribution.
@@ -55,6 +59,20 @@ constructor(
         wiring.register { target -> ecosystem.spec(runtimeTasks.customise(target, runtimeTasks.jlink(target))) }
         project.tasks.named("appSmokeTest", AppSmokeTest::class.java) {
             failureHint.set("If the app is missing a JDK module, ./gradlew jlinkFindModules finds which.")
+        }
+    }
+
+    /**
+     * Configured when the task is created, after the build script has run, so a build's own
+     * `tasks.startScripts { … }` still wins and `runtimeOptions` is final.
+     */
+    private fun useEmbeddedRuntimeScripts(project: Project, extension: JavaAppExtension) {
+        val application = project.extensions.getByType(JavaApplication::class.java)
+        project.tasks.named("startScripts", CreateStartScripts::class.java) {
+            val locked = extension.runtimeOptions.get() == RuntimeOptions.LOCKED
+            unixStartScriptGenerator = EmbeddedRuntimeScriptGenerator(windows = false, lockedOptions = locked)
+            windowsStartScriptGenerator = EmbeddedRuntimeScriptGenerator(windows = true, lockedOptions = locked)
+            defaultJvmOpts = application.applicationDefaultJvmArgs + extension.jvmArgs.get()
         }
     }
 

@@ -8,13 +8,7 @@ import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.OutputDirectory
 import org.gradle.api.tasks.TaskAction
 
-/**
- * Writes `bin/<app>` (POSIX `sh`) or `bin/<app>.bat` (Windows) from templates in the plugin jar.
- * `.bat` rather than `.cmd` is the extension Gradle's own `startScripts` produces.
- *
- * Line endings are fixed here (LF for sh, CRLF for bat) so the launcher is correct whatever the
- * developer's `core.autocrlf` setting — a CRLF shell launcher fails with `/bin/sh^M: bad interpreter`.
- */
+/** Writes Node's `bin/<app>` or `bin/<app>.bat` from [LauncherTemplate]; Java's come from `startScripts`. */
 @CacheableTask
 abstract class GenerateLaunchers : DefaultTask() {
     @get:Input abstract val appName: Property<String>
@@ -37,36 +31,12 @@ abstract class GenerateLaunchers : DefaultTask() {
         val out = outputDir.get().asFile
         out.listFiles()?.forEach { it.deleteRecursively() }
         val name = appName.get()
-
-        if (windows.get()) {
-            val text =
-                template("launcher.bat")
-                    .replace("@APP_NAME@", name)
-                    .replace("@POLICY@", if (lockedOptions.get()) LockedOptions.windows() else "")
-                    .replace("@EXEC@", windowsExec.get())
-            out.resolve("$name.bat").writeText(text.lines().joinToString("\r\n"))
-        } else {
-            val text =
-                template("launcher.sh")
-                    .replace("@APP_NAME@", name)
-                    .replace("@POLICY@", if (lockedOptions.get()) LockedOptions.posix() else "")
-                    .replace("@EXEC@", posixExec.get())
-            out.resolve(name).apply {
-                writeText(text.replace("\r\n", "\n"))
-                setExecutable(true, false)
-            }
+        val windows = windows.get()
+        val exec = if (windows) windowsExec.get() else posixExec.get()
+        val text = LauncherTemplate.render(windows, name, lockedOptions.get(), exec)
+        out.resolve(if (windows) "$name.bat" else name).apply {
+            writeText(text)
+            setExecutable(true, false)
         }
-    }
-
-    private fun template(name: String): String =
-        GenerateLaunchers::class.java.getResource("/io/github/fiftieshousewife/appcore/launcher/$name")?.readText()
-            ?: error("Launcher template $name missing from plugin jar")
-
-    companion object {
-        /** Quotes a value for a POSIX shell word. */
-        fun shQuote(value: String) = "'" + value.replace("'", "'\"'\"'") + "'"
-
-        /** Quotes a value for a Windows batch argument. */
-        fun cmdQuote(value: String) = "\"" + value.replace("\"", "\"\"") + "\""
     }
 }

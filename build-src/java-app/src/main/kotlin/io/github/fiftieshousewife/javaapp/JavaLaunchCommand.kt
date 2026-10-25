@@ -1,7 +1,7 @@
 package io.github.fiftieshousewife.javaapp
 
-import io.github.fiftieshousewife.appcore.tasks.GenerateLaunchers.Companion.cmdQuote
-import io.github.fiftieshousewife.appcore.tasks.GenerateLaunchers.Companion.shQuote
+import io.github.fiftieshousewife.appcore.tasks.LauncherTemplate.cmdQuote
+import io.github.fiftieshousewife.appcore.tasks.LauncherTemplate.shQuote
 
 /** What the launcher starts: the main class, the app's own jar, and the fixed JVM options. */
 internal data class JavaLaunch(val mainClass: String, val appJar: String, val jvmArgs: List<String>)

@@ -4,17 +4,17 @@ import org.junit.jupiter.api.Assertions.assertAll
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 
-class GenerateLaunchersQuotingTest {
+class LauncherQuotingTest {
     @Test
     fun `quotes a value as one POSIX shell word, single quotes included`() {
         assertAll(
-            { assertEquals("'-Xmx1g'", GenerateLaunchers.shQuote("-Xmx1g")) },
-            { assertEquals("'it'\"'\"'s'", GenerateLaunchers.shQuote("it's")) },
+            { assertEquals("'-Xmx1g'", LauncherTemplate.shQuote("-Xmx1g")) },
+            { assertEquals("'it'\"'\"'s'", LauncherTemplate.shQuote("it's")) },
         )
     }
 
     @Test
     fun `quotes a value as one batch argument, double quotes doubled`() {
-        assertEquals("\"say \"\"hi\"\"\"", GenerateLaunchers.cmdQuote("say \"hi\""))
+        assertEquals("\"say \"\"hi\"\"\"", LauncherTemplate.cmdQuote("say \"hi\""))
     }
 }

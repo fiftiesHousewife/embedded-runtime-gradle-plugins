@@ -2,6 +2,7 @@ package io.github.fiftieshousewife.nodeapp
 
 import io.github.fiftieshousewife.appcore.AppWiring
 import io.github.fiftieshousewife.appcore.EcosystemSpec
+import io.github.fiftieshousewife.appcore.Launchers
 import io.github.fiftieshousewife.appcore.Target
 import io.github.fiftieshousewife.nodeapp.tasks.NpmProductionInstall
 import io.github.fiftieshousewife.nodeapp.tasks.VerifyNodeModules
@@ -31,8 +32,10 @@ internal class NodeTargetTasks(
         return EcosystemSpec(
             runtimeName = "nodejs",
             runtimeVersion = extension.nodeVersion,
-            posixExec = launch.map(NodeLaunchCommand::posix),
-            windowsExec = launch.map(NodeLaunchCommand::windows),
+            launchers = Launchers.Generated(
+                launch.map(NodeLaunchCommand::posix),
+                launch.map(NodeLaunchCommand::windows),
+            ),
             contents = {
                 dependsOn(npmBuild, verified)
                 into("runtime") { from(runtime) }

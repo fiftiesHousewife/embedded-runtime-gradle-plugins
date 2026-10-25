@@ -1,7 +1,7 @@
 package io.github.fiftieshousewife.nodeapp
 
-import io.github.fiftieshousewife.appcore.tasks.GenerateLaunchers.Companion.cmdQuote
-import io.github.fiftieshousewife.appcore.tasks.GenerateLaunchers.Companion.shQuote
+import io.github.fiftieshousewife.appcore.tasks.LauncherTemplate.cmdQuote
+import io.github.fiftieshousewife.appcore.tasks.LauncherTemplate.shQuote
 
 /** What the launcher starts: the script under `app/` and the fixed Node options. */
 internal data class NodeLaunch(val entryPoint: String, val nodeArgs: List<String>)

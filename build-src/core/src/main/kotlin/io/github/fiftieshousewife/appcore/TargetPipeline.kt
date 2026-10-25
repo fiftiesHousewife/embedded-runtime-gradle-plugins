@@ -40,7 +40,8 @@ internal class TargetPipeline(private val project: Project, private val wiring: 
 
     /** The generated pieces every target's directory holds besides the ecosystem's own content. */
     private class Parts(
-        val launchers: TaskProvider<GenerateLaunchers>,
+        /** A task or file tree: whatever `bin/` is copied from. */
+        val launchers: Any,
         val manifest: TaskProvider<GenerateAppManifest>,
         val sbom: TaskProvider<GenerateSbom>,
     )
@@ -94,17 +95,25 @@ internal class TargetPipeline(private val project: Project, private val wiring: 
             resultFile.set(workDir.map { it.file("policy/${target.id}.txt") })
         }
 
-    private fun registerLaunchers(target: Target, spec: EcosystemSpec) =
-        tasks.register("appLaunchers${target.taskSuffix}", GenerateLaunchers::class.java) {
-            group = taskGroup
-            description = "Generates the bin/ launcher for ${target.id}"
-            appName.set(this@TargetPipeline.appName)
-            windows.set(target.isWindows)
-            posixExec.set(spec.posixExec)
-            windowsExec.set(spec.windowsExec)
-            lockedOptions.set(extension.runtimeOptions.map { it == RuntimeOptions.LOCKED })
-            outputDir.set(workDir.map { it.dir("launchers/${target.id}") })
-        }
+    /** This target's `bin/`: its own script from `startScripts`, or one generated for it. */
+    private fun registerLaunchers(target: Target, spec: EcosystemSpec): Any = when (val launchers = spec.launchers) {
+        is Launchers.StartScripts ->
+            project.files(launchers.task).asFileTree.matching {
+                if (target.isWindows) include("*.bat") else exclude("*.bat")
+            }
+
+        is Launchers.Generated ->
+            tasks.register("appLaunchers${target.taskSuffix}", GenerateLaunchers::class.java) {
+                group = taskGroup
+                description = "Generates the bin/ launcher for ${target.id}"
+                appName.set(this@TargetPipeline.appName)
+                windows.set(target.isWindows)
+                posixExec.set(launchers.posixExec)
+                windowsExec.set(launchers.windowsExec)
+                lockedOptions.set(extension.runtimeOptions.map { it == RuntimeOptions.LOCKED })
+                outputDir.set(workDir.map { it.dir("launchers/${target.id}") })
+            }
+    }
 
     private fun registerManifest(target: Target, spec: EcosystemSpec) =
         tasks.register("appManifest${target.taskSuffix}", GenerateAppManifest::class.java) {

@@ -1,11 +1,11 @@
 package io.github.fiftieshousewife.javaapp
 
 import io.github.fiftieshousewife.appcore.EcosystemSpec
+import io.github.fiftieshousewife.appcore.Launchers
 import io.github.fiftieshousewife.javaapp.tasks.CustomiseRuntime
 import org.gradle.api.Project
 import org.gradle.api.artifacts.component.ModuleComponentIdentifier
 import org.gradle.api.artifacts.result.ResolvedArtifactResult
-import org.gradle.api.plugins.JavaApplication
 import org.gradle.api.tasks.TaskProvider
 import org.gradle.api.tasks.bundling.Jar
 
@@ -18,30 +18,22 @@ internal class JavaEcosystem(private val project: Project, private val extension
     private val runtimeClasspath = project.configurations.named("runtimeClasspath")
     private val resolvedArtifacts = runtimeClasspath.flatMap { it.incoming.artifacts.resolvedArtifacts }
 
-    fun spec(runtime: TaskProvider<CustomiseRuntime>): EcosystemSpec {
-        val mainClass = project.extensions.getByType(JavaApplication::class.java).mainClass
-        val launch =
-            mainClass
-                .zip(jar.flatMap { it.archiveFileName }) { main, appJar -> main to appJar }
-                .zip(extension.jvmArgs) { (main, appJar), jvmArgs -> JavaLaunch(main, appJar, jvmArgs) }
-        return EcosystemSpec(
-            runtimeName = JdkSources.from(project.providers).distribution.id,
-            runtimeVersion = extension.jdkVersion,
-            posixExec = launch.map(JavaLaunchCommand::posix),
-            windowsExec = launch.map(JavaLaunchCommand::windows),
-            contents = {
-                into("runtime") { from(runtime) }
-                into("lib") {
-                    from(jar)
-                    from(runtimeClasspath)
-                }
-            },
-            sbom = {
-                mavenComponents.set(resolvedArtifacts.map { artifacts -> artifacts.mapNotNull(::coordinates) })
-                mavenFiles.from(resolvedArtifacts.map { artifacts -> artifacts.map { it.file } })
-            },
-        )
-    }
+    fun spec(runtime: TaskProvider<CustomiseRuntime>): EcosystemSpec = EcosystemSpec(
+        runtimeName = JdkSources.from(project.providers).distribution.id,
+        runtimeVersion = extension.jdkVersion,
+        launchers = Launchers.StartScripts(project.tasks.named("startScripts")),
+        contents = {
+            into("runtime") { from(runtime) }
+            into("lib") {
+                from(jar)
+                from(runtimeClasspath)
+            }
+        },
+        sbom = {
+            mavenComponents.set(resolvedArtifacts.map { artifacts -> artifacts.mapNotNull(::coordinates) })
+            mavenFiles.from(resolvedArtifacts.map { artifacts -> artifacts.map { it.file } })
+        },
+    )
 
     /** `group:module:version:fileName` for an artifact from a repository; null for a project or file. */
     private fun coordinates(artifact: ResolvedArtifactResult): String? =

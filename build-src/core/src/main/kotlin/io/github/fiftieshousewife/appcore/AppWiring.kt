@@ -39,12 +39,21 @@ data class Ecosystem(
 /** The Gradle services a plugin is injected with and the shared pipeline needs. */
 data class AppServices(val archives: ArchiveOperations, val components: SoftwareComponentFactory)
 
+/** Where an ecosystem's launchers come from. */
+sealed interface Launchers {
+    /** Rendered by [GenerateLaunchers] from these start lines (Node). */
+    data class Generated(val posixExec: Provider<String>, val windowsExec: Provider<String>) : Launchers
+
+    /** Gradle's own `startScripts` task, which writes both scripts; each target takes its own (Java). */
+    data class StartScripts(val task: TaskProvider<out Task>) : Launchers
+}
+
 /** What an ecosystem plugin contributes to the shared archive pipeline for one target. */
 data class EcosystemSpec(
     val runtimeName: String,
     val runtimeVersion: Provider<String>,
-    val posixExec: Provider<String>,
-    val windowsExec: Provider<String>,
+    /** Where `bin/` comes from for a target. */
+    val launchers: Launchers,
     /** Adds the ecosystem's own content (`runtime/`, plus `lib/` or `app/`) to the assembled directory. */
     val contents: Sync.() -> Unit,
     /** Feeds library components into the SBOM task. */

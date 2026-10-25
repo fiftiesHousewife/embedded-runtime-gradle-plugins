@@ -35,7 +35,7 @@ class JavaAppSecurityTest {
         val result = project.build("build")
         val runtime = project.project.resolve("build/app/${TestProject.hostTarget()}/svc-2.0.0/runtime")
         val seen = probe(runtime)
-        val trusted = Regex("""trusted=(\d+)""").find(seen)!!.groupValues[1].toInt()
+        val trusted = checkNotNull(Regex("""trusted=(\d+)""").find(seen)) { seen }.groupValues[1].toInt()
         assertAll(
             { assertEquals(TaskOutcome.SUCCESS, result.task(":appSmokeTest")?.outcome) },
             { assertTrue(seen.contains("ttl=30"), seen) },

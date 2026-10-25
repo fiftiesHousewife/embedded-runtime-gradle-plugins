@@ -12,13 +12,6 @@ Done on 2026-10-25 ([plans/gradle-distributions.md](plans/gradle-distributions.m
 come from Gradle's own `startScripts`, every target is a Gradle distribution, plain `installDist`
 installs this machine's app with its runtime, and the custom installer is gone.
 
-## Samples
-
-| Item | Notes |
-|---|---|
-| **Docker sample: a real run** | `samples/docker-service` builds the image and smoke-tests the container, skipping cleanly without a Linux Docker daemon (verified). CI's Linux job now passes `-PdockerRequired=true`, so it fails rather than skips without Docker: the first green Ubuntu run after commit 2026-10-25 "Require Docker" proves the container runs. Close this item once that run is green |
-
-
 ## AI tooling
 
 Done 2026-10-25: everything in `ai/` (see `ai/README.md`): skills in the open Agent Skills format
@@ -54,6 +47,8 @@ and `./gradlew aiSkills` to install them in a project. Prompt files were dropped
 - Publishing to Maven Central and the Gradle Plugin Portal (needs the owner's credentials).
 - Proposals awaiting a decision: Jib, SLSA provenance, CDS/AOT cache opt-in.
 - Article: the "HUFs" anecdote is unsourced; "Try it" uses version 1.0.0, which is not published.
-- Gradle deprecation warnings from third-party build plugins (`ReportingExtension.file`,
-  `Configuration.setVisible`), affecting only this repository's own build.
+- Gradle deprecation warnings in this repository's own build: detekt 2.0.0-alpha.6 removed the
+  only one due in Gradle 10 (`ReportingExtension.file`). `Configuration.setVisible`, due in Gradle 11,
+  is still called by Dokka (2.2.0 and 2.3.0-Beta) and detekt 2's alpha; bump them when fixed
+  releases ship, and move detekt to 2.0.0 final when it is out.
 - Stale `~/.m2/repository/io/github/fiftieshousewife/platform*` folders on the owner's machine.

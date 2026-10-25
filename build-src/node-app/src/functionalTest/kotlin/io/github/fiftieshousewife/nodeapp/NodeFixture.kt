@@ -49,12 +49,12 @@ object NodeFixture {
                 ?.parentFile
         val npm = listOfNotNull(besideNode, onPath).firstOrNull { it.resolve("package.json").isFile }
         assumeTrue(npm != null, "no npm package found beside $node or on PATH")
-        return npm!!
+        return checkNotNull(npm)
     }
 
     private fun nodeExecutable(): String = onPath("node")?.absolutePath.also {
         assumeTrue(it != null, "node is not on PATH")
-    }!!
+    }.let(::checkNotNull)
 
     private fun onPath(name: String): File? = System
         .getenv("PATH")

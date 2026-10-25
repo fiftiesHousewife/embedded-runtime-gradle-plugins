@@ -14,7 +14,7 @@ object JdkTools {
 
     /** `JAVA_VERSION` from the home's `release` file, e.g. `21.0.13`. */
     fun javaVersion(home: File): String? = Properties()
-        .apply { home.resolve("release").inputStream().use(::load) }
+        .apply { Files.newInputStream(home.resolve("release").toPath()).use(::load) }
         .getProperty("JAVA_VERSION")
         ?.trim('"')
 

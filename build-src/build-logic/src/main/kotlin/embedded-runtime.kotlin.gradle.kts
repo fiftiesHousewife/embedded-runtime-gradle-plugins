@@ -1,5 +1,5 @@
 import com.github.benmanes.gradle.versions.updates.DependencyUpdatesTask
-import io.gitlab.arturbosch.detekt.Detekt
+import dev.detekt.gradle.Detekt
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 // Every published module: compiled for the JVM Gradle runs on, checked by ktlint and detekt, and
@@ -9,7 +9,7 @@ plugins {
     `maven-publish`
     signing
     id("com.diffplug.spotless")
-    id("io.gitlab.arturbosch.detekt")
+    id("dev.detekt")
     id("io.github.ben-manes.versions")
     id("de.thetaphi.forbiddenapis")
     id("org.jetbrains.dokka")
@@ -96,6 +96,11 @@ detekt {
         files("src/main/kotlin", "src/test/kotlin", "src/testFixtures/kotlin", "src/functionalTest/kotlin")
             .filter { it.isDirectory },
     )
+}
+// detekt 2 runs the rules that need type resolution (LongParameterList, ForbiddenMethodCall, …) only
+// in its per-source-set tasks (detektMain, detektTest, …), so check runs those, not just `detekt`.
+tasks.named("check") {
+    dependsOn(tasks.withType<Detekt>().matching { it.name != "detekt" && !it.name.endsWith("SourceSet") })
 }
 tasks.withType<Detekt>().configureEach {
     jvmTarget = gradleMinimumJvm.toString()

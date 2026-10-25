@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.io.File
+import java.nio.file.Files
 import java.util.Properties
 
 /** An organisation's runtime policy, set per machine, applied over every project and enforced. */
@@ -35,7 +36,7 @@ class RuntimePolicyTest {
         project.build("appArchive", policyProperty)
         val runtime = project.project.resolve("build/app/${TestProject.hostTarget()}/svc-2.0.0/runtime")
         val effective = Properties().apply {
-            runtime.resolve("conf/security/java.security").inputStream().use(::load)
+            Files.newInputStream(runtime.resolve("conf/security/java.security").toPath()).use(::load)
         }
         val record = runtime.resolve("conf/security/java-app-customisations.txt").readText()
         assertAll(

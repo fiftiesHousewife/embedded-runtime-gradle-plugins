@@ -3,6 +3,7 @@ package io.github.fiftieshousewife.appcore
 import org.cyclonedx.model.Component
 import org.cyclonedx.parsers.JsonParser
 import java.io.File
+import java.nio.file.Files
 import java.security.KeyStore
 import java.security.MessageDigest
 import java.security.cert.CertificateFactory
@@ -31,7 +32,7 @@ object RuntimePolicyCheck {
         val launchers = app.resolve("bin").listFiles().orEmpty().filter(File::isFile).map(File::readText)
         val ecosystem = when {
             security.isFile -> {
-                val effective = Properties().apply { security.inputStream().use(::load) }
+                val effective = Properties().apply { Files.newInputStream(security.toPath()).use(::load) }
                 properties(policy, effective) + modules(policy, runtime) + trust(policy, runtime) +
                     forbiddenArgs(policy.forbiddenJvmArgs, starts(launchers, JAVA_STARTS), "JVM", "javaApp.jvmArgs")
             }
@@ -77,7 +78,7 @@ object RuntimePolicyCheck {
         }
         val factory = CertificateFactory.getInstance("X.509")
         return policy.certificates.flatMap { file ->
-            file.inputStream().use(factory::generateCertificates).filterIsInstance<X509Certificate>()
+            Files.newInputStream(file.toPath()).use(factory::generateCertificates).filterIsInstance<X509Certificate>()
                 .filterNot { fingerprint(it) in trusted }
                 .map { "cacerts does not trust ${it.subjectX500Principal.name} (${file.name})" }
         }
@@ -122,9 +123,11 @@ private object NodePolicyCheck {
         val bundle = app.resolve(CA_BUNDLE)
         if (!bundle.isFile) return listOf("the app has no $CA_BUNDLE holding the policy's certificates")
         val factory = CertificateFactory.getInstance("X.509")
-        val trusted = bundle.inputStream().use(factory::generateCertificates).map(::fingerprint).toSet()
+        val trusted = Files.newInputStream(
+            bundle.toPath(),
+        ).use(factory::generateCertificates).map(::fingerprint).toSet()
         val missing = policy.certificates.flatMap { file ->
-            file.inputStream().use(factory::generateCertificates).filterIsInstance<X509Certificate>()
+            Files.newInputStream(file.toPath()).use(factory::generateCertificates).filterIsInstance<X509Certificate>()
                 .filterNot { fingerprint(it) in trusted }
                 .map { "$CA_BUNDLE does not hold ${it.subjectX500Principal.name} (${file.name})" }
         }

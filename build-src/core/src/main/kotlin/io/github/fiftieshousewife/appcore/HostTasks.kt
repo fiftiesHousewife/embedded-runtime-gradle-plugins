@@ -9,7 +9,7 @@ import java.time.Duration
 /**
  * `appSmokeTest` and `runApp`: the tasks that use this machine's archive, once it is known.
  */
-internal class HostTasks(private val project: Project, private val wiring: AppWiring) {
+internal class HostTasks(private val project: Project, wiring: AppWiring) {
     private val extension = wiring.extension
 
     val smoke: TaskProvider<AppSmokeTest> =

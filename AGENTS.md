@@ -33,7 +33,7 @@ breaks applying both together, breaks this build.
 ## Build and test
 
 ```bash
-./gradlew check                                  # every module: ktlint, detekt, Forbidden APIs, JaCoCo, all tests
+./gradlew check                                  # every module: ktlint, detekt (with type resolution), Forbidden APIs, JaCoCo, all tests
 ./gradlew -p build-src :java-app:functionalTest  # one module's TestKit tests
 ./gradlew -p samples/java-service build          # end to end, against the real internet
 ./gradlew -p samples/java-service build -PjavaApp.jdk.distribution=zulu

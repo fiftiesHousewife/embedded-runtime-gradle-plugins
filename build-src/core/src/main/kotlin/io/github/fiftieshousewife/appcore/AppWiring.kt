@@ -136,8 +136,6 @@ class AppWiring(
             )
             .orElse("unknown")
 
-    private val appName: Provider<String> get() = extension.appName
-
     private val rpmPackages by lazy { RpmPackages(project, this) }
 
     /** The organisation's runtime policy, if one is configured; see [RuntimePolicySource]. */

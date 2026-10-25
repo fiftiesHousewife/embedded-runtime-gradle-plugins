@@ -14,6 +14,7 @@ import org.gradle.api.tasks.PathSensitive
 import org.gradle.api.tasks.PathSensitivity
 import org.gradle.api.tasks.TaskAction
 import java.io.File
+import java.nio.file.Files
 import java.security.cert.CertificateException
 import java.security.cert.CertificateFactory
 import java.security.cert.X509Certificate
@@ -62,7 +63,7 @@ constructor(
         files.filter { it.extension.lowercase() in EXTENSIONS }.sortedBy { it.name }
 
     private fun read(file: File): List<X509Certificate> = try {
-        file.inputStream().use { CertificateFactory.getInstance("X.509").generateCertificates(it) }
+        Files.newInputStream(file.toPath()).use { CertificateFactory.getInstance("X.509").generateCertificates(it) }
             .filterIsInstance<X509Certificate>()
     } catch (e: CertificateException) {
         throw GradleException("${file.name} is not a PEM or DER certificate: ${e.message}", e)

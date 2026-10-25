@@ -1,45 +1,62 @@
-# Overrides on top of detekt's defaults (`buildUponDefaultConfig = true`). The thresholds follow the
+# Overrides on top of detekt's defaults (`buildUponDefaultConfig = true`). Every rule set here is
+# switched on explicitly: detekt 2 changed which rules are active by default. The thresholds follow the
 # Clean Code plugin's standards (fiftiesHousewife/Clean-Claude), tightened where noted: small
 # methods, few parameters, low complexity and shallow nesting.
 
 complexity:
   LongMethod:
-    threshold: 30
+    active: true
+    allowedLines: 30
   LongParameterList:
+    active: true
     # At most four parameters; data classes are exempt, as their constructor IS their shape.
-    functionThreshold: 5
-    constructorThreshold: 5
+    allowedFunctionParameters: 4
+    allowedConstructorParameters: 4
     ignoreDataClasses: true
     ignoreDefaultParameters: false
   LargeClass:
-    threshold: 150
+    active: true
+    allowedLines: 150
   CyclomaticComplexMethod:
-    threshold: 10
+    active: true
+    allowedComplexity: 10
   CognitiveComplexMethod:
     active: true
-    threshold: 10
+    allowedComplexity: 10
   NestedBlockDepth:
-    threshold: 3
+    active: true
+    allowedDepth: 3
   ComplexCondition:
-    threshold: 3
+    active: true
+    allowedConditions: 3
   TooManyFunctions:
-    thresholdInFiles: 11
-    thresholdInClasses: 11
-    thresholdInObjects: 11
-    thresholdInEnums: 11
+    active: true
+    allowedFunctionsPerFile: 11
+    allowedFunctionsPerClass: 11
+    allowedFunctionsPerObject: 11
+    allowedFunctionsPerEnum: 11
   StringLiteralDuplication:
     active: true
     excludes: ['**/test/**', '**/testFixtures/**', '**/functionalTest/**']
 
 style:
+  # Gradle instantiates abstract task and extension classes and injects their abstract properties,
+  # so "could be concrete" or "could be an interface" is wrong for nearly every class here.
+  AbstractClassCanBeConcreteClass:
+    active: false
+  AbstractClassCanBeInterface:
+    active: false
   # ktlint (through Spotless) enforces the same 120 columns, so the two never disagree.
   MaxLineLength:
+    active: true
     maxLineLength: 120
   ReturnCount:
+    active: true
     # `?: return` / `if (...) return` at the top of a function is the clearest way to say
     # "not applicable", and the toolchain resolver contract is built on early `Optional.empty()`.
     excludeGuardClauses: true
   MagicNumber:
+    active: true
     excludes: ['**/test/**', '**/testFixtures/**', '**/functionalTest/**']
   ForbiddenMethodCall:
     active: true
@@ -56,7 +73,7 @@ style:
         value: 'kotlin.io.outputStream'
   ForbiddenImport:
     active: true
-    imports:
+    forbiddenImports:
       - value: 'java.io.FileInputStream'
         reason: 'use java.nio.file.Files'
       - value: 'java.io.FileOutputStream'
@@ -65,7 +82,13 @@ style:
     active: true
 
 naming:
+  # kotlin-dsl compiles Gradle's Action lambdas with SAM-with-receiver, so `tasks.register { … }`
+  # has a receiver, not an `it`; detekt's type resolution doesn't know that and reports every inner
+  # `it` as shadowing one that doesn't exist.
+  NoNameShadowing:
+    active: false
   FunctionNaming:
+    active: true
     # Names say what a function returns or changes, never handle/process/do/perform. Backtick test
     # names are a sentence describing the behaviour under test.
     functionPattern: '(?!handle|process|perform|do[A-Z])[a-z][a-zA-Z0-9]*'
@@ -82,4 +105,5 @@ exceptions:
 
 performance:
   SpreadOperator:
+    active: true
     excludes: ['**/test/**', '**/testFixtures/**', '**/functionalTest/**']

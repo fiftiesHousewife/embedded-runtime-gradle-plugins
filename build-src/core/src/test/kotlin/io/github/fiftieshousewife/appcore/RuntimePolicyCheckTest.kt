@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.io.File
+import java.nio.file.Files
 import java.security.KeyStore
 import java.security.cert.CertificateFactory
 
@@ -53,10 +54,12 @@ class RuntimePolicyCheckTest {
         val store = KeyStore.getInstance("PKCS12").apply { load(null, null) }
         if (trustAcme) store.setCertificateEntry("acme", acme())
         app.resolve("runtime/lib/security").mkdirs()
-        app.resolve("runtime/lib/security/cacerts").outputStream().use { store.store(it, "changeit".toCharArray()) }
+        Files.newOutputStream(app.resolve("runtime/lib/security/cacerts").toPath()).use {
+            store.store(it, "changeit".toCharArray())
+        }
     }
 
-    private fun acme() = policy.certificates.single().inputStream().use {
+    private fun acme() = Files.newInputStream(policy.certificates.single().toPath()).use {
         CertificateFactory.getInstance("X.509").generateCertificate(it)
     }
 

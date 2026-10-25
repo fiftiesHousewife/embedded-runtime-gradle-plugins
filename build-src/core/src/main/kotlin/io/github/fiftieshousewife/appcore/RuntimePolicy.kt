@@ -2,6 +2,7 @@ package io.github.fiftieshousewife.appcore
 
 import org.gradle.api.GradleException
 import java.io.File
+import java.nio.file.Files
 import java.security.MessageDigest
 import java.util.HexFormat
 import java.util.Properties
@@ -62,7 +63,7 @@ data class RuntimePolicy(
         fun load(dir: File): RuntimePolicy {
             val file = dir.resolve(FILE)
             if (!file.isFile) throw GradleException("$dir is not a runtime policy: it has no $FILE")
-            val props = Properties().apply { file.inputStream().use(::load) }
+            val props = Properties().apply { Files.newInputStream(file.toPath()).use(::load) }
             fun list(key: String) =
                 props.getProperty(key).orEmpty().split(',').map(String::trim).filter(String::isNotEmpty)
             fun prefixed(prefix: String) = props.stringPropertyNames().filter { it.startsWith(prefix) }.sorted()

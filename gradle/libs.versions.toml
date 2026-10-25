@@ -7,7 +7,7 @@ ktlint = "1.8.0"
 plugin-publish = "2.2.1"
 versions = "0.66.0"
 spotless = "8.10.4"
-detekt = "1.23.8"
+detekt = "2.0.0-alpha.6"
 forbiddenapis = "3.11"
 dokka = "2.2.0"
 cyclonedx = "13.4.0"
@@ -104,6 +104,6 @@ junit-jupiter-api = { module = "org.junit.jupiter:junit-jupiter-api" }
 gradle-plugin-publish = { module = "com.gradle.plugin-publish:com.gradle.plugin-publish.gradle.plugin", version.ref = "plugin-publish" }
 gradle-versions = { module = "io.github.ben-manes.versions:io.github.ben-manes.versions.gradle.plugin", version.ref = "versions" }
 gradle-spotless = { module = "com.diffplug.spotless:com.diffplug.spotless.gradle.plugin", version.ref = "spotless" }
-gradle-detekt = { module = "io.gitlab.arturbosch.detekt:io.gitlab.arturbosch.detekt.gradle.plugin", version.ref = "detekt" }
+gradle-detekt = { module = "dev.detekt:dev.detekt.gradle.plugin", version.ref = "detekt" }
 gradle-forbiddenapis = { module = "de.thetaphi:forbiddenapis", version.ref = "forbiddenapis" }
 gradle-dokka = { module = "org.jetbrains.dokka:dokka-gradle-plugin", version.ref = "dokka" }

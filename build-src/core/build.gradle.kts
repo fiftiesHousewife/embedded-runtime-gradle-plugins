@@ -37,10 +37,28 @@ dependencies {
     implementation(libs.cyclonedx.core)
     implementation(libs.packageurl)
 
+    // RPMs are built by Redline, the library Nebula's ospackage plugin is built on, without the
+    // plugin itself. Redline was last released in 2021: its Ant tasks are dropped, and its
+    // compression and OpenPGP libraries are replaced by current releases of the same code.
+    implementation(libs.redline) {
+        exclude(group = "org.apache.ant")
+        exclude(group = "org.bouncycastle")
+    }
+    implementation(libs.bouncycastle.pg)
+    constraints {
+        implementation(libs.commons.compress) { because("Redline 1.2.10 asks for 1.21, which has known CVEs") }
+        implementation(libs.xz) { because("Redline 1.2.10 asks for 1.4") }
+    }
+
     // TestProject: the TestKit harness both plugins' functional tests build fixture projects with.
     testFixturesApi(gradleTestKit())
     testFixturesImplementation(platform(libs.junit.bom))
     testFixturesImplementation(libs.junit.jupiter.api)
+    // RpmFile: reads back the RPMs functional tests build.
+    testFixturesImplementation(libs.redline) {
+        exclude(group = "org.apache.ant")
+        exclude(group = "org.bouncycastle")
+    }
 }
 
 // The test fixtures are for this repository's functional tests, not for consumers of app-core.

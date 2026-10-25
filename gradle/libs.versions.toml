@@ -11,10 +11,19 @@ detekt = "1.23.8"
 forbiddenapis = "3.11"
 cyclonedx = "13.4.0"
 packageurl = "1.5.0"
+redline = "1.2.10"
+commons-compress = "1.28.0"
+xz = "1.12"
+bouncycastle = "1.86"
 
 [libraries]
 cyclonedx-core = { module = "org.cyclonedx:cyclonedx-core-java", version.ref = "cyclonedx" }
 packageurl = { module = "com.github.package-url:packageurl-java", version.ref = "packageurl" }
+# Redline writes RPMs in plain Java; its own dependencies are old, so the build pins current ones.
+redline = { module = "org.redline-rpm:redline", version.ref = "redline" }
+commons-compress = { module = "org.apache.commons:commons-compress", version.ref = "commons-compress" }
+xz = { module = "org.tukaani:xz", version.ref = "xz" }
+bouncycastle-pg = { module = "org.bouncycastle:bcpg-jdk18on", version.ref = "bouncycastle" }
 junit-bom = { module = "org.junit:junit-bom", version.ref = "junit" }
 junit-jupiter-api = { module = "org.junit.jupiter:junit-jupiter-api" }
 # Gradle plugins applied from build-src/build-logic convention plugins, as ordinary dependencies.

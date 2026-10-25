@@ -46,7 +46,7 @@ class JavaAppSecurityTest {
     @Test
     fun `the runtime records what was changed and carries the overlay`() {
         val project = securedService()
-        project.build("appTar")
+        project.build("appArchive")
         val runtime = project.project.resolve("build/app/${TestProject.hostTarget()}/svc-2.0.0/runtime")
         val record = runtime.resolve("conf/security/java-app-customisations.txt").readText()
         assertAll(
@@ -65,7 +65,7 @@ class JavaAppSecurityTest {
                     javaApp = """jlinkModules = listOf("java.base", "jdk.httpserver", "jdk.jdwp.agent")""",
                 ),
             )
-        val failed = project.buildAndFail("appTar")
+        val failed = project.buildAndFail("appArchive")
         assertTrue(failed.output.contains("The runtime contains jdk.jdwp.agent"), failed.output)
     }
 

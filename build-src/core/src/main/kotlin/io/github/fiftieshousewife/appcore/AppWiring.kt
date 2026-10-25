@@ -1,11 +1,9 @@
 package io.github.fiftieshousewife.appcore
 
-import io.github.fiftieshousewife.appcore.tasks.AppSmokeTest
 import io.github.fiftieshousewife.appcore.tasks.GenerateAppManifest
 import io.github.fiftieshousewife.appcore.tasks.GenerateLaunchers
 import io.github.fiftieshousewife.appcore.tasks.GenerateSbom
 import io.github.fiftieshousewife.appcore.tasks.GitCommitValueSource
-import io.github.fiftieshousewife.appcore.tasks.RunApp
 import io.github.fiftieshousewife.appcore.tasks.WriteTextFile
 import org.gradle.api.GradleException
 import org.gradle.api.NamedDomainObjectProvider
@@ -15,18 +13,13 @@ import org.gradle.api.artifacts.ExternalModuleDependency
 import org.gradle.api.artifacts.ResolvableConfiguration
 import org.gradle.api.component.SoftwareComponentFactory
 import org.gradle.api.file.ArchiveOperations
-import org.gradle.api.file.CopySpec
 import org.gradle.api.file.Directory
 import org.gradle.api.file.DuplicatesStrategy
-import org.gradle.api.file.RelativePath
 import org.gradle.api.provider.Provider
 import org.gradle.api.tasks.Sync
 import org.gradle.api.tasks.TaskProvider
 import org.gradle.api.tasks.bundling.AbstractArchiveTask
-import org.gradle.api.tasks.bundling.Compression
-import org.gradle.api.tasks.bundling.Tar
 import java.io.File
-import java.time.Duration
 
 /** The names that tell the Java and Node plugins apart wherever they share code. */
 data class Ecosystem(
@@ -59,9 +52,8 @@ data class EcosystemSpec(
 
 /** The tasks registered before the targets are known, wired to them afterwards. */
 private data class Lifecycle(
-    val allTars: TaskProvider<Task>,
-    val smoke: TaskProvider<AppSmokeTest>,
-    val runApp: TaskProvider<RunApp>,
+    val allArchives: TaskProvider<Task>,
+    val hostTasks: HostTasks,
     val dockerContext: DockerContext,
     val publishing: AppPublishing,
 )
@@ -77,7 +69,8 @@ internal fun untestedTargets(targets: Collection<Target>, host: Target, smokeTes
 class TargetTasks(
     val target: Target,
     val assemble: TaskProvider<Sync>,
-    val tar: TaskProvider<Tar>,
+    /** `appArchive<T>`: a Tar or Zip task, as [AppExtension.archiveFormat] says. */
+    val archive: TaskProvider<out AbstractArchiveTask>,
     val sbom: TaskProvider<GenerateSbom>,
 )
 
@@ -86,18 +79,19 @@ class TargetTasks(
  *
  * ```
  * appLaunchers<T> ─┐
- * appManifest<T>  ─┼─► appAssemble<T> ─► appTar<T> ──► publish
+ * appManifest<T>  ─┼─► appAssemble<T> ─► appArchive<T> ──► publish
  * appSbom<T>      ─┘
  * ```
  *
  * plus, for this machine's archive only, `appSmokeTest` and `runApp`, and for a Linux archive
- * `appDockerContext`. `appTar` builds every target's archive.
+ * `appDockerContext`, and for a Linux target with `rpm { enabled = true }` `appRpm<T>`. `appArchive`
+ * builds every target's archive.
  *
  * Targets are set in the build script, so per-target tasks are registered once it has run. The
  * tasks a build script may refer to by name are registered up front and wired to their target then.
  *
- * Every archive, whatever the target, is a `.tar.gz` with one top-level directory
- * `<app>-<version>/`. Windows 10+ extracts it with the built-in `tar.exe`.
+ * Every archive, whatever the target, is a `.tar.gz` (or the [ArchiveFormat] chosen) with one
+ * top-level directory `<app>-<version>/`. Windows 10+ extracts a `.tar.gz` with the built-in `tar.exe`.
  */
 class AppWiring(
     private val project: Project,
@@ -130,6 +124,8 @@ class AppWiring(
 
     private val appName: Provider<String> get() = extension.appName
 
+    private val rpmPackages by lazy { RpmPackages(project, this) }
+
     fun applyConventions() {
         AppSettings.requireApplied(project, ecosystem.settingsPluginId)
         extension.appName.convention(project.name)
@@ -147,8 +143,13 @@ class AppWiring(
             ),
         )
         extension.configDefaults.convention(projectDir.dir("src/deploy/conf"))
+        extension.archiveFormat.convention(
+            providers.gradleProperty(ecosystem.property("archiveFormat")).map(ArchiveFormat::parse)
+                .orElse(ArchiveFormat.TAR_GZ),
+        )
+        rpmPackages.applyConventions()
         extension.smokeTestEnabled.convention(true)
-        extension.smokeTestTimeout.convention(DEFAULT_SMOKE_TEST_TIMEOUT)
+        extension.smokeTestTimeout.convention(HostTasks.DEFAULT_SMOKE_TEST_TIMEOUT)
         extension.allowUntestedPublish.convention(
             providers.gradleProperty(ecosystem.property("allowUntestedPublish")).map(String::toBoolean).orElse(false),
         )
@@ -187,13 +188,9 @@ class AppWiring(
             // Lambdas stored in tasks must not capture this class: it holds the Project, which the
             // configuration cache cannot serialise. Hence the local copies here and below.
             val archiveOps = archives
-            from(
-                archive.map { file ->
-                    if (file.name.endsWith(".zip")) archiveOps.zipTree(file) else archiveOps.tarTree(file)
-                },
-            )
+            from(archive.map { archiveOps.archiveTree(it) })
             into(destination)
-            dropTopLevelDirectory(this)
+            AppCopySpecs.dropTopLevelDirectory(this)
         }
 
     /** The single file a [runtimeArchive] configuration resolves to. */
@@ -211,14 +208,15 @@ class AppWiring(
 
     /** The tasks a build script may name, registered before the targets are known. */
     private fun registerLifecycle(): Lifecycle {
-        val allTars =
-            tasks.register("appTar") {
+        val allArchives =
+            tasks.register("appArchive") {
                 group = taskGroup
                 description = "Builds the archive for every target"
             }
-        val smoke = registerSmokeTest()
+        val hostTasks = HostTasks(project, this)
+        val smoke = hostTasks.smoke
         val publishing = AppPublishing(project, this, services.components).apply { register(smoke) }
-        tasks.named("assemble") { dependsOn(allTars) }
+        tasks.named("assemble") { dependsOn(allArchives) }
         tasks.named("check") { dependsOn(smoke) }
         // Every archive feeding the app (the application jar included) must be byte-reproducible,
         // so rebuilding a commit yields an identical archive checksum. Gradle 9 does this by default.
@@ -226,80 +224,25 @@ class AppWiring(
             isPreserveFileTimestamps = false
             isReproducibleFileOrder = true
         }
-        return Lifecycle(allTars, smoke, registerRunApp(), DockerContext(project, this, services.archives), publishing)
+        return Lifecycle(allArchives, hostTasks, DockerContext(project, this, services.archives), publishing)
     }
 
     private fun registerTargets(lifecycle: Lifecycle, contribute: (Target) -> EcosystemSpec) {
         extension.targets.finalizeValue()
+        extension.archiveFormat.finalizeValue()
         val targets = extension.targets.get()
         if (targets.isEmpty()) throw GradleException("${ecosystem.extensionName}.targets is empty; name at least one")
         val pipeline = TargetPipeline(project, this)
         val built = targets.map { pipeline.register(it, contribute(it)) }
-        lifecycle.allTars.configure { dependsOn(built.map { it.tar }) }
-        built.firstOrNull { it.target == host }?.let { wireHostTasks(lifecycle, it) }
+        lifecycle.allArchives.configure { dependsOn(built.map { it.archive }) }
+        built.firstOrNull { it.target == host }?.let(lifecycle.hostTasks::use)
         lifecycle.dockerContext.useLinuxArchive(built)
         lifecycle.publishing.addTargets(built, untestedTargets(targets, host, extension.smokeTestEnabled.get()))
-    }
-
-    /** This machine's archive is the one `appSmokeTest` starts and `runApp` runs. */
-    private fun wireHostTasks(lifecycle: Lifecycle, hostTasks: TargetTasks) {
-        lifecycle.smoke.configure { archiveFiles.from(hostTasks.tar.flatMap { it.archiveFile }) }
-        lifecycle.runApp.configure {
-            dependsOn(hostTasks.assemble)
-            appDir.set(layout.dir(hostTasks.assemble.map { it.destinationDir }))
-        }
-    }
-
-    private fun registerSmokeTest() = tasks.register("appSmokeTest", AppSmokeTest::class.java) {
-        group = VERIFICATION_GROUP
-        description = "Extracts this machine's archive, starts it and waits for its healthcheck"
-        healthTimeout.set(extension.smokeTestTimeout)
-        resultFile.set(workDir.map { it.file("smoke-test.txt") })
-        val enabled = extension.smokeTestEnabled
-        onlyIf("${this@AppWiring.ecosystem.extensionName}.smokeTestEnabled is true") { enabled.get() }
-    }
-
-    private fun registerRunApp() = tasks.register("runApp", RunApp::class.java) {
-        group = APPLICATION_GROUP
-        description = "Runs this machine's assembled app in the foreground (bin/<app> run)"
-        appName.set(this@AppWiring.appName)
-        windows.set(host.isWindows)
-        args.convention(
-            providers.gradleProperty("args").map { it.split(" ").filter(String::isNotBlank) }.orElse(emptyList()),
-        )
-        val dir = appDir
-        onlyIf("an archive is built for this machine") { dir.isPresent }
+        rpmPackages.register(built, listOf(lifecycle.publishing.guard, lifecycle.hostTasks.smoke))
     }
 
     companion object {
         const val VERIFICATION_GROUP = "verification"
         const val APPLICATION_GROUP = "application"
-
-        private val DEFAULT_SMOKE_TEST_TIMEOUT: Duration = Duration.ofSeconds(60)
-
-        /**
-         * Exec bits are set explicitly rather than trusted from the filesystem: a Windows checkout
-         * or a jlink run on Windows has none, and a missing bit on `jspawnhelper` breaks
-         * `ProcessBuilder` on Linux at runtime, long after the build succeeded.
-         */
-        private val EXECUTABLES =
-            listOf("bin/**", "runtime/bin/**", "runtime/lib/jspawnhelper", "runtime/lib/jexec")
-                .let { it + it.map { pattern -> "*/$pattern" } } // also inside the archive's top-level directory
-
-        fun executableBits(spec: CopySpec) {
-            spec.filesMatching(EXECUTABLES) { permissions { unix("rwxr-xr-x") } }
-        }
-
-        /**
-         * Strips an archive's single top-level directory (`node-v24.../`, `<app>-<version>/`) while
-         * copying, or renames it to [replacement].
-         */
-        fun dropTopLevelDirectory(spec: CopySpec, replacement: String? = null) {
-            spec.eachFile {
-                val segments = listOfNotNull(replacement) + relativePath.segments.drop(1)
-                relativePath = RelativePath.parse(!isDirectory, segments.joinToString("/"))
-            }
-            spec.includeEmptyDirs = false
-        }
     }
 }

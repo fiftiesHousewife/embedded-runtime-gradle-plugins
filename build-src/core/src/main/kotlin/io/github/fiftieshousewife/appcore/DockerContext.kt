@@ -34,8 +34,8 @@ internal class DockerContext(
             }
             // Not `into("app")`: inside a child spec the path already starts with `app/`, so dropping
             // the first segment would drop that instead of the archive's `<app>-<version>/`.
-            from(chosen.tar.flatMap { it.archiveFile }.map { archiveOps.tarTree(it) }) {
-                AppWiring.dropTopLevelDirectory(this, replacement = "app")
+            from(chosen.archive.flatMap { it.archiveFile }.map { archiveOps.archiveTree(it.asFile) }) {
+                AppCopySpecs.dropTopLevelDirectory(this, replacement = "app")
             }
         }
     }

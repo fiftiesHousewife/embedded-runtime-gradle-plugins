@@ -1,0 +1,243 @@
+# Ship the runtime with the app
+
+Pippa Newbold · 25 October 2026
+
+The JDK or Node.js your service runs on in production should be the one your tests ran on. These Gradle plugins make that the default: they package each app with its own pinned, trimmed runtime into a single archive that runs the same on a laptop, a server or in a container.
+
+## How Java used to reach production
+
+For most of Java's life the runtime was something the server already had. The JDK carried the compiler, the tools and the headers, with the documentation as a download of its own; the JRE was the runtime alone. The rule was firm: no JDK in production, because nothing should ever be compiled there. Servers got a JRE.
+
+Even so, a Java install was big for its day, and disk and network bandwidth were expensive. Nobody shipped one with each application. It went on once per host, or more often once on a shared filesystem that every host mounted. At one bank these shared software mounts were called HUFs, and every Java process on hundreds of machines ran from the same few directories.
+
+That arrangement had costs everyone learned to live with:
+
+- **Nothing proved an app worked until it was deployed.** CI tested against its own install, often a different build, so the first run on the production runtime was the release itself.
+- **`JAVA_HOME` meant nothing on a shared box.** It held whatever the last login or startup script had set, so teams hard-coded paths into the mount, and those paths moved when the mount was reorganised.
+- **Every upgrade was everyone's upgrade.** Patching the shared runtime changed every application on it at once. A security update became a change across many teams that none of them had tested, and it was rolled back often enough that people stopped expecting it to stick.
+
+## From the JRE to jlink and jdeps
+
+The shared JRE ended in three steps over four years:
+
+| Release | Year | What changed |
+| --- | --- | --- |
+| JDK 11 | 2018 | Oracle stops offering a JRE or Server JRE download; [its release notes](https://www.oracle.com/java/technologies/javase/11-relnote-issues.html) point to jlink for smaller custom runtimes |
+| JDK 9 | 2017 | The module system arrives with [jlink (JEP 282)](https://openjdk.org/jeps/282), which links a runtime from only the modules an app needs |
+| JDK 8 | 2014 | `jdeps` ships, listing which JDK packages and, later, which modules a jar depends on |
+
+The two tools are meant to be used together: jdeps says which modules an app needs, and jlink builds a runtime of exactly those. For this project's sample service the difference is stark. The full Temurin 21 JDK is 336 MB unpacked, the runtime jlink makes for the service is 31 MB, and the whole archive, app and runtime together, is 17 MB. That is small enough to ship with every release, and the shared install, with every problem above, goes away.
+
+The catch is in how jdeps works. It reads the class files and records every class they name, so it sees only what the code refers to directly. As the [OpenJDK wiki](https://wiki.openjdk.org/x/CAESAQ) puts it, dependencies loaded with `Class.forName` or as service providers are not reported. Some of Java's most important modules arrive exactly that way:
+
+- TLS cipher implementations and the elliptic-curve provider (`jdk.crypto.ec`), found through security-provider lookup;
+- JNDI and LDAP (`java.naming`), loaded by name from configuration;
+- locale data beyond English (`jdk.localedata`), loaded on demand;
+- drivers and plugins that frameworks find with `ServiceLoader` or reflection.
+
+A runtime linked from jdeps's list alone starts, passes a quick test, and then fails in production the first time a request needs one of these, often on a code path no test reached. That makes a trimmed runtime safe only when something actually runs the app on it before release.
+
+## Two ways to ship Java, with nothing in common
+
+Today most organisations run Java in two worlds at once, and each solves the runtime problem differently.
+
+**In a container, every app has its own Java.** The image carries exactly one runtime, chosen when the image was built, and nothing outside the image can change it. Often that runtime is a full JDK, compiler and all, because the base image everyone starts from is a JDK image. That breaks the old rule against compilers in production, and most teams accept it because the image is immutable: nothing can be compiled into it after it is built. It is still more runtime than the app uses, and every extra module is something else to patch.
+
+**On a server, Java is everywhere and belongs to no one.** A typical estate has many JDKs and JREs installed side by side, because so much software brings its own. Oracle Database keeps a JDK under its Oracle home; IBM's WebSphere and Db2 ship IBM's Java; Elasticsearch has bundled its own JDK since version 7; Atlassian's Jira and Confluence installers include one; every JetBrains IDE runs on the JetBrains Runtime. Each of those is patched on its vendor's schedule, not the organisation's.
+
+Other software, including most of what an organisation writes itself, expects to find Java outside its own install, and that is where the trouble starts:
+
+- **The shared Java can change underneath the app.** If it lives on a shared mount, a damaged mount takes every app down at once, and an upgrade made by another team reaches the app without anyone on the app's team knowing.
+- **The fixes are outside the tested package.** Teams protect themselves with their own symlinks to a known Java, or with a `JAVA_HOME` injected into a startup script. Neither is part of what was built and tested, so neither is tested; both are found to be wrong only when the app fails to start.
+- **Nothing is shared between the two worlds.** An app that runs on OpenShift and on virtual machines is two deliveries: an image for one, an installation recipe for the other, each with its own way of finding Java, and nothing that proves they run the same thing.
+
+An archive that carries its own trimmed runtime fits both. On a server it is unpacked and run with nothing else installed; in a container the same archive is copied into a base image that needs only glibc and a shell. The runtime, the certificates and the policy are identical in both, because they are the same file.
+
+## The runtime is part of the release
+
+Plenty of Java and Node.js services still work this way: built against one runtime, run on another. CI compiles and tests with whatever JDK its image carries; the server runs whatever its package manager installed last quarter. The gap stays invisible until a patch release changes TLS defaults, a locale, or a garbage collector flag, and then it shows up in production first.
+
+The usual fixes move the problem rather than remove it. A container image pins the runtime, but only for teams that deploy containers. A configuration-management rule pins it on servers, but it drifts from what CI used. Neither makes the runtime part of the artifact that was tested.
+
+These plugins do: the runtime travels inside the archive. A Java app gets a JDK trimmed to the modules it uses; a Node.js app gets the official Node binary. The archive needs nothing on the machine but glibc and a shell, and the same file goes to a server, into a container, or onto a laptop.
+
+## Organisations still choose the runtime
+
+Shipping the runtime with each app ends the shared install. It does not end the need to decide which runtime that is. A large organisation still has to answer three questions for every app it runs, and answer them the same way for all of them.
+
+**Which Java release.** Every app targets a feature release, and the organisation decides which are allowed: usually the long-term-support lines (11, 17, 21, 25), with a date for leaving each one.
+
+**Which exact patch.** OpenJDK publishes security updates every quarter, in January, April, July and October. Security teams need every app on an approved patch within weeks of each update, and need to prove it. That means the exact build is chosen centrally and recorded, not left to whatever a build machine happened to download.
+
+**Which changes to the vendor's build.** A JDK straight from a vendor is configured for the open internet. A bank or a hospital adds its own certificate authorities, removes cipher suites its policy forbids, sets security properties such as the DNS cache lifetime and the deserialization filter, and keeps debugging agents out of production. Those changes have to reach every runtime, on every target, every time.
+
+What changed is where the answers live. Instead of a shared directory that every app trusts, they live in the build, as reviewed configuration, and each app's archive carries the result.
+
+## Many vendors, one Java
+
+When Oracle changed how it licensed its JDK in 2018 and 2019, many organisations moved to OpenJDK builds from other vendors, some long established and some new. The builds come from the same OpenJDK source, pass the same compatibility tests, and behave the same for nearly every app. They differ in who stands behind them, which platforms they cover, and what they add:
+
+| Distribution | Built by | Why organisations choose it |
+| --- | --- | --- |
+| Temurin | Eclipse Adoptium | Vendor-neutral and free; the default in most build tools and CI images |
+| Oracle JDK | Oracle | The reference build; free under Oracle's NFTC licence for current releases, with paid support for older lines |
+| Corretto | Amazon | Free long-term support, the same builds Amazon runs its own services on |
+| Zulu | Azul | The widest matrix of versions and platforms, including old releases, with commercial support |
+| Liberica | BellSoft | Variants with JavaFX bundled, slim Lite builds, and CRaC-enabled builds for fast startup |
+| Microsoft Build of OpenJDK | Microsoft | The build Microsoft runs on Azure and supports there; long-term-support releases only |
+| SapMachine | SAP | The JDK SAP's own products run on, with builds for platforms such as AIX and musl-based Linux |
+
+Most organisations pick one, sometimes two, usually for the support contract rather than the bits. The build should make that choice a single setting, and changing it should be safe.
+
+## Why SDKMAN! and Foojay stop at the firewall
+
+Open-source developers already have good answers to "get me a JDK". [SDKMAN!](https://sdkman.io/install/) installs and switches JDKs on a developer's machine. [Foojay's Disco API](https://foojay.io/today/disco-api-helping-you-to-find-any-openjdk-distribution) catalogues every OpenJDK build from every vendor, and [Gradle's Foojay resolver](https://github.com/gradle/foojay-toolchains) uses it to download whatever toolchain a build asks for. Both are excellent, and inside most large organisations neither can be used as they are:
+
+- **They reach the internet.** SDKMAN! installs with `curl | bash` from its own site and downloads from vendors; the Foojay resolver asks api.foojay.io and then the vendor. Build agents in a bank have no route to either; everything comes through an approved repository such as Artifactory.
+- **They choose the version.** The Foojay resolver takes the newest update of the requested release at the moment the build runs. That is convenient, and it is exactly what a change-controlled build cannot accept: two builds of the same commit can get different JDKs, and neither is the one security approved.
+- **They install, they don't record.** SDKMAN! keeps JDKs in each person's home directory. Nothing records which build a given release was compiled or tested with, so nothing can prove it later.
+- **They leave the JDK as the vendor shipped it.** There is no step for the organisation's certificates, policy or cipher list.
+- **They widen the trust boundary.** Every download now depends on a third-party catalogue service as well as the vendor, and a resolver that can pick any distribution can also pick one whose licence the organisation never agreed to.
+
+None of this is a criticism of either project; they solve a different problem. The plugins described here borrow their good ideas, toolchains resolved by the build and a choice of vendors, and keep the decisions inside the organisation: an exact pinned build, fetched through the organisation's own repository, customised, and recorded in the archive it ships in.
+
+## At a glance
+
+```mermaid
+flowchart LR
+    src["Source<br/>code + pinned JDK or Node.js"] --> link["Link and harden<br/>jlink, certificates, policy"]
+    link --> pack["Package<br/>one archive per target"]
+    pack --> smoke["Smoke test<br/>start it, wait for healthy"]
+    smoke --> repo[("Repository<br/>Artifactory")]
+    repo --> server["Server<br/>tarball or RPM"]
+    repo --> container["Container<br/>glibc + shell base image"]
+    repo --> pipeline["Deployment pipeline<br/>app-smoke-test"]
+```
+
+The build tests the archive it is about to publish; servers, containers and a deployment pipeline then all receive that exact file.
+
+## One JDK, compiled with and shipped
+
+A Gradle toolchain request names only a feature release, "21". The plugin answers it with an exact build, such as Temurin 21.0.12.1+1, and links the archive's runtime from that same build. The compiler and the runtime come from one pin, read in one place, so they cannot drift apart.
+
+Each plugin release carries a catalogue of tested pins, one per distribution and Java release from 11 to 25. Releasing the plugin is how a quarterly security update reaches every repository at once. A team that cannot wait overrides one line, `javaApp.jdk.21=21.0.13+9`, until the next release.
+
+Seven distributions are supported, and each spells its versions and file names its own way:
+
+| Distribution | Version form | Source |
+| --- | --- | --- |
+| Temurin | `21.0.13+9` | Adoptium GitHub releases |
+| Oracle | `25.0.3` | download.oracle.com |
+| Corretto | `21.0.13.0.10` | corretto.aws |
+| Zulu | `21.54.107-ca-jdk21.0.13` | cdn.azul.com |
+| Liberica | `21.0.13+11` | BellSoft GitHub releases |
+| Microsoft | `21.0.12` | aka.ms/download-jdk |
+| SapMachine | `21.0.13` | SAP GitHub releases |
+
+Each entry knows its own version format, so a pin in the wrong form fails before anything is downloaded. Checking every pinned URL against the real servers taught one lesson worth passing on: vendors upload a release one platform at a time over several days. A pin must point at a build that exists for every target, which can trail the newest announced release.
+
+## Small runtimes without guesswork
+
+A full JDK is around 300 MB. `jlink` builds a runtime holding only the modules an app uses; for an HTTP service that is often `java.base` and a handful more. The hard part has always been the list itself.
+
+By default the plugin asks `jdeps`, which reads the compiled classes of the app and its dependencies and names every JDK module they reference. For the sample service in the repository that is `java.base,jdk.httpserver`, and the build file names no modules at all.
+
+jdeps reads only static references. Code that loads a class by name at runtime, such as a TLS provider, a JNDI lookup or locale data, is invisible to it. Those gaps surface as a `NoClassDefFoundError` when the app starts, so the plugin can find them by running the app. `./gradlew jlinkFindModules`:
+
+1. links a runtime from the current module list;
+2. starts the app exactly as the smoke test does, and waits for its health check;
+3. on failure, reads the output for the JDK class that failed to load, finds the module that holds it, and adds it;
+4. repeats until the app is healthy, then prints the line to add to the build:
+
+```kotlin
+javaApp { additionalModules.addAll("jdk.httpserver") }
+```
+
+The class-to-module map comes from the JDK itself, via `jimage list`, so it is always right for the exact build being linked. The loop finds what fails at startup or on the health check; a code path neither reaches still needs a test of its own.
+
+## Hardening every runtime
+
+The organisation's changes to the vendor's JDK are configuration in the build, applied to every target's runtime after jlink and before packaging:
+
+```kotlin
+javaApp {
+    security {
+        trustedCertificates.from("security/certs")          // approved CAs, added to cacerts
+        propertiesFiles.from("security/java.security")     // the organisation's policy
+        disabledTlsAlgorithms.addAll("TLS_RSA_WITH_AES_128_GCM_SHA256", "TLS_RSA_WITH_AES_256_GCM_SHA384")
+        lockProperties = true                               // no -Djava.security.properties at runtime
+    }
+}
+```
+
+Certificates and policy can come from any source Gradle can read: the repository, a shared directory, or a versioned artifact in Artifactory, so a policy change is a dependency bump with a review. Disabled algorithms are added to the JDK's own list rather than replacing it, so a JDK update that disables something new is never silently undone. The build fails if the runtime contains the remote debugger, and each runtime records what was changed, including every certificate's fingerprint, in a file an auditor can read.
+
+The step is open by design. Anything the plugin does not model, a FIPS provider's jar or a replacement logging configuration, goes in an overlay directory copied over the runtime, and the step is an ordinary Gradle task that a build can extend.
+
+The test for all of this is the running JVM, not the files. A small program run on the customised runtime confirms that it trusts the approved CA alongside the vendor's, sees the extra disabled cipher suites with the JDK's defaults still in place, and reports the locked policy.
+
+## Every target from one build
+
+A team on Macs that deploys to Linux, with a few Windows customers, needs three archives. One line asks for them:
+
+```kotlin
+javaApp { targets("linux-x64", "linux-aarch64", "windows-x64") }
+```
+
+Cross-linking makes this possible without containers or WSL. `jlink` runs from the build machine's JDK and reads the target JDK's `jmods`, so a Mac produces a Linux runtime directly. The same exact JDK release must sit on both sides; the plugin checks the two `release` files and refuses a mismatch with a message naming both versions.
+
+All the archives publish under one version, with the target as the Maven classifier. The publication is a real Gradle software component: its module metadata gives each archive the standard operating-system and architecture attributes, so another Gradle build can ask for "the archive for this machine" rather than spell out a classifier.
+
+An archive for another machine cannot be started where it was built, so only this machine's archive is smoke-tested. `publish` refuses the others unless the build says `allowUntestedPublish = true`. That default is deliberate: an untested archive should be a decision someone makes, not something that slips out of a laptop build.
+
+## Proving the archive works
+
+Every app answers to one small contract: read the port from `APP_PORT`, and exit 0 when started with `--healthcheck` if the running instance is healthy. The generated launcher, `bin/<app>`, turns that into `run`, `healthcheck` and `version` commands that servers, containers and the build all use.
+
+`./gradlew build` then tests the archive itself, not the build directories it came from. It extracts the finished `.tar.gz` to a scratch directory, checks that `version` reports the right release, starts the app on a free port, and waits for the health check. A build that passes has started the exact file it will publish.
+
+The same check is available to any other build. A deployment pipeline applies `io.github.fiftieshousewife.app-smoke-test`, declares `smokeTest("com.example:orders-service:1.4.2")`, and runs `appSmokeTest`. Gradle picks the archive built for the machine it runs on from the published metadata, and the task reads the app's name, version and target from the archive's own `META-INF/app.json`. Producer and consumer run the same code.
+
+Testing the real deployment path paid off quickly. Two bugs had sat unnoticed:
+
+- The server installer pruned old releases with `head -n -3`, which macOS's `head` rejects. Every install on a Mac failed after the app was already healthy. A new test that installs, upgrades and rolls back an archive found it on the first run.
+- The Windows launcher added `--healthcheck` without the leading space every other argument had, so it ran `Main--healthcheck`. The health check could never pass on Windows. CI's Windows job, the first place that launcher ever ran, caught it; a unit test now checks the rule on every OS.
+
+## Behind a corporate firewall
+
+Many build machines cannot reach GitHub or nodejs.org. One machine-level setting routes everything through Artifactory instead:
+
+```properties
+# ~/.gradle/gradle.properties
+artifactory.url=https://artifactory.example.com/artifactory
+```
+
+With it set, Maven libraries, Gradle plugins, JDKs, Node.js and npm packages all resolve from Artifactory, and projects change nothing. The same project builds on a laptop at home against the public internet and on a locked-down CI agent against Artifactory.
+
+Runtime archives are ordinary Gradle dependencies, read from a plain file tree. That brings Gradle's cache, credentials, offline mode and checksum verification for free, and means any layout can be described by a pattern rather than by code. An approved JDK sits at a predictable path such as `runtimes/temurin/jdk/21.0.12.1_1/jdk-21.0.12.1_1-linux-x64.tar.gz`, whichever vendor it came from.
+
+Some organisations already have JDKs on disk, unpacked from their own RPMs on every agent. The plugin uses them as they are: a shared directory of archives, or one path per release and target.
+
+```properties
+javaApp.jdk.21.linux-x64.path=/usr/lib/jvm/jdk-21
+```
+
+## Try it
+
+The smallest Java build is two files:
+
+```kotlin
+// settings.gradle.kts
+plugins { id("io.github.fiftieshousewife.java-app.settings") version "1.0.0" }
+```
+
+```kotlin
+// build.gradle.kts
+plugins { id("io.github.fiftieshousewife.java-app") }
+application { mainClass = "com.example.Main" }
+javaApp { javaVersion = 21 }
+```
+
+`./gradlew build` compiles with the pinned JDK, links a trimmed runtime, packages the archive and starts it once to prove it works. Node.js apps swap in `node-app` and an `entryPoint`. Kotlin/JVM apps add `kotlin("jvm")` and nothing else.
+
+The code, both samples and the full documentation are at [github.com/fiftiesHousewife/embedded-runtime-gradle-plugins](https://github.com/fiftiesHousewife/embedded-runtime-gradle-plugins), under the Apache 2.0 licence.

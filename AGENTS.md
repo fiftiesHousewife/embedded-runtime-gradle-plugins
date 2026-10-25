@@ -1,7 +1,8 @@
 # Working on this repository
 
-Notes for anyone (human or agent) changing the plugins. The [README](README.md) is for people
-*using* them and must stay free of anything below.
+Notes for anyone (human or agent) changing the plugins. The [README](README.md) and [`docs/`](docs)
+are for people *using* them and must stay free of anything below. Keep the README a short overview
+that links into `docs/`.
 
 ## Layout
 
@@ -12,7 +13,9 @@ build-src/                  the plugin build, included by the root build
   java-app/                 io.github.fiftieshousewife:java-app      package …javaapp
   node-app/                 io.github.fiftieshousewife:node-app      package …nodeapp
   config/detekt/detekt.yml  deviations from detekt's defaults only
-deploy/                     install.sh (servers), curate-runtimes.sh (Artifactory)
+deploy/                     install.sh (servers without root), curate-runtimes.sh (Artifactory)
+docs/                       user documentation, linked from the README; article.md is the article's home
+.github/scripts/            verify-rpm.sh: CI installs the sample's RPM in a Rocky Linux container
 gradle/init.d/              init script for machines behind Artifactory
 gradle/libs.versions.toml   the one version catalogue, shared by every build here
 samples/                    a Java and a Node service, built in CI end to end
@@ -48,6 +51,8 @@ Where things are tested:
 - `JavaAppModulesTest`: the jdeps default and `jlinkFindModules` fixing a missing module.
 - `JavaAppSecurityTest`: certificates, policy and ciphers seen by the running JVM (a probe program run
   on the built runtime), the customisation record and overlay, and the forbidden-module guard.
+- `JavaAppPackagingTest`: the zip format end to end, the RPM's header and file list (read back by
+  `RpmFile` in the test fixtures), and the RPM upload to a `RecordingRepository`.
 - `KotlinAppTest`, `NodeAppPluginTest`, the settings plugin tests, and the URL unit tests.
 
 Known test caveats:
@@ -68,9 +73,10 @@ resource). `AppWiring` builds the shared pipeline; `TargetPipeline` the part bui
 
 ```
 appLaunchers<T> ─┐
-appManifest<T>  ─┼─► appAssemble<T> ─► appTar<T> ──► publish (one variant per target)
-appSbom<T>      ─┘
-                     this machine's ──► appSmokeTest, runApp, jlinkFindModules
+appManifest<T>  ─┼─► appAssemble<T> ─► appArchive<T> ──► publish (one variant per target)
+appSbom<T>      ─┘         │
+                           └─► appRpm<T> (Linux, rpm enabled) ──► appPublishRpm
+                     this machine's ──► appSmokeTest, runApp (HostTasks), jlinkFindModules
                      a Linux one   ──► appDockerContext (DockerContext)
 ```
 
@@ -80,7 +86,7 @@ inputs). Everything Java- or Node-specific stays in its own module.
 
 **Targets are known only after the build script runs,** so per-target tasks are registered in
 `afterEvaluate`, as are the Java plugin's JDK tasks (the Java release is final then too). Tasks a
-build script might name (`appTar`, `appSmokeTest`, `runApp`, `appDockerContext`, the publication)
+build script might name (`appArchive`, `appRpm`, `appSmokeTest`, `runApp`, `appDockerContext`, the publication)
 are registered up front and wired to their target afterwards. Values feeding conventions set at
 apply time but known later (the jdeps modules) go through a property set in `afterEvaluate`.
 
@@ -119,9 +125,20 @@ are opaque strings that start with the feature release; each vendor validates it
 can't be started on the host, so only the host's archive is smoke-tested and `appVerifyPublishable`
 blocks `publish` while any archive is untested, unless explicitly allowed.
 
-**Archives** are always `.tar.gz` (Windows 10+ has `tar.exe`) with one top-level directory,
-reproducible ordering and timestamps, and exec bits set explicitly (`AppWiring.EXECUTABLES`), since
-a Windows checkout or Windows jlink run carries none. The publication is a real software component
+**Archives** are `.tar.gz` by default (Windows 10+ has `tar.exe`), or `.tar`/`.zip`
+(`ArchiveFormat`; the task type is chosen when targets are registered), with one top-level
+directory, reproducible ordering and timestamps, and exec bits set explicitly
+(`AppCopySpecs.executables`), since a Windows checkout or Windows jlink run carries none. Anything
+that reads an archive back goes through `archiveTree`, which handles every format.
+
+**RPMs** (`RpmPackages`, `GenerateRpm`, `RpmContents`) are written by Redline in plain Java from the
+assembled directory, laid out by `RpmLayout` (names, version mapping, FHS paths) with the unit and
+scriptlets as resource templates under `appcore/rpm/`. Redline is from 2021: the build drops its Ant
+tasks and replaces its compression and BouncyCastle dependencies with current releases, and it
+stamps payload files with the current time, so RPMs are not reproducible. Nebula's ospackage
+plugin was not used: it pulls in a Docker plugin, and 13.x (the first with configuration-cache
+support) was days old. `docs/packaging-standards.md` records the conventions; change it with the
+code. The publication is a real software component
 whose Gradle Module Metadata carries the standard OS and architecture attributes.
 
 **Configuration cache:** lambdas stored in tasks (`onlyIf`, providers resolved at execution) must

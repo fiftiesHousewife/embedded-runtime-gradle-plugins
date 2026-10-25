@@ -41,9 +41,9 @@ class JavaAppPluginTest {
     @Test
     fun `rebuilding the same sources produces a byte-identical archive from the configuration cache`() {
         val project = javaService(tmp)
-        project.build("clean", "appTar")
+        project.build("clean", "appArchive")
         val first = sha256(archive(project))
-        val rebuilt = project.build("clean", "appTar")
+        val rebuilt = project.build("clean", "appArchive")
         assertAll(
             { assertTrue(rebuilt.output.contains("Reusing configuration cache"), rebuilt.output) },
             { assertEquals(first, sha256(archive(project))) },
@@ -53,8 +53,8 @@ class JavaAppPluginTest {
     @Test
     fun `the archive installs, keeps an operator's configuration through an upgrade, and rolls back`() {
         val project = javaService(tmp)
-        project.build("appTar")
-        project.build("appTar", "-PappVersion=2.1.0")
+        project.build("appArchive")
+        project.build("appArchive", "-PappVersion=2.1.0")
         val installer = Installer(tmp.resolve("srv/svc"))
         try {
             installer.install(archive(project))

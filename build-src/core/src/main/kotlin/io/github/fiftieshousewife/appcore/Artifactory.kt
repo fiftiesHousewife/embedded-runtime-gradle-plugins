@@ -18,6 +18,7 @@ data class Artifactory(
     val runtimesRepo: String,
     val releasesRepo: String,
     val snapshotsRepo: String,
+    val rpmRepo: String,
     val allowInsecureProtocol: Boolean,
 ) {
     fun repo(path: String): URI = URI.create("${baseUrl.trimEnd('/')}/${path.trim('/')}/")
@@ -25,6 +26,7 @@ data class Artifactory(
     val mavenUrl: URI get() = repo(mavenRepo)
     val gradlePluginsUrl: URI get() = repo(gradlePluginsRepo)
     val runtimesUrl: URI get() = repo(runtimesRepo)
+    val rpmUrl: URI get() = repo(rpmRepo)
 
     fun publishUrl(snapshot: Boolean): URI = repo(if (snapshot) snapshotsRepo else releasesRepo)
 
@@ -36,6 +38,7 @@ data class Artifactory(
         const val RUNTIMES_REPO = "artifactory.repo.runtimes"
         const val RELEASES_REPO = "artifactory.repo.releases"
         const val SNAPSHOTS_REPO = "artifactory.repo.snapshots"
+        const val RPM_REPO = "artifactory.repo.rpm"
         const val ALLOW_INSECURE = "artifactory.allowInsecureProtocol"
 
         /**
@@ -55,6 +58,7 @@ data class Artifactory(
                 runtimesRepo = providers.setting(RUNTIMES_REPO) ?: "runtimes",
                 releasesRepo = providers.setting(RELEASES_REPO) ?: "libs-release-local",
                 snapshotsRepo = providers.setting(SNAPSHOTS_REPO) ?: "libs-snapshot-local",
+                rpmRepo = providers.setting(RPM_REPO) ?: "rpm-local",
                 allowInsecureProtocol = providers.setting(ALLOW_INSECURE).toBoolean(),
             )
         }

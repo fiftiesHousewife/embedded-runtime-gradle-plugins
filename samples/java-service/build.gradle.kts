@@ -13,4 +13,9 @@ javaApp {
     javaVersion = 21
     // No jlinkModules: jdeps finds java.base and jdk.httpserver from the code.
     jvmArgs = listOf("-XX:+UseSerialGC", "-Xss512k")
+    // Linux targets also get an RPM: /opt/java-service, /etc/java-service and a systemd unit.
+    rpm {
+        enabled = true
+        summary = "Sample HTTP service with its own Java runtime"
+    }
 }

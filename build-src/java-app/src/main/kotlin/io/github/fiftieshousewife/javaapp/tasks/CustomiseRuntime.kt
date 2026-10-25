@@ -70,9 +70,13 @@ constructor(private val fs: FileSystemOperations) : DefaultTask() {
     @TaskAction
     fun customise() {
         val out = outputDir.get().asFile
-        fs.sync {
+        // jlink writes some files read-only (the legal notices), which an in-place sync cannot
+        // overwrite on the next build: start empty, and keep the copies writable by their owner.
+        fs.delete { delete(out) }
+        fs.copy {
             from(runtime)
             into(out)
+            filePermissions { user { write = true } }
         }
         val present = ForbiddenModules.present(
             Files.readString(out.resolve("release").toPath()),

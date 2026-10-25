@@ -1,6 +1,7 @@
 package io.github.fiftieshousewife.appcore.tasks
 
 import io.github.fiftieshousewife.appcore.Target
+import io.github.fiftieshousewife.appcore.archiveTree
 import org.gradle.api.DefaultTask
 import org.gradle.api.GradleException
 import org.gradle.api.file.ArchiveOperations
@@ -88,7 +89,7 @@ constructor(
     /** Extracts [archiveFile] afresh and returns its single top-level directory. */
     private fun extract(archiveFile: File, into: File): File {
         fs.sync {
-            from(archives.tarTree(archiveFile))
+            from(archives.archiveTree(archiveFile))
             into(into)
         }
         return into.listFiles()?.singleOrNull { it.isDirectory }

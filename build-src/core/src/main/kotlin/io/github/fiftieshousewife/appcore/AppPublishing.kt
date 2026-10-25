@@ -39,7 +39,8 @@ internal class AppPublishing(
     private val component: AdhocComponentWithVariants = components.adhoc(publicationName)
     private val publishing: PublishingExtension
 
-    private val guard =
+    /** Fails a publication of archives nobody started; RPM uploads depend on it too. */
+    val guard: TaskProvider<VerifyPublishable> =
         project.tasks.register("appVerifyPublishable", VerifyPublishable::class.java) {
             group = AppWiring.VERIFICATION_GROUP
             description = "Fails publication of archives that were not smoke-tested on this machine"
@@ -121,7 +122,7 @@ internal class AppPublishing(
                         objects.named(MachineArchitecture::class.java, architectureOf(built.target)),
                     )
                 }
-                outgoing.artifact(built.tar)
+                outgoing.artifact(built.archive)
             }
         component.addVariantsFromConfiguration(elements.get()) { mapToMavenScope("runtime") }
     }

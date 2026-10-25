@@ -1,0 +1,29 @@
+# Installed by the @NAME@ RPM. Local changes belong in a drop-in: systemctl edit @NAME@
+[Unit]
+Description=@SUMMARY@
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=@USER@
+Group=@USER@
+Environment=APP_ROOT=/var/lib/@NAME@
+Environment=APP_CONF_DIR=/etc/@NAME@
+Environment=APP_DATA_DIR=/var/lib/@NAME@
+Environment=APP_LOG_DIR=/var/log/@NAME@
+EnvironmentFile=-/etc/@NAME@/env
+WorkingDirectory=/var/lib/@NAME@
+ExecStart=/opt/@NAME@/bin/@LAUNCHER@ run
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+UMask=0027
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/@NAME@ /var/log/@NAME@
+
+[Install]
+WantedBy=multi-user.target

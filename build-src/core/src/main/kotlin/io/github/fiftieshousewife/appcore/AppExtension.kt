@@ -1,9 +1,11 @@
 package io.github.fiftieshousewife.appcore
 
+import org.gradle.api.Action
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.file.RegularFileProperty
 import org.gradle.api.provider.Property
 import org.gradle.api.provider.SetProperty
+import org.gradle.api.tasks.Nested
 import java.time.Duration
 
 /**
@@ -29,6 +31,22 @@ abstract class AppExtension {
      * `src/deploy/docker/Dockerfile`; with neither, a generated one is used.
      */
     abstract val dockerfile: RegularFileProperty
+
+    /**
+     * The archive each target is packed into: `tar.gz` (default), `tar` or `zip`. Defaults to
+     * `-PjavaApp.archiveFormat` / `-PnodeApp.archiveFormat`. The extension is part of the published
+     * artifact, so consumers resolving by Gradle Module Metadata are unaffected by a change.
+     */
+    abstract val archiveFormat: Property<ArchiveFormat>
+
+    /** Replaces [archiveFormat]: `archiveFormat("zip")`. */
+    fun archiveFormat(id: String) = archiveFormat.set(ArchiveFormat.parse(id))
+
+    /** An RPM per Linux target, for installing with dnf; see [RpmPackaging]. Off by default. */
+    @get:Nested
+    abstract val rpm: RpmPackaging
+
+    fun rpm(action: Action<RpmPackaging>) = action.execute(rpm)
 
     /** Default configuration shipped as `conf.defaults/`. Defaults to `src/deploy/conf`. */
     abstract val configDefaults: DirectoryProperty

@@ -18,11 +18,6 @@ installs this machine's app with its runtime, and the custom installer is gone.
 |---|---|
 | **Java with Docker sample** | Builds the image from `appDockerContext` and runs it. Runs only when Docker is reachable (skipped, not failed, otherwise); locally colima can be started for it |
 
-## Article
-
-| Item | Notes |
-|---|---|
-| Revisit after the Gradle rework | The launcher and archive sections should describe `startScripts` templates and per-target distributions |
 
 ## AI tooling
 
@@ -55,10 +50,6 @@ and `./gradlew aiSkills` to install them in a project. Prompt files were dropped
 | Windows pre-installed JDKs | `javaApp.jdk.<feature>.windows-x64.path` has unit tests only; functional tests skip on Windows (fixtures use system `tar`). Add a Windows functional path |
 | GitHub API access for the agent | Unauthenticated API calls hit the rate limit; `gh` config is unreadable in the sandbox |
 
-## Pins to recheck
-
-- Microsoft's download page (2026-10-25) lists macOS builds of 21.0.13 and 25.0.5 as "Coming soon":
-  check that the Microsoft pins resolve on `mac-x64` and `mac-aarch64` before the next pin bump.
 
 ## Older open items
 

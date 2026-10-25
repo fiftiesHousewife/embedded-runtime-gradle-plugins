@@ -311,6 +311,8 @@ An archive for another machine cannot be started where it was built, so only thi
 
 Every app answers to one small contract: read the port from `APP_PORT`, and exit 0 when started with `--healthcheck` if the running instance is healthy. The generated launcher, `bin/<app>`, turns that into `run`, `healthcheck` and `version` commands that servers, containers and the build all use.
 
+None of this replaces Gradle's own machinery; it is built on it. The launcher comes from Gradle's standard `startScripts` task, with a script generator that starts the embedded runtime instead of whatever `JAVA_HOME` finds, so a project can still customise it the way it would any Gradle application. Each target is an ordinary Gradle distribution, with the usual `install…Dist`, `…DistTar` and `…DistZip` tasks, and plain `installDist` lays out this machine's app with its runtime.
+
 `./gradlew build` then tests the archive itself, not the build directories it came from. It extracts the finished `.tar.gz` to a scratch directory, checks that `version` reports the right release, starts the app on a free port, and waits for the health check. A build that passes has started the exact file it will publish.
 
 The same check is available to any other build. A deployment pipeline applies `io.github.fiftieshousewife.app-smoke-test`, declares `smokeTest("com.example:orders-service:1.4.2")`, and runs `appSmokeTest`. Gradle picks the archive built for the machine it runs on from the published metadata, and the task reads the app's name, version and target from the archive's own `META-INF/app.json`. Producer and consumer run the same code.

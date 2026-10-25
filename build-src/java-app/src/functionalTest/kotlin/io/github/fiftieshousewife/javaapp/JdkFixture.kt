@@ -3,6 +3,8 @@ package io.github.fiftieshousewife.javaapp
 import io.github.fiftieshousewife.appcore.TestProject
 import org.junit.jupiter.api.Assumptions.assumeTrue
 import java.io.File
+import java.io.IOException
+import java.nio.file.Files
 
 /**
  * The JDK running the tests, repackaged in Adoptium's layout under [TestProject.sources]. It is the
@@ -30,7 +32,6 @@ object JdkFixture {
         targets.forEach { t ->
             val (os, arch) = t.split("-")
             archive(
-                project,
                 project.sources
                     .resolve("adoptium/temurin$javaFeature-binaries/releases/download/jdk-$jdkVersion")
                     .resolve("OpenJDK${javaFeature}U-jdk_${arch}_${os}_hotspot_${jdkVersion.replace('+', '_')}.tar.gz"),
@@ -38,24 +39,37 @@ object JdkFixture {
         }
 
     /** Lays the test JDK out under [root] the way a curated binary repository tree (or a shared directory) holds it. */
-    fun publishCurated(project: TestProject, root: File, target: String = TestProject.hostTarget()) {
+    fun publishCurated(root: File, target: String = TestProject.hostTarget()) {
         val version = jdkVersion.replace('+', '_')
-        archive(project, root.resolve("temurin/jdk/$version/jdk-$version-$target.tar.gz"))
+        archive(root.resolve("temurin/jdk/$version/jdk-$version-$target.tar.gz"))
     }
 
-    private fun archive(project: TestProject, out: File) {
-        assumeTrue(home.resolve("jmods").isDirectory, "the test JDK must ship jmods/")
-        val stage = project.dir.resolve("stage/jdk-$jdkVersion")
-        if (!stage.exists()) {
-            stage.mkdirs()
-            // Dereference links (distro JDKs link into /etc); dangling ones are skipped, not fatal.
-            TestProject.run(
-                "sh",
-                "-c",
-                "cd '${home.absolutePath}' && tar -chf - . 2>/dev/null | (cd '${stage.absolutePath}' && tar -xf -)",
-            )
-        }
+    /** Every target's archive holds the same bytes, so each test links one shared archive under its name. */
+    private fun archive(out: File) {
         out.parentFile.mkdirs()
-        TestProject.run("tar", "-czf", out.absolutePath, "-C", stage.parentFile.absolutePath, stage.name)
+        out.delete()
+        try {
+            Files.createLink(out.toPath(), sharedArchive.toPath())
+        } catch (_: IOException) {
+            sharedArchive.copyTo(out) // a filesystem without hard links
+        }
+    }
+
+    /** The test JDK as a `jdk-<version>/` tarball, built once per test JVM; [publish] costs a link, not a gzip. */
+    private val sharedArchive: File by lazy {
+        assumeTrue(home.resolve("jmods").isDirectory, "the test JDK must ship jmods/")
+        val dir = Files.createTempDirectory("jdk-fixture").toFile()
+        Runtime.getRuntime().addShutdownHook(Thread { dir.deleteRecursively() })
+        val stage = dir.resolve("jdk-$jdkVersion").apply { mkdirs() }
+        // Dereference links (distro JDKs link into /etc); dangling ones are skipped, not fatal. Fastest
+        // gzip level: the archive is unpacked once per build and never shipped.
+        TestProject.run(
+            "sh",
+            "-c",
+            "cd '${home.absolutePath}' && tar -chf - . 2>/dev/null | (cd '${stage.absolutePath}' && tar -xf -) && " +
+                "cd '${dir.absolutePath}' && tar -cf - '${stage.name}' | gzip -1 > jdk.tar.gz",
+        )
+        stage.deleteRecursively()
+        dir.resolve("jdk.tar.gz")
     }
 }

@@ -126,7 +126,7 @@ class JavaAppTargetsTest {
                     properties = listOf(JdkSources.LOCAL_PATH to shared.absolutePath),
                 ),
             )
-        JdkFixture.publishCurated(project, shared)
+        JdkFixture.publishCurated(shared)
         assertEquals(TaskOutcome.SUCCESS, project.build("build").task(":appSmokeTest")?.outcome)
     }
 }

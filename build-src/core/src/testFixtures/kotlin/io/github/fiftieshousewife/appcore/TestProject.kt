@@ -9,15 +9,16 @@ import java.util.concurrent.TimeUnit
 /**
  * Builds throwaway projects against a fake "public" runtime source on disk, so the functional
  * tests need no network: each plugin's tests repackage a local runtime under [sources] in the
- * layout that plugin resolves from.
+ * layout that plugin resolves from. Those fixtures use the system `tar`, so a project runs on
+ * Windows only when a test asks for it with `runsOnWindows` and needs no fixture archive.
  */
-class TestProject(val dir: File) {
+class TestProject(val dir: File, runsOnWindows: Boolean = false) {
     /** Root of the fake runtime download site. */
     val sources = dir.resolve("sources")
     val project = dir.resolve("project").apply { mkdirs() }
 
     init {
-        assumeTrue(!System.getProperty("os.name").startsWith("Windows"), "fixtures use the system tar")
+        assumeTrue(runsOnWindows || !isWindows, "fixtures use the system tar")
     }
 
     fun gradleProperties(vararg extra: Pair<String, String>) {
@@ -29,7 +30,7 @@ class TestProject(val dir: File) {
         project
             .resolve(
                 "gradle.properties",
-            ).writeText(props.entries.joinToString("\n") { "${it.key}=${it.value}" } + "\n")
+            ).writeText(props.entries.joinToString("\n") { "${it.key}=${it.value.replace("\\", "\\\\")}" } + "\n")
     }
 
     fun settings(settingsPluginId: String, name: String = "app") = project.resolve("settings.gradle.kts").writeText(
@@ -69,11 +70,9 @@ class TestProject(val dir: File) {
 
     companion object {
         /** The build host as a target id, e.g. `mac-aarch64`. */
-        fun hostTarget(): String {
-            val os = System.getProperty("os.name").lowercase().let { if (it.startsWith("mac")) "mac" else "linux" }
-            val arch = if (System.getProperty("os.arch") in setOf("aarch64", "arm64")) "aarch64" else "x64"
-            return "$os-$arch"
-        }
+        fun hostTarget(): String = Target.host().id
+
+        val isWindows: Boolean = System.getProperty("os.name").startsWith("Windows")
 
         fun run(vararg command: String): String {
             val process = ProcessBuilder(*command).redirectErrorStream(true).start()

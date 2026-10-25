@@ -22,6 +22,11 @@ testing {
                     // Each test runs whole Gradle builds; separate forks run them side by side. Capped,
                     // because every fork starts TestKit daemons of its own.
                     maxParallelForks = (Runtime.getRuntime().availableProcessors() / 2).coerceIn(1, 4)
+                    // Windows can't delete files a TestKit daemon still holds open, which would fail
+                    // the test; CI's Windows runners are thrown away after the job anyway.
+                    if (System.getProperty("os.name").startsWith("Windows")) {
+                        systemProperty("junit.jupiter.tempdir.cleanup.mode.default", "never")
+                    }
                 }
             }
         }

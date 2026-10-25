@@ -95,7 +95,7 @@ class JavaAppTargetsTest {
     }
 
     @Test
-    fun `a JDK installed in a directory is used as it is`() {
+    fun `a JDK installed in a directory is used as it is, on every OS`() {
         val jdk = JdkFixture.home.absolutePath
         val path = JdkSources.pathProperty(JdkFixture.javaFeature, Target.parse(host)) to jdk
         val project = javaService(
@@ -106,6 +106,7 @@ class JavaAppTargetsTest {
                     path,
                     "org.gradle.java.installations.paths" to jdk,
                 ),
+                runsOnWindows = true,
             ),
         )
         val result = project.build("build")

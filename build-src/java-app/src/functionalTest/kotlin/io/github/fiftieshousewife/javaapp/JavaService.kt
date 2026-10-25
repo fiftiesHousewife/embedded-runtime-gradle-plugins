@@ -12,6 +12,8 @@ data class JavaServiceOptions(
     val build: String = "",
     val publishJdk: Boolean = true,
     val properties: List<Pair<String, String>> = emptyList(),
+    /** Only with [publishJdk] false: publishing uses the system `tar`. */
+    val runsOnWindows: Boolean = false,
 )
 
 /** A fixture file from `src/functionalTest/resources/fixtures`. */
@@ -21,17 +23,18 @@ fun fixture(path: String): String = JavaServiceOptions::class.java.getResource("
  * A small HTTP service applying java-app, with the test JDK published on a fake download site for
  * this machine and for `linux-aarch64` unless [JavaServiceOptions.publishJdk] is false.
  */
-fun javaService(dir: File, options: JavaServiceOptions = JavaServiceOptions()): TestProject = TestProject(dir).apply {
-    if (options.publishJdk) JdkFixture.publish(this, TestProject.hostTarget(), "linux-aarch64")
-    gradleProperties(*JdkFixture.properties(this), *options.properties.toTypedArray())
-    settings(JavaAppSettingsPlugin.ID, "svc")
-    file(
-        "build.gradle.kts",
-        fixture("java-service/build.gradle.kts.template")
-            .replace("@FEATURE@", JdkFixture.javaFeature.toString())
-            .replace("@JAVA_APP@", options.javaApp)
-            .replace("@BUILD@", options.build),
-    )
-    file("src/main/java/test/Main.java", fixture("java-service/Main.java"))
-    file("src/deploy/conf/app.properties", "key=value")
-}
+fun javaService(dir: File, options: JavaServiceOptions = JavaServiceOptions()): TestProject =
+    TestProject(dir, options.runsOnWindows).apply {
+        if (options.publishJdk) JdkFixture.publish(this, TestProject.hostTarget(), "linux-aarch64")
+        gradleProperties(*JdkFixture.properties(this), *options.properties.toTypedArray())
+        settings(JavaAppSettingsPlugin.ID, "svc")
+        file(
+            "build.gradle.kts",
+            fixture("java-service/build.gradle.kts.template")
+                .replace("@FEATURE@", JdkFixture.javaFeature.toString())
+                .replace("@JAVA_APP@", options.javaApp)
+                .replace("@BUILD@", options.build),
+        )
+        file("src/main/java/test/Main.java", fixture("java-service/Main.java"))
+        file("src/deploy/conf/app.properties", "key=value")
+    }

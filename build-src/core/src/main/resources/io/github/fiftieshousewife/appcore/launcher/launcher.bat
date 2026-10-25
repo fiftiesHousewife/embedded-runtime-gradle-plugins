@@ -30,7 +30,7 @@ goto collect
 :collected
 
 if /i "%COMMAND%"=="run" goto launch
-if /i "%COMMAND%"=="healthcheck" (set "ARGS=--healthcheck%ARGS%" & goto launch)
+if /i "%COMMAND%"=="healthcheck" (set "ARGS= --healthcheck%ARGS%" & goto launch)
 if /i "%COMMAND%"=="version" (type "%APP_HOME%\META-INF\app.json" & exit /b 0)
 echo Usage: %APP_NAME% run [args...] ^| healthcheck ^| version 1>&2
 exit /b 64

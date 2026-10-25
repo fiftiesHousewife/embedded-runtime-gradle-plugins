@@ -8,8 +8,8 @@ One source for every assistant, copied to where each tool looks. Edit only the f
 | `skills/<name>/SKILL.md` | `.agents/skills/` | GitHub Copilot (agent mode in VS Code, Visual Studio and JetBrains IDEs, the Copilot app and CLI, the cloud agent, code review) and Devin, in the open Agent Skills format. Each skill is also a slash command (`/embedded-runtime-adopt`) in Copilot and `@skills:embedded-runtime-adopt` in Devin |
 | `skills/<name>/SKILL.md` | `claude/skills/` | Claude Code, through the `embedded-runtime` plugin in `claude/` (marketplace in `/.claude-plugin/`) |
 | `hooks/embedded-runtime-check-gradle-build.sh` | `claude/hooks/scripts/`, `.github/hooks/` | The post-edit build check, shared by all three tools |
-| `copilot/hooks/*.json` | `.github/hooks/` | Copilot's `postToolUse` hook (CLI, cloud agent, VS Code) |
-| `devin/hooks.v1.json` | `.devin/hooks.v1.json` | The Devin CLI's `PostToolUse` hook |
+| `copilot/hooks/*.json` | `.github/hooks/` | Copilot's `postToolUse` hook (Copilot CLI and the cloud agent, which reads it from the default branch; GitHub documents no hooks in the IDEs) |
+| `devin/hooks.v1.json` | `.devin/hooks.v1.json` | The Devin CLI's `PostToolUse` hook, on its `write`, `edit` and `apply_patch` tools |
 | `copilot/copilot-instructions.md` | `.github/copilot-instructions.md` | Copilot Chat, code review and the cloud agent, for work on this repository |
 
 The tools fix those destination paths, which is why the copies exist.
@@ -18,10 +18,17 @@ The tools fix those destination paths, which is why the copies exist.
 
 After the agent edits a Gradle build file (`*.gradle.kts`, `*.gradle`, `gradle.properties`,
 `libs.versions.toml`), the hook runs `./gradlew -p <project> -q help` and, if the build no longer
-configures, hands the error back to the agent: Claude Code and Devin read it from stderr with exit
-code 2; Copilot only passes a `postToolUse` hook's output to the model as JSON `additionalContext`,
-which the script writes when `EMBEDDED_RUNTIME_HOOK_FORMAT=copilot` (set in the Copilot hook config).
-`.github/scripts/test-agent-hooks.sh` tests it both ways in CI.
+configures, hands the error back to the agent in the form each one documents:
+
+| Agent | How the error reaches the model | Set by |
+|---|---|---|
+| Claude Code | stderr, exit code 2 | the default |
+| Copilot | `{"additionalContext": …}` on stdout | `EMBEDDED_RUNTIME_HOOK_FORMAT=copilot` in its hook config |
+| Devin CLI | `{"hookSpecificOutput": {"hookEventName": "PostToolUse", "additionalContext": …}}` on stdout | `EMBEDDED_RUNTIME_HOOK_FORMAT=devin` in its hook command |
+
+The script finds the edited file in `file_path` or `path` (also inside Copilot's escaped `toolArgs`
+string), or in a patch's `*** Update File:` lines. `.github/scripts/test-agent-hooks.sh` calls it
+the way each agent does, in CI.
 
 ## In projects that use the plugins
 

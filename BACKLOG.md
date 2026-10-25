@@ -29,7 +29,7 @@ and `./gradlew aiSkills` to install them in a project. Prompt files were dropped
 | Item | Notes |
 |---|---|
 | **`.claude/settings.json`** | Sandbox blocks writing it; the snippet that auto-suggests the marketplace to collaborators is in the conversation of 2026-10-25. Owner to add |
-| **Unverified hook details** | The exact argument names Copilot's `edit`/`create` and Devin's edit tools use for the file path (the script accepts `file_path` and `path`); whether Copilot's cloud agent and Devin's cloud sessions run these hooks; hooks in Visual Studio and JetBrains |
+| **Unverified hook details** | Researched 2026-10-25 from GitHub's and Devin's hook docs: Copilot runs hooks in its CLI and cloud agent only (none documented for VS Code, Visual Studio or JetBrains); Devin's edit tools are `write`, `edit`, `apply_patch` and its PostToolUse feedback is `hookSpecificOutput.additionalContext`, both now used. Still undocumented anywhere: the file-path argument names of Copilot's `edit`/`create` and Devin's `write`/`edit`, and the shape of Devin's `apply_patch` input (the script tries `file_path`, `path` and `*** Update File:` lines), and whether Devin's cloud sessions run hooks. Settle by logging one real payload from each agent |
 
 
 ## Code quality

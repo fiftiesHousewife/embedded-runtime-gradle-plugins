@@ -1,9 +1,13 @@
 {
   "PostToolUse": [
     {
-      "matcher": ".*",
+      "matcher": "^(write|edit|apply_patch)$",
       "hooks": [
-        { "type": "command", "command": "sh .github/hooks/embedded-runtime-check-gradle-build.sh", "timeout": 300 }
+        {
+          "type": "command",
+          "command": "EMBEDDED_RUNTIME_HOOK_FORMAT=devin sh .github/hooks/embedded-runtime-check-gradle-build.sh",
+          "timeout": 300
+        }
       ]
     }
   ]

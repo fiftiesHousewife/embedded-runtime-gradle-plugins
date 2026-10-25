@@ -3,10 +3,14 @@
 # Gradle build file, check that the build still configures, and hand any error back to the agent.
 #
 # Input (JSON on stdin): Claude Code and Devin send tool_input.file_path; Copilot sends toolArgs
-# (sometimes as an escaped JSON string) with path or file_path, and cwd for relative paths.
-# Output: by default exit 2 with the error on stderr (Claude Code, Devin); with
-# EMBEDDED_RUNTIME_HOOK_FORMAT=copilot, exit 0 with {"additionalContext": "..."} on stdout,
-# the only way a Copilot postToolUse hook reaches the model.
+# (as an escaped JSON string) with path or file_path, and cwd for relative paths. A patch tool's
+# input (Devin's apply_patch) names its files in "*** Update File: <path>" lines instead.
+# Output, by EMBEDDED_RUNTIME_HOOK_FORMAT:
+#   unset    exit 2 with the error on stderr (Claude Code)
+#   copilot  exit 0 with {"additionalContext": "..."} on stdout, the only way a Copilot
+#            postToolUse hook reaches the model
+#   devin    exit 0 with {"hookSpecificOutput": {"hookEventName": "PostToolUse",
+#            "additionalContext": "..."}}, the PostToolUse output the Devin CLI documents
 # EMBEDDED_RUNTIME_HOOK_GRADLE_ARGS adds Gradle arguments, e.g. --offline.
 # Plain POSIX sh with no jq or Python, so it runs wherever these agents run hooks.
 payload=$(cat)
@@ -15,6 +19,8 @@ field() { # first value of the named JSON string field, quotes plain or backslas
 }
 file=$(field file_path)
 [ -n "$file" ] || file=$(field path)
+[ -n "$file" ] || file=$(printf '%s' "$payload" | grep -oE '\*\*\* (Update|Add) File: [^\\"]+' |
+  sed 's/^[^:]*: //' | grep -E '\.gradle(\.kts)?$|(^|/)gradle\.properties$|(^|/)libs\.versions\.toml$' | head -n 1)
 case "$file" in
   /*|?:*) ;;
   "") exit 0 ;;
@@ -43,10 +49,13 @@ wrapper=$(up_to gradlew) || exit 0
 output=$(cd "$wrapper" && sh ./gradlew -p "$project" -q help ${EMBEDDED_RUNTIME_HOOK_GRADLE_ARGS:-} 2>&1) && exit 0
 message="The Gradle build in $project no longer configures after editing $file:
 $(printf '%s\n' "$output" | grep -v -e '^Picked up' -e 'FSEvents' | tail -n 30)"
-if [ "${EMBEDDED_RUNTIME_HOOK_FORMAT:-}" = copilot ]; then
-  escaped=$(printf '%s' "$message" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g' -e 's/	/\\t/g' | awk 'BEGIN { ORS = "\\n" } { print }')
-  printf '{"additionalContext":"%s"}\n' "$escaped"
-  exit 0
-fi
+escaped=$(printf '%s' "$message" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g' -e 's/	/\\t/g' | awk 'BEGIN { ORS = "\\n" } { print }')
+case "${EMBEDDED_RUNTIME_HOOK_FORMAT:-}" in
+  copilot) printf '{"additionalContext":"%s"}\n' "$escaped"; exit 0 ;;
+  devin)
+    printf '{"hookSpecificOutput":{"hookEventName":"PostToolUse","additionalContext":"%s"}}\n' "$escaped"
+    exit 0
+    ;;
+esac
 printf '%s\n' "$message" >&2
 exit 2

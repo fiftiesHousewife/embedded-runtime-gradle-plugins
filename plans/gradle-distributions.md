@@ -1,6 +1,6 @@
 # Plan: Gradle-native launchers and distributions
 
-Status: agreed in principle 2026-10-25, not started. Owner decision: build on Gradle's own
+Status: agreed 2026-10-25; spike done the same day (findings at the end); implementation in progress. Owner decision: build on Gradle's own
 `application`/`distribution` machinery instead of beside it; no custom installer.
 
 ## Why
@@ -113,6 +113,22 @@ Each step ends with `./gradlew check` green and a commit.
 
 About a day of work after the spike, plus the spike itself (half a day).
 
-## Spike findings
+## Spike findings (2026-10-25)
 
-_Not yet run._
+Run in a throwaway project on Gradle 9.8.2 with only Gradle's own `application` and `distribution`
+plugins, twice in a row with the configuration cache on.
+
+| Question | Finding |
+|---|---|
+| Custom `ScriptGenerator` with the configuration cache | Works: the entry is stored on the first run and reused on the second. The generator is a `Serializable` class holding only plain values (target OS, locked flag) |
+| What the generator is given | `JavaAppStartScriptGenerationDetails`: `applicationName`, `mainClassName`, `defaultJvmOpts` (from `application { applicationDefaultJvmArgs }`), `optsEnvironmentVar` (`<APP>_OPTS`), `classpath` relative to the app home with the app's jar first (`lib/spike-1.2.3.jar`, then dependencies), `scriptRelPath` (`bin/spike`). There is **no** `appHomeRelativePath`: Gradle computes that only for its own template generator, so ours derives `APP_HOME` from `scriptRelPath` (one directory up from `bin/`) |
+| Windows line endings | The generator writes CRLF itself and Gradle keeps it |
+| Reproducible archives | Our existing `AbstractArchiveTask` settings apply to distribution archives: fixed timestamps (1970) and stable order |
+| Exec bits | A `filesMatching` on the distribution's root spec does not reach a child `into("bin")` spec; set `filePermissions { unix("rwxr-xr-x") }` on the `bin` child spec itself. `runtime/` keeps the modes it was copied with |
+| Archive name | Set `archiveFileName` on each target's `DistTar`/`DistZip` to keep `<app>-<version>-<target>.<ext>`; Maven classifiers are set on the publication, not derived from the file name |
+| Top-level directory | The distribution plugin names it `<app>-<version>-<target>/`, not today's `<app>-<version>/`, whatever the archive is called. **Accepted as a contract change**: archives for two targets now unpack side by side, and nothing downstream needs the old name (the smoke test, Docker context and RPM all take the single top-level directory, whatever it is called) |
+| `install<Target>Dist` | Installs into `build/install/<app>` |
+
+Consequences for the steps above: in step 2 the generator computes `APP_HOME` from `scriptRelPath`;
+in step 3 archive names come from `archiveFileName`, the `bin` spec sets its own permissions, and the
+docs describe the new top-level directory.

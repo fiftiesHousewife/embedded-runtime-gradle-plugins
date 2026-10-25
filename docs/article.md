@@ -143,6 +143,23 @@ Renovate can group the rest so related versions move together, for example:
 
 There is still no ecosystem-wide standard for "this set of versions works together, upgrade it as one". A plugin that owns the runtime can at least make the most important set, the JDK and everything that depends on its exact build, behave like one, and prove each step before it ships.
 
+## Why this doesn't exist already
+
+It is fair to ask why something this useful isn't already a standard tool. Every piece of it exists somewhere; the combination doesn't.
+
+| Tool | What it covers | What it leaves out |
+|---|---|---|
+| [JReleaser](https://jreleaser.org/guide/latest/reference/assemble/jlink.html) | jlink images for several platforms from one machine, archives, packagers, signing, SBOMs, publishing | You install every target JDK yourself; it checks only that they share a major version; no test that the image runs |
+| [badass-runtime](https://badass-runtime-plugin.beryx.org/releases/latest/) | Cross-target jlink images from Gradle, a jdeps-based module suggestion, jpackage | Downloads JDKs from raw URLs, outside Gradle's cache and checksum verification; warns that its module suggestion can miss modules, and nothing runs the image to find out |
+| Nebula ospackage | RPM and DEB packages from Gradle | Packaging only; it doesn't touch the runtime |
+| Containers and buildpacks | The runtime inside the image, chosen when the image is built | Containers only; jlink is off by default in Paketo |
+
+Together JReleaser, badass-runtime and Nebula get perhaps 60% of the way (an estimate, not a measurement). The missing 40% is the part that matters most to a regulated organisation: runtimes fetched only from the corporate repository, at an exact pinned and checksummed version; one security policy applied to every runtime and checked before any archive exists; and a smoke test that runs the real archive.
+
+Two forces explain the gap. Containers absorbed the problem for most teams: once the runtime lives in the image, shipping it with the app is the default, and the [CNCF's 2024 survey](https://www.cncf.io/reports/cncf-annual-survey-2024/) found containers in production at about nine organisations in ten. What remains is the estate that still runs on servers and virtual machines, which is concentrated in exactly the banks, insurers and public bodies whose build machines can't reach the internet. They solve it in-house and never publish it. Elasticsearch, Jira and the JetBrains IDEs each bundle a JDK their own way.
+
+jlink's habit of missing modules also put people off: a runtime trimmed by jdeps alone starts, passes a quick test, and fails in production on the first code path that loads a module by name. A smoke test that runs the real archive is the fix, and it is this project's clearest difference from what came before.
+
 ## At a glance
 
 ```mermaid
@@ -216,7 +233,33 @@ Certificates and policy can come from any source Gradle can read: the repository
 
 The step is open by design. Anything the plugin does not model, a FIPS provider's jar or a replacement logging configuration, goes in an overlay directory copied over the runtime, and the step is an ordinary Gradle task that a build can extend.
 
+Within one project that is enough. Across an organisation, the same settings can be published once as a runtime policy and applied to every build, which the next section explains.
+
 The test for all of this is the running JVM, not the files. A small program run on the customised runtime confirms that it trusts the approved CA alongside the vendor's, sees the extra disabled cipher suites with the JDK's defaults still in place, and reports the locked policy.
+
+## Control without repackaging
+
+Large organisations have long controlled Java by controlling the JDK: they block downloads of anything unmanaged, repackage an approved build with their certificates and policy, and make every team use it. That control is real, but it works against the approach in this article. A repackaged JDK installed once per server is the shared runtime again, with all the problems of the first section, and a build that may only use the corporate JDK can't fetch a runtime to trim.
+
+It doesn't have to be one or the other. If an organisation keeps its repackaged JDK, the plugin can link from it: point `javaApp.jdk.21.linux-x64.path` at the installed JDK, or put its archive in the curated repository. Each app still gets a trimmed runtime, built from the approved bits. The one condition is that the repackaged JDK keeps its `jmods/` directory, because linking a runtime for another platform needs it.
+
+The harder question is whether the lockdown achieves what it is for. Can a locked-down JDK actually decide which ciphers an application uses? Not from inside the JVM. Every control in `java.security` is a setting that the application's own code can change or step around:
+
+- code can call `Security.setProperty("jdk.tls.disabledAlgorithms", …)` before its first TLS connection;
+- a library can bring its own TLS implementation, such as BouncyCastle's, and never consult the JDK's settings;
+- an application can install its own `TrustManager` that trusts anything;
+- anyone who can start the process can add `-javaagent`, `JAVA_TOOL_OPTIONS` or system properties that change TLS behaviour.
+
+Repackaging the JDK changes the defaults. It doesn't make them binding.
+
+What can be made binding is narrower and more useful:
+
+1. **Check the artefact, not the intention.** A central runtime policy, published once and named by a machine-level property so projects can't unset it, is applied to every runtime and then checked against the files actually built: the effective `java.security`, the trusted certificates, the linked modules, the launcher and the SBOM. A project that falls short gets no archive.
+2. **Check again where it lands.** The same check runs before anything is installed, so an archive built some other way still can't reach a server.
+3. **Close the doors that can be closed.** `security.overridePropertiesFile=false`, launchers that refuse `JAVA_TOOL_OPTIONS` and friends, root-owned read-only files under `/opt`, and a policy that forbids shipping a TLS library of the app's own, found through the SBOM.
+4. **Enforce the wire at the boundary.** Which ciphers and protocols actually cross the network is decided by whoever terminates the connection. An egress proxy or service mesh that terminates TLS under its own policy, with direct egress blocked, is the only control the application cannot bypass.
+
+That is a better deal than repackaging: the policy lives in one versioned place, every runtime records which version it carries, and the checks look at what is really there.
 
 ## Every target from one build
 

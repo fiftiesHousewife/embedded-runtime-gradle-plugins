@@ -5,15 +5,11 @@ JEPs, systemd, Sigstore, SLSA, Renovate and others). Items marked **verified** w
 against the live source; the rest come from the cited documentation and still need confirming
 before they are built. Effort: S (hours), M (a day or two), L (more).
 
-## Fix first
+## Fix first: done
 
-| | What | Why | Effort |
-|---|---|---|---|
-| 1 | **Temurin 24+ cross-builds:** also download the separate `OpenJDK<N>U-jmods_…` archive | Temurin 24 and later ship without `jmods/` (JEP 493); Adoptium publishes jmods as their own asset (**verified** for 25.0.4.1+1). `JlinkRuntime` refuses to cross-link without them, so `javaVersion = 25` with more than one target fails on the default distribution. Check the other six vendors for 25 too | S–M |
-| 2 | **Lock down runtime overrides:** a policy for `APP_JAVA_OPTS`, `JAVA_TOOL_OPTIONS`, `JDK_JAVA_OPTIONS` | They can re-enable an agent, the attach API, or loosen TLS system properties; `lockProperties` covers only `java.security`. Offer `locked` (launcher clears them) or an allow-list, plus an operator `conf/jvm.options` argfile | M |
-| 3 | **Fix the hardening example in `docs/java.md`** | The `TLS_RSA_*` suites it disables are already disabled by default from JDK 24, 21.0.10, 17.0.18 and 11.0.30 | S |
-| 4 | **systemd unit:** `Type=exec`, `SuccessExitStatus=143`, `SystemCallFilter=@system-service`, `PrivateDevices`, `ProtectKernel*`, `RestrictAddressFamilies`, empty `CapabilityBoundingSet`, `LimitNOFILE`; logs to journald (`APP_LOG_TARGET=stdout`) or a logrotate file | `simple` reports success even if the binary can't start; file logs under `/var/log` currently never rotate. Never `MemoryDenyWriteExecute` (breaks JIT) | S |
-| 5 | **Java 26 and 27** | Both have shipped; the plugin stops at 25 | S per release |
+All five were fixed on 2026-10-25: Temurin 24+ separate jmods (and SapMachine 24+, which ships
+none, documented); runtime options can be locked; the hardening example; the systemd unit; Java 26
+and 27. The queue of requested work is in [BACKLOG.md](BACKLOG.md).
 
 ## High
 
@@ -21,7 +17,7 @@ before they are built. Effort: S (hours), M (a day or two), L (more).
 |---|---|---|
 | **Runtime CVE matching in the SBOM:** add a CPE and vendor/build to the runtime component; move to CycloneDX 1.6/1.7; add SPDX licence ids and a `THIRD-PARTY-LICENSES` file built from the SBOM | Scanners can't match `pkg:generic` to advisories; licence notices for the JDK (GPLv2+CPE) and Node must travel with the archive; EU CRA SBOM duties approach | S–M |
 | **Production JVM defaults** (`runtimeDefaults {}`): `MaxRAMPercentage=75`, `ExitOnOutOfMemoryError`, heap dumps and `hs_err` files into `APP_LOG_DIR` with tight permissions, explicit GC, optional `DisableAttachMechanism` | The JVM's defaults (25% heap, SerialGC below 2 CPUs/1.8 GB, dumps in the working directory) suit few services | S |
-| **Sigstore signing and SLSA provenance:** cosign bundles for archives, RPMs and images; a CI recipe with GitHub artifact attestations; signature checks in the documented install steps | `.sha256` from the same server gives integrity, not authenticity; Maven Central now validates Sigstore bundles. Keep PGP for air-gapped sites | M |
+| **Sigstore signing and SLSA provenance:** cosign bundles for archives, RPMs and images; a CI recipe with GitHub artifact attestations; signature checks before installation | `.sha256` from the same server gives integrity, not authenticity; Maven Central now validates Sigstore bundles. Keep PGP for air-gapped sites | M |
 | **Runtime end-of-life and patch tracking:** a `checkRuntimeSupport` task (endoflife.date API), a Renovate preset for the pins and overrides, a documented rebuild cadence for each JDK CPU and Node security release | Embedding a runtime makes patching the app team's job; nothing reminds them | S–M |
 | **Container image:** document that Node apps handle SIGTERM (or add tini); live/ready modes for `--healthcheck` and a Kubernetes probe snippet; OCI labels `created`, `source`, `licenses`, `base.name`, `base.digest`; base image by digest; a `buildx` multi-arch recipe | `HEALTHCHECK` is dropped in OCI-format builds (Podman's default) and ignored by Kubernetes | S–M |
 

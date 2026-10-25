@@ -92,7 +92,7 @@ class JavaAppSecurityTest {
         open.build(Target.parse(TestProject.hostTarget()).installTaskName)
         val conf = tmp.resolve("conf").apply { mkdirs() }
         conf.resolve("jvm.options").writeText("-XX:+NoSuchOptionAnywhere\n")
-        val fromFile = launch(open, conf)
+        val fromFile = runLauncher(open, conf)
 
         val locked =
             javaService(
@@ -101,7 +101,7 @@ class JavaAppSecurityTest {
             )
         locked.build(Target.parse(TestProject.hostTarget()).installTaskName)
         val emptyConf = tmp.resolve("empty-conf").apply { mkdirs() }
-        val refused = launch(locked, emptyConf, "APP_JAVA_OPTS" to "-agentlib:jdwp=transport=dt_socket")
+        val refused = runLauncher(locked, emptyConf, "APP_JAVA_OPTS" to "-agentlib:jdwp=transport=dt_socket")
         assertAll(
             { assertTrue(fromFile.second.contains("NoSuchOptionAnywhere"), fromFile.second) },
             { assertEquals(78, refused.first, refused.second) },
@@ -109,12 +109,11 @@ class JavaAppSecurityTest {
         )
     }
 
-    /** Runs the assembled app's launcher with [conf] as its configuration directory. */
-    private fun launch(project: TestProject, conf: File, vararg env: Pair<String, String>): Pair<Int, String> {
+    private fun runLauncher(project: TestProject, confDir: File, vararg env: Pair<String, String>): Pair<Int, String> {
         val launcher = project.project.resolve("build/app/${TestProject.hostTarget()}/svc-2.0.0/bin/svc")
         val process = ProcessBuilder(launcher.absolutePath, "run").redirectErrorStream(true).apply {
             environment().keys.removeIf { it.endsWith("_OPTIONS") || it.endsWith("_OPTS") }
-            environment()["APP_CONF_DIR"] = conf.absolutePath
+            environment()["APP_CONF_DIR"] = confDir.absolutePath
             environment()["APP_ROOT"] = tmp.resolve("root").absolutePath
             environment().putAll(env)
         }.start()

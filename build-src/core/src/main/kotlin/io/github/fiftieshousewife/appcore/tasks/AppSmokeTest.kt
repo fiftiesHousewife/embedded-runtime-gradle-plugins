@@ -71,7 +71,7 @@ constructor(
 
     private fun test(index: Int, archiveFile: File): String {
         val host = Target.host()
-        val home = extract(archiveFile, temporaryDir.resolve("extract-$index"))
+        val home = extractTopDirectory(archiveFile, temporaryDir.resolve("extract-$index"))
         requirePolicy(home)
         val manifest = AppManifest.read(home)
         val work = temporaryDir.resolve("run-$index").apply { mkdirs() }
@@ -109,8 +109,7 @@ constructor(
         logger.lifecycle("${home.name} complies with runtime policy ${policy.label}")
     }
 
-    /** Extracts [archiveFile] afresh and returns its single top-level directory. */
-    private fun extract(archiveFile: File, into: File): File {
+    private fun extractTopDirectory(archiveFile: File, into: File): File {
         fs.sync {
             from(archives.archiveTree(archiveFile))
             into(into)

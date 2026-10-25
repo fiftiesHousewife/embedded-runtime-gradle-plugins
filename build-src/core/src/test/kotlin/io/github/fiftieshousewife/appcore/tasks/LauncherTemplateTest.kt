@@ -21,7 +21,6 @@ class LauncherTemplateTest {
     fun `every value the Windows launcher puts in ARGS starts with a space`() {
         val assignments = Regex("""set "?ARGS=([^"\r\n]*)""").findAll(template).map { it.groupValues[1] }.toList()
         assertTrue(assignments.size >= 3, "expected the reset, collect and healthcheck assignments in:\n$template")
-        // Appending to ARGS keeps whatever space it already starts with.
         assignments.filter(String::isNotEmpty).forEach { value ->
             assertTrue(
                 value.startsWith(" ") || value.startsWith("%ARGS% "),

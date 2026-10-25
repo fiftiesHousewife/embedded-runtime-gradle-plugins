@@ -34,7 +34,6 @@ internal class AppPublishing(
     private val extension = wiring.extension
     private val ecosystem = wiring.ecosystem
 
-    /** The publication, its software component and the consumable configurations behind it. */
     private val publicationName = ecosystem.extensionName
     private val component: AdhocComponentWithVariants = components.adhoc(publicationName)
     private val publishing: PublishingExtension

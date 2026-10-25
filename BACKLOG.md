@@ -54,7 +54,6 @@ and `./gradlew aiSkills` to install them in a project. Prompt files were dropped
 
 - The company's RPM-packaged JDK: real file name, install path, and whether it ships `jmods/`
   (naming described as `jdk<major>_<patch>-64_linux.x86_64.rpm`).
-- `deploy/curate-runtimes.sh` mirrors only Temurin and Node.js.
 - Node.js has no security customisation (`NODE_EXTRA_CA_CERTS`, TLS options) and no runtime policy.
 - Publishing to Maven Central and the Gradle Plugin Portal (needs the owner's credentials).
 - Proposals awaiting a decision: Jib, SLSA provenance, CDS/AOT cache opt-in.

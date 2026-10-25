@@ -3,17 +3,13 @@ package io.github.fiftieshousewife.appcore
 import org.gradle.api.GradleException
 import java.io.Serializable
 
-enum class Os(
-    val id: String,
-) {
+enum class Os(val id: String) {
     LINUX("linux"),
     WINDOWS("windows"),
     MAC("mac"),
 }
 
-enum class Arch(
-    val id: String,
-) {
+enum class Arch(val id: String) {
     X64("x64"),
     AARCH64("aarch64"),
 }
@@ -23,10 +19,7 @@ enum class Arch(
  * classifier of the published archive, so it is part of the artefact contract and must never change
  * meaning.
  */
-data class Target(
-    val os: Os,
-    val arch: Arch,
-) : Serializable {
+data class Target(val os: Os, val arch: Arch) : Serializable {
     val id: String get() = "${os.id}-${arch.id}"
     val isWindows: Boolean get() = os == Os.WINDOWS
     val archiveExtension: String get() = if (isWindows) "zip" else "tar.gz"
@@ -50,9 +43,8 @@ data class Target(
         /** A comma-separated list, as given on the command line: `linux-x64,windows-x64`. */
         fun parseList(ids: String): List<Target> = ids.split(',').filter(String::isNotBlank).map(::parse)
 
-        fun parse(id: String): Target =
-            SUPPORTED.firstOrNull { it.id == id.trim().lowercase() }
-                ?: throw GradleException("Unsupported target '$id'. Supported: ${SUPPORTED.joinToString()}")
+        fun parse(id: String): Target = SUPPORTED.firstOrNull { it.id == id.trim().lowercase() }
+            ?: throw GradleException("Unsupported target '$id'. Supported: ${SUPPORTED.joinToString()}")
 
         /** The machine Gradle is running on. */
         fun host(): Target {

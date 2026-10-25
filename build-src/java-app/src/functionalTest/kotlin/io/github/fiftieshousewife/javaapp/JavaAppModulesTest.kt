@@ -1,7 +1,7 @@
 package io.github.fiftieshousewife.javaapp
 
-import io.github.fiftieshousewife.appcore.TestProject
 import org.gradle.testkit.runner.TaskOutcome
+import org.junit.jupiter.api.Assertions.assertAll
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
@@ -15,23 +15,23 @@ class JavaAppModulesTest {
 
     @Test
     fun `without jlinkModules the runtime gets what jdeps finds`() {
-        val project = javaService(tmp, javaApp = "")
-
+        val project = javaService(tmp, JavaServiceOptions(javaApp = ""))
         val result = project.build("build")
-        assertEquals(TaskOutcome.SUCCESS, result.task(":appSmokeTest")?.outcome)
         val detected = project.project.resolve("build/app-work/jdeps/modules.txt").readText()
-        assertTrue(detected.contains("jdk.httpserver"), detected)
+        assertAll(
+            { assertEquals(TaskOutcome.SUCCESS, result.task(":appSmokeTest")?.outcome) },
+            { assertTrue(detected.contains("jdk.httpserver"), detected) },
+        )
     }
 
     @Test
     fun `jlinkFindModules adds the modules a failing app turns out to need`() {
-        // jdk.httpserver left out: the app fails at startup with NoClassDefFoundError.
-        val project = javaService(tmp, javaApp = """jlinkModules = listOf("java.base")""")
-
+        val project = javaService(tmp, JavaServiceOptions(javaApp = """jlinkModules = listOf("java.base")"""))
         val failed = project.buildAndFail("build")
-        assertTrue(failed.output.contains("./gradlew jlinkFindModules"), failed.output)
-
         val found = project.build("jlinkFindModules")
-        assertTrue(found.output.contains("""additionalModules.addAll("jdk.httpserver")"""), found.output)
+        assertAll(
+            { assertTrue(failed.output.contains("./gradlew jlinkFindModules"), failed.output) },
+            { assertTrue(found.output.contains("""additionalModules.addAll("jdk.httpserver")"""), found.output) },
+        )
     }
 }

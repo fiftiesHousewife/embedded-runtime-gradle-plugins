@@ -9,15 +9,14 @@ object NodeFixture {
     val nodeVersion: String by lazy { TestProject.run(nodeExecutable(), "--version").trim().removePrefix("v") }
 
     /** Points the build at the fake site and pins [nodeVersion]. */
-    fun properties(project: TestProject) =
-        arrayOf(
-            NodeSources.PUBLIC_URL to
-                project.sources
-                    .resolve("nodejs")
-                    .toURI()
-                    .toString(),
-            NodeSources.VERSION to nodeVersion,
-        )
+    fun properties(project: TestProject) = arrayOf(
+        NodeSources.PUBLIC_URL to
+            project.sources
+                .resolve("nodejs")
+                .toURI()
+                .toString(),
+        NodeSources.VERSION to nodeVersion,
+    )
 
     fun publish(project: TestProject) {
         val node = File(nodeExecutable()).canonicalFile
@@ -53,13 +52,14 @@ object NodeFixture {
         return npm!!
     }
 
-    private fun nodeExecutable(): String = onPath("node")?.absolutePath.also { assumeTrue(it != null, "node is not on PATH") }!!
+    private fun nodeExecutable(): String = onPath("node")?.absolutePath.also {
+        assumeTrue(it != null, "node is not on PATH")
+    }!!
 
-    private fun onPath(name: String): File? =
-        System
-            .getenv("PATH")
-            .orEmpty()
-            .split(File.pathSeparator)
-            .map { File(it, name) }
-            .firstOrNull { it.canExecute() }
+    private fun onPath(name: String): File? = System
+        .getenv("PATH")
+        .orEmpty()
+        .split(File.pathSeparator)
+        .map { File(it, name) }
+        .firstOrNull { it.canExecute() }
 }

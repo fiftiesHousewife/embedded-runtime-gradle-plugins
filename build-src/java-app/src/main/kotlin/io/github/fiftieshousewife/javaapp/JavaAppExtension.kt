@@ -1,8 +1,11 @@
 package io.github.fiftieshousewife.javaapp
 
 import io.github.fiftieshousewife.appcore.AppExtension
+import org.gradle.api.Action
+import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.provider.ListProperty
 import org.gradle.api.provider.Property
+import org.gradle.api.tasks.Nested
 
 /** `javaApp {}`: the Java application archive and the jlink-trimmed runtime inside it. */
 abstract class JavaAppExtension : AppExtension() {
@@ -30,4 +33,17 @@ abstract class JavaAppExtension : AppExtension() {
 
     /** Fixed JVM options baked into the launcher, before `$APP_JAVA_OPTS`. */
     abstract val jvmArgs: ListProperty<String>
+
+    /**
+     * Files copied over every runtime after [security] is applied, by path: anything the plugin does
+     * not model, such as a provider's jar or a replacement `conf/logging.properties`. Default
+     * `src/deploy/runtime`.
+     */
+    abstract val runtimeOverlay: DirectoryProperty
+
+    /** Certificates, security policy and hardening applied to every runtime; see [JavaRuntimeSecurity]. */
+    @get:Nested
+    abstract val security: JavaRuntimeSecurity
+
+    fun security(action: Action<JavaRuntimeSecurity>) = action.execute(security)
 }

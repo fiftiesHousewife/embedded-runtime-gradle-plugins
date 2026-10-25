@@ -10,7 +10,10 @@ object PluginVersion {
     val current: String by lazy {
         Properties()
             .apply {
-                PluginVersion::class.java.getResourceAsStream("/io/github/fiftieshousewife/appcore/version.properties")?.use(::load)
+                PluginVersion::class.java
+                    .getResourceAsStream(
+                        "/io/github/fiftieshousewife/appcore/version.properties",
+                    )?.use(::load)
             }.getProperty("version") ?: error("version.properties missing from the app-core jar")
     }
 }

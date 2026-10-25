@@ -1,83 +1,94 @@
 package io.github.fiftieshousewife.javaapp
 
 import io.github.fiftieshousewife.appcore.TestProject
+import io.github.fiftieshousewife.appcore.checks
 import org.gradle.testkit.runner.TaskOutcome
+import org.junit.jupiter.api.Assertions.assertAll
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.io.File
-import java.net.ServerSocket
+import java.nio.file.Files
 import java.security.MessageDigest
+import java.util.HexFormat
 
 class JavaAppPluginTest {
     @TempDir
     lateinit var tmp: File
 
-    private fun javaService(extraBuild: String = "") = javaService(tmp, build = extraBuild)
+    private val host = TestProject.hostTarget()
+
+    private fun archive(project: TestProject, version: String = "2.0.0") =
+        project.project.resolve("build/distributions/svc-$version-$host.tar.gz")
 
     @Test
-    fun `builds, smoke-tests and reproduces a self-contained archive`() {
-        val project = javaService()
-        val first = project.build("build")
-        assertEquals(TaskOutcome.SUCCESS, first.task(":appSmokeTest")?.outcome)
-
-        val archive = project.project.resolve("build/distributions/svc-2.0.0-${TestProject.hostTarget()}.tar.gz")
-        val entries = TestProject.run("tar", "-tvzf", archive.absolutePath)
-        listOf(
-            "svc-2.0.0/bin/svc",
-            "svc-2.0.0/runtime/bin/java",
-            "svc-2.0.0/lib/svc-2.0.0.jar",
-            "svc-2.0.0/conf.defaults/app.properties",
-            "svc-2.0.0/META-INF/app.json",
-            "svc-2.0.0/META-INF/sbom.cdx.json",
-        ).forEach { assertTrue(entries.contains(it), "missing $it in\n$entries") }
-        assertTrue(entries.lines().any { it.startsWith("-rwxr-xr-x") && it.endsWith("svc-2.0.0/bin/svc") }, entries)
-        assertTrue(entries.lines().any { it.startsWith("-rwxr-xr-x") && it.endsWith("runtime/lib/jspawnhelper") }, entries)
-
-        project.build("clean", "appTar")
-        val checksum = sha256(archive)
-        val rebuilt = project.build("clean", "appTar")
-        assertTrue(rebuilt.output.contains("Reusing configuration cache"), rebuilt.output)
-        assertEquals(checksum, sha256(archive), "rebuilding the same sources must produce an identical archive")
+    fun `builds and smoke-tests a self-contained archive laid out like the application plugin's`() {
+        val project = javaService(tmp)
+        val result = project.build("build")
+        val entries = TestProject.run("tar", "-tvzf", archive(project).absolutePath).lines()
+        val smokeTested = { assertEquals(TaskOutcome.SUCCESS, result.task(":appSmokeTest")?.outcome) }
+        val present = LAYOUT.map { path ->
+            { assertTrue(entries.any { it.endsWith("svc-2.0.0/$path") }, "missing $path") }
+        }
+        val executable =
+            EXECUTABLES.map { path ->
+                { assertTrue(entries.any { it.startsWith("-rwxr-xr-x") && it.endsWith(path) }, "$path") }
+            }
+        assertAll(checks(listOf(smokeTested) + present + executable))
     }
 
     @Test
-    fun `the archive installs, upgrades and rolls back with deploy-install-sh`() {
-        val project = javaService()
+    fun `rebuilding the same sources produces a byte-identical archive from the configuration cache`() {
+        val project = javaService(tmp)
+        project.build("clean", "appTar")
+        val first = sha256(archive(project))
+        val rebuilt = project.build("clean", "appTar")
+        assertAll(
+            { assertTrue(rebuilt.output.contains("Reusing configuration cache"), rebuilt.output) },
+            { assertEquals(first, sha256(archive(project))) },
+        )
+    }
+
+    @Test
+    fun `the archive installs, keeps an operator's configuration through an upgrade, and rolls back`() {
+        val project = javaService(tmp)
         project.build("appTar")
-        val first = project.project.resolve("build/distributions/svc-2.0.0-${TestProject.hostTarget()}.tar.gz")
         project.build("appTar", "-PappVersion=2.1.0")
-        val second = project.project.resolve("build/distributions/svc-2.1.0-${TestProject.hostTarget()}.tar.gz")
-
-        // conf/env is the operator's per-server file; a free port keeps parallel test runs apart.
-        val root = tmp.resolve("srv/svc")
-        val port = ServerSocket(0).use { it.localPort }
-        root.resolve("conf").mkdirs()
-        root.resolve("conf/env").writeText("APP_PORT=$port\n")
-
-        fun install(vararg args: String) =
-            TestProject.run("bash", System.getProperty("installScript"), *args, "--app-root", root.absolutePath)
-
+        val installer = Installer(tmp.resolve("srv/svc"))
         try {
-            install("install", "--archive", first.absolutePath, "--supervisor", "nohup", "--health-timeout", "60")
-            assertEquals("2.0.0", root.resolve("current").canonicalFile.name)
-            assertEquals("key=value\n", root.resolve("conf/app.properties").readText(), "conf/ is seeded from conf.defaults/")
-
-            // An operator edit must survive an upgrade: conf/ is seeded once, never overwritten.
-            root.resolve("conf/app.properties").writeText("key=edited\n")
-            install("install", "--archive", second.absolutePath, "--supervisor", "nohup", "--health-timeout", "60")
-            assertEquals("2.1.0", root.resolve("current").canonicalFile.name)
-            assertEquals("key=edited\n", root.resolve("conf/app.properties").readText())
-            val status = install("status", "--supervisor", "nohup")
-            assertTrue(status.contains("health:   healthy"), status)
-
-            install("rollback", "--supervisor", "nohup", "--health-timeout", "60")
-            assertEquals("2.0.0", root.resolve("current").canonicalFile.name)
+            installer.install(archive(project))
+            val seeded = installer.config("app.properties").readText()
+            installer.config("app.properties").writeText("key=edited\n")
+            installer.install(archive(project, "2.1.0"))
+            val upgraded = installer.current
+            val status = installer.status()
+            installer.rollback()
+            assertAll(
+                { assertEquals("key=value\n", seeded) },
+                { assertEquals("2.1.0", upgraded) },
+                { assertEquals("key=edited\n", installer.config("app.properties").readText()) },
+                { assertTrue(status.contains("health:   healthy"), status) },
+                { assertEquals("2.0.0", installer.current) },
+            )
         } finally {
-            install("stop", "--supervisor", "nohup")
+            installer.stop()
         }
     }
 
-    private fun sha256(file: File) = MessageDigest.getInstance("SHA-256").digest(file.readBytes()).joinToString("") { "%02x".format(it) }
+    private fun sha256(file: File) =
+        HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(Files.readAllBytes(file.toPath())))
+
+    private companion object {
+        val LAYOUT =
+            listOf(
+                "bin/svc",
+                "runtime/bin/java",
+                "lib/svc-2.0.0.jar",
+                "conf.defaults/app.properties",
+                "META-INF/app.json",
+                "META-INF/sbom.cdx.json",
+            )
+        val EXECUTABLES = listOf("svc-2.0.0/bin/svc", "runtime/lib/jspawnhelper")
+    }
 }

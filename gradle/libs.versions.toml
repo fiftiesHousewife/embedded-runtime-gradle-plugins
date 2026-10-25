@@ -8,8 +8,13 @@ plugin-publish = "2.2.1"
 versions = "0.66.0"
 spotless = "8.10.4"
 detekt = "1.23.8"
+forbiddenapis = "3.11"
+cyclonedx = "13.4.0"
+packageurl = "1.5.0"
 
 [libraries]
+cyclonedx-core = { module = "org.cyclonedx:cyclonedx-core-java", version.ref = "cyclonedx" }
+packageurl = { module = "com.github.package-url:packageurl-java", version.ref = "packageurl" }
 junit-bom = { module = "org.junit:junit-bom", version.ref = "junit" }
 junit-jupiter-api = { module = "org.junit.jupiter:junit-jupiter-api" }
 # Gradle plugins applied from build-src/build-logic convention plugins, as ordinary dependencies.
@@ -17,3 +22,4 @@ gradle-plugin-publish = { module = "com.gradle.plugin-publish:com.gradle.plugin-
 gradle-versions = { module = "io.github.ben-manes.versions:io.github.ben-manes.versions.gradle.plugin", version.ref = "versions" }
 gradle-spotless = { module = "com.diffplug.spotless:com.diffplug.spotless.gradle.plugin", version.ref = "spotless" }
 gradle-detekt = { module = "io.gitlab.arturbosch.detekt:io.gitlab.arturbosch.detekt.gradle.plugin", version.ref = "detekt" }
+gradle-forbiddenapis = { module = "de.thetaphi:forbiddenapis", version.ref = "forbiddenapis" }

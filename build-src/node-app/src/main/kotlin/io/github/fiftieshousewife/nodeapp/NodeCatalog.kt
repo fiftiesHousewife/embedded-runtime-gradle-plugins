@@ -13,9 +13,12 @@ object NodeCatalog {
 
     val cataloguedNode: String by lazy {
         Properties()
-            .apply { NodeCatalog::class.java.getResourceAsStream(RESOURCE)?.use(::load) ?: error("Missing $RESOURCE in plugin jar") }
-            .getProperty("node.default")
+            .apply {
+                NodeCatalog::class.java.getResourceAsStream(RESOURCE)?.use(::load)
+                    ?: error("Missing $RESOURCE in plugin jar")
+            }.getProperty("node.default")
     }
 
-    fun nodeVersion(providers: ProviderFactory): Provider<String> = providers.gradleProperty(NodeSources.VERSION).orElse(cataloguedNode)
+    fun nodeVersion(providers: ProviderFactory): Provider<String> =
+        providers.gradleProperty(NodeSources.VERSION).orElse(cataloguedNode)
 }

@@ -1,0 +1,11 @@
+plugins {
+    kotlin("jvm") version "@KOTLIN@"
+    id("io.github.fiftieshousewife.java-app")
+}
+version = "1.0.0"
+application { mainClass = "test.MainKt" }
+javaApp {
+    javaVersion = @FEATURE@
+    jlinkModules = listOf("java.base", "jdk.httpserver")
+}
+java { toolchain { vendor = JvmVendorSpec.matching("") } }

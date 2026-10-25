@@ -24,7 +24,7 @@ breaks applying both together, breaks this build.
 ## Build and test
 
 ```bash
-./gradlew check                                  # every module: ktlint, detekt, unit + functional tests
+./gradlew check                                  # every module: ktlint, detekt, Forbidden APIs, JaCoCo, all tests
 ./gradlew -p build-src :java-app:functionalTest  # one module's TestKit tests
 ./gradlew -p samples/java-service build          # end to end, against the real internet
 ./gradlew -p samples/java-service build -PjavaApp.jdk.distribution=zulu
@@ -32,8 +32,9 @@ breaks applying both together, breaks this build.
 ./gradlew -p build-src dependencyUpdates         # upgrades within the current major
 ```
 
-Detekt and ktlint are blocking. Unit tests (`src/test`) cover pure logic, above all every vendor's
-download URL. Functional tests (`src/functionalTest`) build real throwaway projects through TestKit
+ktlint, detekt and Forbidden APIs are blocking. Unit tests (`src/test`) cover every `internal`
+decision explicitly: vendor download URLs (`jdk-download-urls.csv`), version forms, security policy
+merging, certificates, the module search, launcher lines, SBOM contents and npm arguments. Functional tests (`src/functionalTest`) build real throwaway projects through TestKit
 against a fake download site on disk (`TestProject` in `core/src/testFixtures`, plus `JdkFixture`
 and `NodeFixture`), so they need no network except the Kotlin test, which resolves the Kotlin
 plugin from the portal.
@@ -45,6 +46,8 @@ Where things are tested:
 - `JavaAppTargetsTest`: several targets in one build and one publication, the container context,
   JDKs from a directory and from a shared local path, and the `app-smoke-test` consumer plugin.
 - `JavaAppModulesTest`: the jdeps default and `jlinkFindModules` fixing a missing module.
+- `JavaAppSecurityTest`: certificates, policy and ciphers seen by the running JVM (a probe program run
+  on the built runtime), the customisation record and overlay, and the forbidden-module guard.
 - `KotlinAppTest`, `NodeAppPluginTest`, the settings plugin tests, and the URL unit tests.
 
 Known test caveats:
@@ -124,6 +127,17 @@ whose Gradle Module Metadata carries the standard OS and architecture attributes
 **Configuration cache:** lambdas stored in tasks (`onlyIf`, providers resolved at execution) must
 not capture `AppWiring` or anything else holding the `Project`; copy what they need into locals.
 
+**Runtime customisation** (`CustomiseRuntime`, one per target, between `jlink` and the archive)
+copies the linked runtime, refuses forbidden modules (`ForbiddenModules`, from the runtime's `release`
+file), installs certificates with the JDK's own `KeyStore` (`TrustedCertificates`), appends the
+policy's changes to `java.security` (`SecurityPolicy`: later entries win, so the JDK's file stays
+intact; disabled-algorithm lists are extended, never replaced), copies the overlay, and writes
+`conf/security/java-app-customisations.txt`. It is an ordinary task so builds can extend it.
+
+**SBOMs and image labels come from standard libraries and specs:** `CycloneDx` builds the SBOM with
+the CycloneDX reference model and package-url's purl builder (no timestamp, so rebuilds are
+byte-identical); `DockerfileTemplate` fills in the OCI `org.opencontainers.image.*` annotations.
+
 **Artifactory credentials** come from Gradle's `artifactoryUsername`/`artifactoryPassword` by
 repository *name*, which must be `artifactory` and is unique per container. Other repositories in
 the same container (the runtime Ivy repositories) set credentials explicitly instead.
@@ -135,20 +149,51 @@ the same container (the runtime Ivy repositories) set credentials explicitly ins
 release one platform at a time, so check all five URLs exist before pinning (the unit tests prove the
 URL shape, not that the file exists). The `every catalogue pin…` test checks each pin's form.
 
-**Add a JDK vendor.** Add a `JdkDistribution` entry (vendor spec, base URL, pattern, version regex,
-example, `artifact()`), pins in `jdks.properties`, URL assertions for Linux, macOS and Windows in
-`JdkSourcesTest` and a rejected example in its version test, and a row in the README table. Then
-build `samples/java-service` with `-PjavaApp.jdk.distribution=<id>`.
+**Add a JDK vendor.** Add a `JdkDistribution` entry (vendor spec, `JdkSite`, `VersionForm`, and an
+`artifact()` built from an `ArchiveName` and the vendor's `Spelling`), pins in `jdks.properties`,
+Linux, macOS and Windows rows in `java-app/src/test/resources/jdk-download-urls.csv`, a rejected
+example in `JdkVersionFormsTest`, and a row in the README table. Then build `samples/java-service`
+with `-PjavaApp.jdk.distribution=<id>`.
 
 **Add a target.** One constant in `Arch` or `Os` and one entry in `Target.SUPPORTED`. Target ids
 are published Maven classifiers: never change an existing one.
 
 **Release.** `./gradlew publish -PreleaseVersion=x.y.z -PsigningKey=… -PsigningPassword=…` puts all
 three modules on Maven Central (or the corporate repository); then `./gradlew publishPlugins
--PreleaseVersion=x.y.z` publishes the two plugins to the Gradle Plugin Portal. `app-core` must
-already be on Central, because the portal resolves plugin dependencies from there.
+-PreleaseVersion=x.y.z` publishes the three plugins (`java-app`, `node-app`, and `app-smoke-test`
+from `app-core`) to the Gradle Plugin Portal. `app-core` must already be on Central, because the
+portal resolves plugin dependencies from there.
 
 ## Conventions
+
+The coding standards follow the Clean Code plugin ([fiftiesHousewife/Clean-Claude](https://github.com/fiftiesHousewife/Clean-Claude)),
+enforced with standard tools rather than the plugin itself; the thresholds live in
+`config/detekt/detekt.yml` and `.editorconfig`:
+
+| Standard | Enforced by |
+|---|---|
+| Lines of at most 120 characters | ktlint (Spotless) and detekt |
+| Functions of at most 30 lines, at most 4 parameters (data classes exempt), classes of at most 150 lines | detekt |
+| Cyclomatic and cognitive complexity at most 10, nesting at most 3 | detekt |
+| No magic strings, no `*Helper`/`*Util`/`*Manager`/`*Processor`, no `handle`/`process`/`do`/`perform` names | detekt |
+| No swallowed exceptions, no `println`/`printStackTrace`, no legacy `java.io` streams | detekt |
+| No default-charset or default-locale JDK calls, nothing deprecated or internal | Forbidden APIs |
+| Coverage reported | JaCoCo |
+
+And by hand, since no tool checks them:
+
+- Small functions, each with one job; decisions extracted into `internal` functions or objects with
+  their own unit tests. Collection operations rather than loops (a `tailrec` where an attempt must
+  repeat).
+- Tests: several checks go in one `assertAll` (`checks(...)` turns a list of lambdas into
+  `Executable`s); no comments inside tests; fixture sources (Java, Kotlin, JavaScript, build scripts)
+  live in `src/*/resources/fixtures`, build scripts with a `.template` suffix so ktlint leaves them
+  alone.
+- Libraries first: CycloneDX and package-url for SBOMs, the JDK's `KeyStore`, `CertificateFactory`,
+  `HexFormat` and `java.nio.file`, Gradle's archive and copy tasks, Groovy's JSON. Hand-written code
+  only where nothing standard exists (Ivy URL patterns for the toolchain resolver, the launchers).
+  `java.io.File` stays where Gradle's own API hands one out.
+- No `@Suppress`: a rule that does not fit is a design to change, or a threshold to discuss.
 
 - Names say what things are: "app" and "archive", "target" for OS and CPU. Avoid "bundle" and
   "platform", which were too general.

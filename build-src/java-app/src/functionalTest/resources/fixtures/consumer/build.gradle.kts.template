@@ -1,0 +1,3 @@
+plugins { id("io.github.fiftieshousewife.app-smoke-test") }
+repositories { maven { url = uri("@REPO@") } }
+dependencies { smokeTest("com.example.test:svc:2.0.0") }

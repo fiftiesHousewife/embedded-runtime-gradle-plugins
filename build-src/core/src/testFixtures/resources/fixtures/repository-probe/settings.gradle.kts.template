@@ -1,0 +1,7 @@
+plugins { @PLUGINS@ }
+rootProject.name = "probe"
+dependencyResolutionManagement.repositories.forEach { repo ->
+    val url = (repo as? org.gradle.api.artifacts.repositories.UrlArtifactRepository)?.url
+    println("REPO ${repo.name} $url")
+}
+pluginManagement.repositories.forEach { println("PLUGINS ${it.name}") }

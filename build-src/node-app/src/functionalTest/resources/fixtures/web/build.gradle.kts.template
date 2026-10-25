@@ -1,0 +1,4 @@
+plugins { id("io.github.fiftieshousewife.node-app") }
+group = "com.example.test"
+version = "3.1.0"
+nodeApp { entryPoint = "server.mjs" }

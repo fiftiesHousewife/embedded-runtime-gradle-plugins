@@ -14,7 +14,8 @@ gradlePlugin {
             id = "io.github.fiftieshousewife.node-app.settings"
             implementationClass = "io.github.fiftieshousewife.nodeapp.NodeAppSettingsPlugin"
             displayName = "Node app repositories"
-            description = "Routes Maven, plugin and Node.js resolution to the public internet or a corporate Artifactory"
+            description =
+                "Routes Maven, plugin and Node.js resolution to the public internet or a corporate Artifactory"
             tags = listOf("nodejs", "npm", "artifactory")
         }
         register("nodeApp") {

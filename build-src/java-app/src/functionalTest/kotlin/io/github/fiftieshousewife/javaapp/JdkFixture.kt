@@ -13,53 +13,47 @@ object JdkFixture {
     val javaFeature: Int = Runtime.version().feature()
 
     /** Points the build at the fake site and pins [jdkVersion]. */
-    fun properties(project: TestProject) =
-        arrayOf(
-            JdkSources.PUBLIC_URL to
-                project.sources
-                    .resolve("adoptium")
-                    .toURI()
-                    .toString(),
-            JdkSources.VERSION_PREFIX + javaFeature to jdkVersion,
-        )
+    fun properties(project: TestProject) = arrayOf(
+        JdkSources.PUBLIC_URL to
+            project.sources
+                .resolve("adoptium")
+                .toURI()
+                .toString(),
+        JdkSources.VERSION_PREFIX + javaFeature to jdkVersion,
+    )
 
     /** The JDK running the tests, which the fixtures repackage. */
     val home: File get() = File(System.getProperty("java.home"))
 
     /** Publishes the test JDK as `OpenJDK<f>U-jdk_<arch>_<os>_hotspot_<v>.tar.gz` for each target id. */
-    fun publish(
-        project: TestProject,
-        vararg targets: String = arrayOf(TestProject.hostTarget()),
-    ) = targets.forEach { t ->
-        val (os, arch) = t.split("-")
-        archive(
-            project,
-            project.sources
-                .resolve("adoptium/temurin$javaFeature-binaries/releases/download/jdk-$jdkVersion")
-                .resolve("OpenJDK${javaFeature}U-jdk_${arch}_${os}_hotspot_${jdkVersion.replace('+', '_')}.tar.gz"),
-        )
-    }
+    fun publish(project: TestProject, vararg targets: String = arrayOf(TestProject.hostTarget())) =
+        targets.forEach { t ->
+            val (os, arch) = t.split("-")
+            archive(
+                project,
+                project.sources
+                    .resolve("adoptium/temurin$javaFeature-binaries/releases/download/jdk-$jdkVersion")
+                    .resolve("OpenJDK${javaFeature}U-jdk_${arch}_${os}_hotspot_${jdkVersion.replace('+', '_')}.tar.gz"),
+            )
+        }
 
     /** Lays the test JDK out under [root] the way a curated Artifactory tree (or a shared local directory) holds it. */
-    fun publishCurated(
-        project: TestProject,
-        root: File,
-        target: String = TestProject.hostTarget(),
-    ) {
+    fun publishCurated(project: TestProject, root: File, target: String = TestProject.hostTarget()) {
         val version = jdkVersion.replace('+', '_')
         archive(project, root.resolve("temurin/jdk/$version/jdk-$version-$target.tar.gz"))
     }
 
-    private fun archive(
-        project: TestProject,
-        out: File,
-    ) {
+    private fun archive(project: TestProject, out: File) {
         assumeTrue(home.resolve("jmods").isDirectory, "the test JDK must ship jmods/")
         val stage = project.dir.resolve("stage/jdk-$jdkVersion")
         if (!stage.exists()) {
             stage.mkdirs()
             // Dereference links (distro JDKs link into /etc); dangling ones are skipped, not fatal.
-            TestProject.run("sh", "-c", "cd '${home.absolutePath}' && tar -chf - . 2>/dev/null | (cd '${stage.absolutePath}' && tar -xf -)")
+            TestProject.run(
+                "sh",
+                "-c",
+                "cd '${home.absolutePath}' && tar -chf - . 2>/dev/null | (cd '${stage.absolutePath}' && tar -xf -)",
+            )
         }
         out.parentFile.mkdirs()
         TestProject.run("tar", "-czf", out.absolutePath, "-C", stage.parentFile.absolutePath, stage.name)

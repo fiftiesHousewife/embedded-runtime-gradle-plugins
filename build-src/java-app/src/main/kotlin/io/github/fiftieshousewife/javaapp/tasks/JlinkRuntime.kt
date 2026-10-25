@@ -28,44 +28,44 @@ import javax.inject.Inject
  */
 @CacheableTask
 abstract class JlinkRuntime
-    @Inject
-    constructor(
-        private val exec: ExecOperations,
-        private val fs: FileSystemOperations,
-    ) : DefaultTask() {
-        @get:Internal abstract val toolJdk: DirectoryProperty
+@Inject
+constructor(
+    private val exec: ExecOperations,
+    private val fs: FileSystemOperations,
+) : DefaultTask() {
+    @get:Internal abstract val toolJdk: DirectoryProperty
 
-        @get:Internal abstract val targetJdk: DirectoryProperty
+    @get:Internal abstract val targetJdk: DirectoryProperty
 
-        @get:Input abstract val jdkVersion: Property<String>
+    @get:Input abstract val jdkVersion: Property<String>
 
-        @get:Input abstract val host: Property<Target>
+    @get:Input abstract val host: Property<Target>
 
-        @get:Input abstract val target: Property<Target>
+    @get:Input abstract val target: Property<Target>
 
-        @get:Input abstract val modules: ListProperty<String>
+    @get:Input abstract val modules: ListProperty<String>
 
-        @get:Input abstract val options: ListProperty<String>
+    @get:Input abstract val options: ListProperty<String>
 
-        @get:OutputDirectory abstract val outputDir: DirectoryProperty
+    @get:OutputDirectory abstract val outputDir: DirectoryProperty
 
-        @TaskAction
-        fun link() {
-            val out = outputDir.get().asFile
-            fs.delete { delete(out) } // jlink refuses to write into an existing directory
+    @TaskAction
+    fun link() {
+        val out = outputDir.get().asFile
+        fs.delete { delete(out) } // jlink refuses to write into an existing directory
 
-            val modules = modules.get()
-            if (modules.isEmpty()) throw GradleException("javaApp.jlinkModules is empty; add at least java.base")
+        val modules = modules.get()
+        if (modules.isEmpty()) throw GradleException("javaApp.jlinkModules is empty; add at least java.base")
 
-            val tool = JdkTools.home(toolJdk.get().asFile)
-            val targetHome = JdkTools.home(targetJdk.get().asFile)
-            val cross = host.get() != target.get()
-            if (cross && !targetHome.resolve("jmods").isDirectory) {
-                throw GradleException(
-                    "Cross-linking for ${target.get()} needs the target JDK's jmods/ directory, which " +
-                        "$targetHome lacks (JEP 493 builds). Use a JDK distribution that ships jmods, or build on ${target.get()}.",
-                )
-            }
-            JdkTools.link(exec, tool, targetHome, modules, options.get(), out)
+        val tool = JdkTools.home(toolJdk.get().asFile)
+        val targetHome = JdkTools.home(targetJdk.get().asFile)
+        val cross = host.get() != target.get()
+        if (cross && !targetHome.resolve("jmods").isDirectory) {
+            throw GradleException(
+                "Cross-linking for ${target.get()} needs the target JDK's jmods/ directory, which $targetHome lacks " +
+                    "(JEP 493 builds). Use a JDK distribution that ships jmods, or build on ${target.get()}.",
+            )
         }
+        JdkTools.link(exec, JlinkRequest(tool, targetHome, modules, options.get(), out))
     }
+}

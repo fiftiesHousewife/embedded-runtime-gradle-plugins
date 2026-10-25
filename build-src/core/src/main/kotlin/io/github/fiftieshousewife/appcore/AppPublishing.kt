@@ -89,33 +89,9 @@ internal class AppPublishing(
     }
 
     /** Adds each target's archive as a variant and its SBOM as an artifact; [untested] were never started here. */
-    fun addTargets(
-        built: List<TargetTasks>,
-        untested: List<Target>,
-    ) {
+    fun addTargets(built: List<TargetTasks>, untested: List<Target>) {
         guard.configure { untestedTargets.set(untested.map { it.id }) }
-        val objects = project.objects
-        built.forEach { t ->
-            val elements =
-                project.configurations.consumable("${publicationName}Elements${t.target.taskSuffix}") {
-                    description = "The app archive for ${t.target.id}"
-                    attributes {
-                        attribute(Category.CATEGORY_ATTRIBUTE, objects.named(Category::class.java, "${ecosystem.id}-app"))
-                        // The runtime and every dependency are inside the archive.
-                        attribute(Bundling.BUNDLING_ATTRIBUTE, objects.named(Bundling::class.java, Bundling.EMBEDDED))
-                        attribute(
-                            OperatingSystemFamily.OPERATING_SYSTEM_ATTRIBUTE,
-                            objects.named(OperatingSystemFamily::class.java, osFamilyOf(t.target)),
-                        )
-                        attribute(
-                            MachineArchitecture.ARCHITECTURE_ATTRIBUTE,
-                            objects.named(MachineArchitecture::class.java, architectureOf(t.target)),
-                        )
-                    }
-                    outgoing.artifact(t.tar)
-                }
-            component.addVariantsFromConfiguration(elements.get()) { mapToMavenScope("runtime") }
-        }
+        built.forEach(::addVariant)
         publishing.publications.named(publicationName, MavenPublication::class.java) {
             built.forEach { t ->
                 artifact(t.sbom.flatMap { it.outputFile }) {
@@ -127,18 +103,39 @@ internal class AppPublishing(
         }
     }
 
-    companion object {
-        fun osFamilyOf(target: Target) =
-            when (target.os) {
-                Os.LINUX -> OperatingSystemFamily.LINUX
-                Os.WINDOWS -> OperatingSystemFamily.WINDOWS
-                Os.MAC -> OperatingSystemFamily.MACOS
+    private fun addVariant(built: TargetTasks) {
+        val objects = project.objects
+        val elements =
+            project.configurations.consumable("${publicationName}Elements${built.target.taskSuffix}") {
+                description = "The app archive for ${built.target.id}"
+                attributes {
+                    attribute(Category.CATEGORY_ATTRIBUTE, objects.named(Category::class.java, "${ecosystem.id}-app"))
+                    // The runtime and every dependency are inside the archive.
+                    attribute(Bundling.BUNDLING_ATTRIBUTE, objects.named(Bundling::class.java, Bundling.EMBEDDED))
+                    attribute(
+                        OperatingSystemFamily.OPERATING_SYSTEM_ATTRIBUTE,
+                        objects.named(OperatingSystemFamily::class.java, osFamilyOf(built.target)),
+                    )
+                    attribute(
+                        MachineArchitecture.ARCHITECTURE_ATTRIBUTE,
+                        objects.named(MachineArchitecture::class.java, architectureOf(built.target)),
+                    )
+                }
+                outgoing.artifact(built.tar)
             }
+        component.addVariantsFromConfiguration(elements.get()) { mapToMavenScope("runtime") }
+    }
 
-        fun architectureOf(target: Target) =
-            when (target.arch) {
-                Arch.X64 -> MachineArchitecture.X86_64
-                Arch.AARCH64 -> MachineArchitecture.ARM64
-            }
+    companion object {
+        fun osFamilyOf(target: Target) = when (target.os) {
+            Os.LINUX -> OperatingSystemFamily.LINUX
+            Os.WINDOWS -> OperatingSystemFamily.WINDOWS
+            Os.MAC -> OperatingSystemFamily.MACOS
+        }
+
+        fun architectureOf(target: Target) = when (target.arch) {
+            Arch.X64 -> MachineArchitecture.X86_64
+            Arch.AARCH64 -> MachineArchitecture.ARM64
+        }
     }
 }

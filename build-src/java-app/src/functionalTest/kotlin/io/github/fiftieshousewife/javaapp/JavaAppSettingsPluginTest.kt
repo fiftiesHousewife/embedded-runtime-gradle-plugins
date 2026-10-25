@@ -1,7 +1,9 @@
 package io.github.fiftieshousewife.javaapp
 
 import io.github.fiftieshousewife.appcore.TestProject
+import org.junit.jupiter.api.Assertions.assertAll
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
@@ -11,59 +13,59 @@ class JavaAppSettingsPluginTest {
     @TempDir
     lateinit var tmp: File
 
-    private fun project(
+    private fun repositories(
         properties: String,
         vararg settingsPlugins: String = arrayOf(JavaAppSettingsPlugin.ID),
-    ): TestProject =
-        TestProject(tmp).apply {
-            file("gradle.properties", properties)
-            file(
-                "settings.gradle.kts",
-                """
-            plugins { ${settingsPlugins.joinToString("; ") { "id(\"$it\")" }} }
-            rootProject.name = "probe"
-            dependencyResolutionManagement.repositories.forEach { repo ->
-                val url = (repo as? org.gradle.api.artifacts.repositories.UrlArtifactRepository)?.url
-                println("REPO ${'$'}{repo.name} ${'$'}url")
+    ): List<String> {
+        val project =
+            TestProject(tmp).apply {
+                file("gradle.properties", properties)
+                repositoryProbe(*settingsPlugins)
             }
-            pluginManagement.repositories.forEach { println("PLUGINS ${'$'}{it.name}") }
-            """,
-            )
-        }
-
-    @Test
-    fun `without artifactory it uses Maven Central, the plugin portal and the vendor's own site`() {
-        val output = project("").build("help").output
-
-        assertTrue(output.contains("REPO MavenRepo https://repo.maven.apache.org/maven2/"), output)
-        assertTrue(output.contains("REPO temurinJdks https://github.com/adoptium/"), output)
-        assertTrue(output.contains("PLUGINS Gradle Central Plugin Repository"), output)
+        return project.repositories(project.build("help").output)
     }
 
     @Test
-    fun `artifactory routes everything through the configured instance`() {
-        val output =
-            project(
-                """
-            artifactory.url=https://artifactory.example.com/artifactory
-            artifactory.repo.maven=maven-remote
-            """,
-            ).build("help").output
+    fun `without Artifactory it uses Maven Central, the plugin portal and the vendor's own site`() {
+        val repos = repositories("")
+        assertAll(
+            { assertTrue(repos.contains("REPO MavenRepo https://repo.maven.apache.org/maven2/"), repos.toString()) },
+            { assertTrue(repos.contains("REPO temurinJdks https://github.com/adoptium/"), repos.toString()) },
+            { assertTrue(repos.contains("PLUGINS Gradle Central Plugin Repository"), repos.toString()) },
+        )
+    }
 
-        assertTrue(output.contains("REPO artifactoryJdks https://artifactory.example.com/artifactory/runtimes/"), output)
-        assertTrue(output.contains("REPO artifactory https://artifactory.example.com/artifactory/maven-remote/"), output)
-        assertTrue(!output.contains("repo.maven.apache.org"), output)
-        assertTrue(output.contains("PLUGINS artifactory"), output)
+    @Test
+    fun `Artifactory routes everything through the configured instance`() {
+        val repos =
+            repositories(
+                "artifactory.url=https://artifactory.example.com/artifactory\nartifactory.repo.maven=maven-remote",
+            )
+        assertAll(
+            {
+                assertTrue(
+                    repos.contains("REPO artifactoryJdks https://artifactory.example.com/artifactory/runtimes/"),
+                    repos.toString(),
+                )
+            },
+            {
+                assertTrue(
+                    repos.contains("REPO artifactory https://artifactory.example.com/artifactory/maven-remote/"),
+                    repos.toString(),
+                )
+            },
+            { assertTrue(repos.contains("PLUGINS artifactory"), repos.toString()) },
+            { assertFalse(repos.any { it.contains("repo.maven.apache.org") }, repos.toString()) },
+        )
     }
 
     @Test
     fun `a build with Java and Node apps can apply both settings plugins`() {
-        val output =
-            project("", JavaAppSettingsPlugin.ID, "io.github.fiftieshousewife.node-app.settings").build("help").output
-        val repos = output.lines().filter { it.startsWith("REPO ") }
-
-        assertEquals(1, repos.count { it.startsWith("REPO MavenRepo") }, output)
-        assertTrue(repos.any { it.startsWith("REPO temurinJdks") }, output)
-        assertTrue(repos.any { it.startsWith("REPO nodejsDist") }, output)
+        val repos = repositories("", JavaAppSettingsPlugin.ID, "io.github.fiftieshousewife.node-app.settings")
+        assertAll(
+            { assertEquals(1, repos.count { it.startsWith("REPO MavenRepo") }, repos.toString()) },
+            { assertTrue(repos.any { it.startsWith("REPO temurinJdks") }, repos.toString()) },
+            { assertTrue(repos.any { it.startsWith("REPO nodejsDist") }, repos.toString()) },
+        )
     }
 }

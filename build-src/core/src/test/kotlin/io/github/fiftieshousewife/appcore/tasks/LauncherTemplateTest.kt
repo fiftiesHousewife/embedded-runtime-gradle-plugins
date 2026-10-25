@@ -11,7 +11,11 @@ import org.junit.jupiter.api.Test
  */
 class LauncherTemplateTest {
     private val template =
-        LauncherTemplateTest::class.java.getResource("/io/github/fiftieshousewife/appcore/launcher/launcher.bat")!!.readText()
+        LauncherTemplateTest::class.java
+            .getResource(
+                "/io/github/fiftieshousewife/appcore/launcher/launcher.bat",
+            )!!
+            .readText()
 
     @Test
     fun `every value the Windows launcher puts in ARGS starts with a space`() {

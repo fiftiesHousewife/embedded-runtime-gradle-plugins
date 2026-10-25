@@ -16,7 +16,7 @@ tasks.named("clean") { dependsOn(modules.map { pluginBuild.task("$it:clean") }) 
 // Release entry points, forwarded so the repository root is the only directory anyone needs:
 //   ./gradlew publish        -PreleaseVersion=1.2.0   → Maven Central staging / the corporate repository
 //   ./gradlew publishPlugins -PreleaseVersion=1.2.0   → the Gradle Plugin Portal (app-core must be on
-//                                                       Maven Central first: the plugins depend on it)
+//                                                       Maven Central first: the other plugins depend on it)
 listOf("publish", "publishToMavenLocal").forEach { name ->
     tasks.register(name) {
         group = "publishing"
@@ -26,6 +26,6 @@ listOf("publish", "publishToMavenLocal").forEach { name ->
 }
 tasks.register("publishPlugins") {
     group = "publishing"
-    description = "Publishes java-app and node-app to the Gradle Plugin Portal"
-    dependsOn(listOf(":java-app", ":node-app").map { pluginBuild.task("$it:publishPlugins") })
+    description = "Publishes java-app, node-app and app-smoke-test (in app-core) to the Gradle Plugin Portal"
+    dependsOn(modules.map { pluginBuild.task("$it:publishPlugins") })
 }

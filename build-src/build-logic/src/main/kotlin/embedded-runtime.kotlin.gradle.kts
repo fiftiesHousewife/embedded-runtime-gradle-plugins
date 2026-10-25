@@ -11,6 +11,8 @@ plugins {
     id("com.diffplug.spotless")
     id("io.gitlab.arturbosch.detekt")
     id("io.github.ben-manes.versions")
+    id("de.thetaphi.forbiddenapis")
+    jacoco
 }
 
 val libs = versionCatalogs.named("libs")
@@ -46,23 +48,49 @@ testing {
     }
 }
 
-// Quality gates: ktlint through Spotless for formatting, detekt in place of SpotBugs (which reads
-// Java bytecode patterns and has little to say about Kotlin), and ben-manes for dependency drift.
+// A failing test prints its whole exception, so a CI log alone explains it.
+tasks.withType<Test>().configureEach {
+    testLogging {
+        events("failed", "skipped")
+        exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
+        showStandardStreams = false
+    }
+}
+
+// Quality gates, following the Clean Code plugin's standards with standard tools: ktlint through
+// Spotless for formatting (120 columns, from .editorconfig), detekt for size, complexity, naming
+// and safety rules (config/detekt/detekt.yml), Forbidden APIs for unsafe JDK calls in the compiled
+// bytecode, JaCoCo for coverage, and ben-manes for dependency drift.
+val ktlintVersion = libs.findVersion("ktlint").get().requiredVersion
+val ktlintRules = mapOf("max_line_length" to "120")
 spotless {
     kotlin {
-        ktlint(libs.findVersion("ktlint").get().requiredVersion)
+        ktlint(ktlintVersion).editorConfigOverride(ktlintRules)
         targetExclude("**/build/**")
     }
     kotlinGradle {
-        ktlint(libs.findVersion("ktlint").get().requiredVersion)
+        ktlint(ktlintVersion).editorConfigOverride(ktlintRules)
     }
 }
+
+tasks.withType<de.thetaphi.forbiddenapis.gradle.CheckForbiddenApis>().configureEach {
+    bundledSignatures = setOf("jdk-unsafe", "jdk-deprecated", "jdk-non-portable", "jdk-system-out", "jdk-internal")
+}
+
+tasks.withType<JacocoReport>().configureEach {
+    reports {
+        xml.required = true
+        html.required = true
+    }
+}
+tasks.named("check") { dependsOn(tasks.withType<JacocoReport>()) }
 
 detekt {
     buildUponDefaultConfig = true
     config.setFrom(rootProject.files("config/detekt/detekt.yml"))
     source.setFrom(
-        files("src/main/kotlin", "src/test/kotlin", "src/testFixtures/kotlin", "src/functionalTest/kotlin").filter { it.isDirectory },
+        files("src/main/kotlin", "src/test/kotlin", "src/testFixtures/kotlin", "src/functionalTest/kotlin")
+            .filter { it.isDirectory },
     )
 }
 tasks.withType<Detekt>().configureEach {

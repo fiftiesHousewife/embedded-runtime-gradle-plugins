@@ -26,10 +26,7 @@ object AppSettings {
     private const val REPOSITORIES_CONFIGURED = "io.github.fiftieshousewife.appcore.repositories"
 
     /** Maven and plugin repositories: configured by whichever settings plugin is applied first. */
-    fun configureRepositories(
-        settings: Settings,
-        artifactory: Artifactory?,
-    ) {
+    fun configureRepositories(settings: Settings, artifactory: Artifactory?) {
         val extra = settings.gradle.extensions.extraProperties
         if (extra.has(REPOSITORIES_CONFIGURED)) return
         extra.set(REPOSITORIES_CONFIGURED, true)
@@ -52,11 +49,7 @@ object AppSettings {
     }
 
     /** An Ivy repository serving exactly one runtime's archives, and nothing else. */
-    fun addRuntimeRepository(
-        settings: Settings,
-        runtime: RuntimeRepository,
-        artifactory: Artifactory?,
-    ) {
+    fun addRuntimeRepository(settings: Settings, runtime: RuntimeRepository, artifactory: Artifactory?) {
         settings.dependencyResolutionManagement.repositories {
             exclusiveContent {
                 forRepository {
@@ -81,10 +74,7 @@ object AppSettings {
      * Project plugins are resolved at the settings plugin's own version, so build scripts write
      * `id("io.github.fiftieshousewife.java-app")` with no version and can never drift from it.
      */
-    fun alignPluginVersions(
-        settings: Settings,
-        vararg pluginIds: String,
-    ) {
+    fun alignPluginVersions(settings: Settings, vararg pluginIds: String) {
         val version = PluginVersion.current
         settings.pluginManagement.plugins {
             pluginIds.forEach { id(it).version(version) }
@@ -92,17 +82,11 @@ object AppSettings {
     }
 
     /** Records that [settingsPluginId] ran, for [requireApplied]. */
-    fun markApplied(
-        settings: Settings,
-        settingsPluginId: String,
-    ) = settings.gradle.extensions.extraProperties
+    fun markApplied(settings: Settings, settingsPluginId: String) = settings.gradle.extensions.extraProperties
         .set(settingsPluginId, true)
 
     /** Fails a project plugin early, with the line to add, when its settings plugin is missing. */
-    fun requireApplied(
-        project: Project,
-        settingsPluginId: String,
-    ) {
+    fun requireApplied(project: Project, settingsPluginId: String) {
         if (!project.gradle.extensions.extraProperties
                 .has(settingsPluginId)
         ) {
@@ -130,10 +114,7 @@ object AppSettings {
      * The values are read at configuration time, so they are stored, encrypted, in the
      * configuration cache entry.
      */
-    private fun authenticateExplicitly(
-        repo: AuthenticationSupported,
-        settings: Settings,
-    ) {
+    private fun authenticateExplicitly(repo: AuthenticationSupported, settings: Settings) {
         val user = settings.providers.gradleProperty("${Artifactory.CREDENTIALS_NAME}Username")
         val password = settings.providers.gradleProperty("${Artifactory.CREDENTIALS_NAME}Password")
         repo.credentials {
@@ -143,10 +124,7 @@ object AppSettings {
         repo.authentication { create("basic", BasicAuthentication::class.java) }
     }
 
-    private fun configurePluginRepositories(
-        handler: RepositoryHandler,
-        artifactory: Artifactory?,
-    ) {
+    private fun configurePluginRepositories(handler: RepositoryHandler, artifactory: Artifactory?) {
         if (artifactory == null) {
             handler.gradlePluginPortal()
             return

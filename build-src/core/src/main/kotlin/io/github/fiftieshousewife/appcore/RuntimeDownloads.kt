@@ -56,11 +56,13 @@ data class RuntimeArtifact(
 
     companion object {
         /** An archive in the curated layout, renamed on upload to the archive's own target id. */
-        fun curated(
-            group: String,
-            module: String,
-            revision: String,
-            target: Target,
-        ) = RuntimeArtifact(group, module, revision, artifact = module, classifier = target.id, extension = target.archiveExtension)
+        fun curated(group: String, module: String, revision: String, target: Target) = RuntimeArtifact(
+            group,
+            module,
+            revision,
+            artifact = module,
+            classifier = target.id,
+            extension = target.archiveExtension,
+        )
     }
 }

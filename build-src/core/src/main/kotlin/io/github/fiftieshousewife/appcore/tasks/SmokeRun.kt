@@ -65,10 +65,7 @@ class SmokeRun(
         }
     }
 
-    private fun awaitHealthy(
-        app: Process,
-        env: Map<String, String>,
-    ): Result {
+    private fun awaitHealthy(app: Process, env: Map<String, String>): Result {
         val deadline = System.nanoTime() + healthTimeout.toNanos()
         var outcome: Result? = null
         while (outcome == null) {
@@ -83,11 +80,7 @@ class SmokeRun(
         return outcome
     }
 
-    @Suppress("UNCHECKED_CAST")
-    private fun checkVersion(
-        env: Map<String, String>,
-        expected: String,
-    ): Result? {
+    private fun checkVersion(env: Map<String, String>, expected: String): Result? {
         val out = workDir.resolve("version.json")
         val process =
             command("version")
@@ -99,15 +92,17 @@ class SmokeRun(
         if (!process.waitFor(VERSION_TIMEOUT.seconds, TimeUnit.SECONDS) || process.exitValue() != 0) {
             return failed("'${launcher.name} version' failed")
         }
-        val reported = (JsonSlurper().parse(out) as Map<String, Any?>)["version"]
-        return if (reported == expected) null else failed("'${launcher.name} version' reported $reported, expected $expected")
+        val reported = (JsonSlurper().parse(out) as Map<*, *>)["version"]
+        return if (reported ==
+            expected
+        ) {
+            null
+        } else {
+            failed("'${launcher.name} version' reported $reported, expected $expected")
+        }
     }
 
-    private fun runQuietly(
-        cmd: String,
-        env: Map<String, String>,
-        limit: Duration,
-    ): Int {
+    private fun runQuietly(cmd: String, env: Map<String, String>, limit: Duration): Int {
         val p =
             command(cmd)
                 .redirectErrorStream(true)
@@ -121,8 +116,9 @@ class SmokeRun(
         return p.exitValue()
     }
 
-    private fun command(cmd: String) =
-        ProcessBuilder(if (windows) listOf("cmd.exe", "/c", launcher.absolutePath, cmd) else listOf(launcher.absolutePath, cmd))
+    private fun command(cmd: String) = ProcessBuilder(
+        if (windows) listOf("cmd.exe", "/c", launcher.absolutePath, cmd) else listOf(launcher.absolutePath, cmd),
+    )
 
     /** Stops the launcher and everything it started (on Windows the launcher is cmd.exe, not the runtime). */
     private fun stop(process: Process) {

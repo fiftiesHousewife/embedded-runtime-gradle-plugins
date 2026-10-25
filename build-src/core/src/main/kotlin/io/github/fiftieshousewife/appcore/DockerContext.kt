@@ -27,7 +27,8 @@ internal class DockerContext(
         val archiveOps = archives
         task.configure {
             if (chosen == null) {
-                val message = "appDockerContext needs a Linux archive; add a linux target to ${wiring.ecosystem.extensionName}.targets"
+                val targets = "${wiring.ecosystem.extensionName}.targets"
+                val message = "appDockerContext needs a Linux archive; add a linux target to $targets"
                 doFirst { throw GradleException(message) }
                 return@configure
             }
@@ -50,7 +51,7 @@ internal class DockerContext(
                 text.set(
                     extension.dockerfile
                         .map { it.asFile.readText() }
-                        .orElse(extension.appName.map { name -> template.replace("@APP_NAME@", name) }),
+                        .orElse(identity().map { DockerfileTemplate.render(template, it) }),
                 )
                 outputFile.set(wiring.workDir.map { it.file("docker/Dockerfile") })
             }
@@ -61,4 +62,19 @@ internal class DockerContext(
             into(project.layout.buildDirectory.dir("docker-context"))
         }
     }
+
+    private fun identity() = extension.appName
+        .zip(wiring.version) { name, version -> name to version }
+        .zip(wiring.gitCommit) { (name, version), commit -> ImageIdentity(name, version, commit) }
+}
+
+/** What an image built from the generated Dockerfile says about itself. */
+internal data class ImageIdentity(val name: String, val version: String, val revision: String)
+
+/** The generated Dockerfile: the template with the app's name, release and commit filled in. */
+internal object DockerfileTemplate {
+    fun render(template: String, identity: ImageIdentity) = template
+        .replace("@APP_NAME@", identity.name)
+        .replace("@APP_VERSION@", identity.version)
+        .replace("@GIT_COMMIT@", identity.revision)
 }

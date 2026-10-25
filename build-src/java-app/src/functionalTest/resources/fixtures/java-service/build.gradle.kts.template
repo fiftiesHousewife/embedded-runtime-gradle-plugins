@@ -1,0 +1,10 @@
+plugins { id("io.github.fiftieshousewife.java-app") }
+group = "com.example.test"
+version = providers.gradleProperty("appVersion").getOrElse("2.0.0")
+application { mainClass = "test.Main" }
+javaApp {
+    javaVersion = @FEATURE@
+    @JAVA_APP@
+}
+java { toolchain { vendor = JvmVendorSpec.matching("") } }
+@BUILD@

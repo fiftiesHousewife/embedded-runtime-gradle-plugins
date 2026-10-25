@@ -50,20 +50,14 @@ object JdkCatalog {
      * The pin for one distribution's feature release. Keys are `jdk.<distribution>.<feature>`,
      * falling back to `jdk.<feature>` so a single-distribution catalogue stays terse.
      */
-    fun cataloguedJdk(
-        distribution: JdkDistribution,
-        feature: Int,
-    ): String? = pins.getProperty("jdk.${distribution.id}.$feature") ?: pins.getProperty("jdk.$feature")
+    fun cataloguedJdk(distribution: JdkDistribution, feature: Int): String? =
+        pins.getProperty("jdk.${distribution.id}.$feature") ?: pins.getProperty("jdk.$feature")
 
     /**
      * The exact JDK for [feature]: a `javaApp.jdk.<feature>` override, else the catalogue pin, else
      * null. Shared by the archive and the toolchain resolver so they cannot disagree.
      */
-    fun pinnedJdk(
-        providers: ProviderFactory,
-        distribution: JdkDistribution,
-        feature: Int,
-    ): JdkVersion? =
+    fun pinnedJdk(providers: ProviderFactory, distribution: JdkDistribution, feature: Int): JdkVersion? =
         (providers.gradleProperty(JdkSources.VERSION_PREFIX + feature).orNull ?: cataloguedJdk(distribution, feature))
             ?.let(::JdkVersion)
             ?.also(distribution::requireVersion)
@@ -72,11 +66,10 @@ object JdkCatalog {
         providers: ProviderFactory,
         distribution: JdkDistribution,
         feature: Provider<Int>,
-    ): Provider<String> =
-        feature.map { f ->
-            val supported = requireSupported(f)
-            (pinnedJdk(providers, distribution, supported) ?: throw unknownJdk(distribution, supported)).value
-        }
+    ): Provider<String> = feature.map { f ->
+        val supported = requireSupported(f)
+        (pinnedJdk(providers, distribution, supported) ?: throw unknownJdk(distribution, supported)).value
+    }
 
     fun requireSupported(feature: Int): Int {
         if (feature !in SUPPORTED_FEATURES) {
@@ -89,13 +82,10 @@ object JdkCatalog {
         return feature
     }
 
-    fun unknownJdk(
-        distribution: JdkDistribution,
-        feature: Int,
-    ) = GradleException(
+    fun unknownJdk(distribution: JdkDistribution, feature: Int) = GradleException(
         "No ${distribution.id} JDK $feature pin in the java-app catalogue. Set " +
             "${JdkSources.VERSION_PREFIX}$feature to an exact ${distribution.id} version, " +
-            "in the form ${distribution.exampleVersion}.",
+            "in the form ${distribution.versionForm.example}.",
     )
 }
 
@@ -104,9 +94,7 @@ object JdkCatalog {
  * `25.0.3`, Corretto's `21.0.13.0.10`, Zulu's `21.54.107-ca-jdk21.0.13`. Every form starts with
  * the feature release; [JdkDistribution.requireVersion] checks the rest against its own layout.
  */
-data class JdkVersion(
-    val value: String,
-) {
+data class JdkVersion(val value: String) {
     init {
         require(FORMAT.matches(value)) {
             "JDK version '$value' must be an exact version that starts with the feature release, e.g. 21.0.13+9"

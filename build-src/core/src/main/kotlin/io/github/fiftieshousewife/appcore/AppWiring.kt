@@ -10,6 +10,7 @@ import io.github.fiftieshousewife.appcore.tasks.WriteTextFile
 import org.gradle.api.GradleException
 import org.gradle.api.NamedDomainObjectProvider
 import org.gradle.api.Project
+import org.gradle.api.Task
 import org.gradle.api.artifacts.ExternalModuleDependency
 import org.gradle.api.artifacts.ResolvableConfiguration
 import org.gradle.api.component.SoftwareComponentFactory
@@ -41,8 +42,11 @@ data class Ecosystem(
     fun property(name: String) = "$extensionName.$name"
 }
 
+/** The Gradle services a plugin is injected with and the shared pipeline needs. */
+data class AppServices(val archives: ArchiveOperations, val components: SoftwareComponentFactory)
+
 /** What an ecosystem plugin contributes to the shared archive pipeline for one target. */
-class EcosystemSpec(
+data class EcosystemSpec(
     val runtimeName: String,
     val runtimeVersion: Provider<String>,
     val posixExec: Provider<String>,
@@ -52,6 +56,22 @@ class EcosystemSpec(
     /** Feeds library components into the SBOM task. */
     val sbom: GenerateSbom.() -> Unit,
 )
+
+/** The tasks registered before the targets are known, wired to them afterwards. */
+private data class Lifecycle(
+    val allTars: TaskProvider<Task>,
+    val smoke: TaskProvider<AppSmokeTest>,
+    val runApp: TaskProvider<RunApp>,
+    val dockerContext: DockerContext,
+    val publishing: AppPublishing,
+)
+
+/**
+ * The targets whose archives are never started here: every target but this machine's, and this
+ * machine's too when the smoke test is turned off.
+ */
+internal fun untestedTargets(targets: Collection<Target>, host: Target, smokeTestEnabled: Boolean): List<Target> =
+    targets.filter { it != host || !smokeTestEnabled }
 
 /** The tasks built for one target. */
 class TargetTasks(
@@ -83,9 +103,10 @@ class AppWiring(
     private val project: Project,
     val ecosystem: Ecosystem,
     val extension: AppExtension,
-    private val archives: ArchiveOperations,
-    private val components: SoftwareComponentFactory,
+    private val services: AppServices,
 ) {
+    private val archives = services.archives
+
     private val providers = project.providers
     private val layout = project.layout
     private val tasks = project.tasks
@@ -94,6 +115,18 @@ class AppWiring(
     val host: Target = Target.host()
     val workDir: Provider<Directory> = layout.buildDirectory.dir("app-work")
     val taskGroup: String get() = ecosystem.taskGroup
+    val version: Provider<String> = providers.provider { project.version.toString() }
+
+    /** `-P<ecosystem>.gitCommit`, else `git rev-parse HEAD`, else `unknown` outside a checkout. */
+    val gitCommit: Provider<String> =
+        providers
+            .gradleProperty(ecosystem.property("gitCommit"))
+            .orElse(
+                providers.of(GitCommitValueSource::class.java) {
+                    parameters.workingDirectory.set(layout.projectDirectory)
+                },
+            )
+            .orElse("unknown")
 
     private val appName: Provider<String> get() = extension.appName
 
@@ -147,18 +180,18 @@ class AppWiring(
         }
 
     /** Extracts the single runtime archive in [archive], dropping its top-level directory. */
-    fun extractRuntime(
-        name: String,
-        archive: Provider<File>,
-        destination: Provider<Directory>,
-    ): TaskProvider<Sync> =
+    fun extractRuntime(name: String, archive: Provider<File>, destination: Provider<Directory>): TaskProvider<Sync> =
         tasks.register(name, Sync::class.java) {
             group = taskGroup
             description = "Extracts a runtime archive"
             // Lambdas stored in tasks must not capture this class: it holds the Project, which the
             // configuration cache cannot serialise. Hence the local copies here and below.
             val archiveOps = archives
-            from(archive.map { file -> if (file.name.endsWith(".zip")) archiveOps.zipTree(file) else archiveOps.tarTree(file) })
+            from(
+                archive.map { file ->
+                    if (file.name.endsWith(".zip")) archiveOps.zipTree(file) else archiveOps.tarTree(file)
+                },
+            )
             into(destination)
             dropTopLevelDirectory(this)
         }
@@ -172,70 +205,71 @@ class AppWiring(
      * has run, to register that target's ecosystem-specific tasks.
      */
     fun register(contribute: (Target) -> EcosystemSpec) {
+        val lifecycle = registerLifecycle()
+        project.afterEvaluate { registerTargets(lifecycle, contribute) }
+    }
+
+    /** The tasks a build script may name, registered before the targets are known. */
+    private fun registerLifecycle(): Lifecycle {
         val allTars =
             tasks.register("appTar") {
                 group = taskGroup
                 description = "Builds the archive for every target"
             }
         val smoke = registerSmokeTest()
-        val runApp = registerRunApp()
-        val dockerContext = DockerContext(project, this, archives)
-        val publishing = AppPublishing(project, this, components)
-        publishing.register(smoke)
-
+        val publishing = AppPublishing(project, this, services.components).apply { register(smoke) }
         tasks.named("assemble") { dependsOn(allTars) }
         tasks.named("check") { dependsOn(smoke) }
-
         // Every archive feeding the app (the application jar included) must be byte-reproducible,
         // so rebuilding a commit yields an identical archive checksum. Gradle 9 does this by default.
         tasks.withType(AbstractArchiveTask::class.java).configureEach {
             isPreserveFileTimestamps = false
             isReproducibleFileOrder = true
         }
+        return Lifecycle(allTars, smoke, registerRunApp(), DockerContext(project, this, services.archives), publishing)
+    }
 
-        project.afterEvaluate {
-            extension.targets.finalizeValue()
-            val targets = extension.targets.get()
-            if (targets.isEmpty()) throw GradleException("${ecosystem.extensionName}.targets is empty; name at least one target")
-            val pipeline = TargetPipeline(project, this@AppWiring)
-            val built = targets.map { pipeline.register(it, contribute(it)) }
-            allTars.configure { dependsOn(built.map { it.tar }) }
+    private fun registerTargets(lifecycle: Lifecycle, contribute: (Target) -> EcosystemSpec) {
+        extension.targets.finalizeValue()
+        val targets = extension.targets.get()
+        if (targets.isEmpty()) throw GradleException("${ecosystem.extensionName}.targets is empty; name at least one")
+        val pipeline = TargetPipeline(project, this)
+        val built = targets.map { pipeline.register(it, contribute(it)) }
+        lifecycle.allTars.configure { dependsOn(built.map { it.tar }) }
+        built.firstOrNull { it.target == host }?.let { wireHostTasks(lifecycle, it) }
+        lifecycle.dockerContext.useLinuxArchive(built)
+        lifecycle.publishing.addTargets(built, untestedTargets(targets, host, extension.smokeTestEnabled.get()))
+    }
 
-            val hostTasks = built.firstOrNull { it.target == host }
-            if (hostTasks != null) {
-                smoke.configure { archiveFiles.from(hostTasks.tar.flatMap { it.archiveFile }) }
-                runApp.configure {
-                    dependsOn(hostTasks.assemble)
-                    appDir.set(layout.dir(hostTasks.assemble.map { it.destinationDir }))
-                }
-            }
-            dockerContext.useLinuxArchive(built)
-            publishing.addTargets(built, untested = targets.filter { it != host || !extension.smokeTestEnabled.get() })
+    /** This machine's archive is the one `appSmokeTest` starts and `runApp` runs. */
+    private fun wireHostTasks(lifecycle: Lifecycle, hostTasks: TargetTasks) {
+        lifecycle.smoke.configure { archiveFiles.from(hostTasks.tar.flatMap { it.archiveFile }) }
+        lifecycle.runApp.configure {
+            dependsOn(hostTasks.assemble)
+            appDir.set(layout.dir(hostTasks.assemble.map { it.destinationDir }))
         }
     }
 
-    private fun registerSmokeTest() =
-        tasks.register("appSmokeTest", AppSmokeTest::class.java) {
-            group = VERIFICATION_GROUP
-            description = "Extracts this machine's archive, starts it and waits for its healthcheck"
-            healthTimeout.set(extension.smokeTestTimeout)
-            resultFile.set(workDir.map { it.file("smoke-test.txt") })
-            val enabled = extension.smokeTestEnabled
-            onlyIf("${this@AppWiring.ecosystem.extensionName}.smokeTestEnabled is true") { enabled.get() }
-        }
+    private fun registerSmokeTest() = tasks.register("appSmokeTest", AppSmokeTest::class.java) {
+        group = VERIFICATION_GROUP
+        description = "Extracts this machine's archive, starts it and waits for its healthcheck"
+        healthTimeout.set(extension.smokeTestTimeout)
+        resultFile.set(workDir.map { it.file("smoke-test.txt") })
+        val enabled = extension.smokeTestEnabled
+        onlyIf("${this@AppWiring.ecosystem.extensionName}.smokeTestEnabled is true") { enabled.get() }
+    }
 
-    private fun registerRunApp() =
-        tasks.register("runApp", RunApp::class.java) {
-            group = APPLICATION_GROUP
-            description = "Runs this machine's assembled app in the foreground (bin/<app> run)"
-            appName.set(this@AppWiring.appName)
-            windows.set(host.isWindows)
-            args.convention(
-                providers.gradleProperty("args").map { it.split(" ").filter(String::isNotBlank) }.orElse(emptyList()),
-            )
-            val dir = appDir
-            onlyIf("an archive is built for this machine") { dir.isPresent }
-        }
+    private fun registerRunApp() = tasks.register("runApp", RunApp::class.java) {
+        group = APPLICATION_GROUP
+        description = "Runs this machine's assembled app in the foreground (bin/<app> run)"
+        appName.set(this@AppWiring.appName)
+        windows.set(host.isWindows)
+        args.convention(
+            providers.gradleProperty("args").map { it.split(" ").filter(String::isNotBlank) }.orElse(emptyList()),
+        )
+        val dir = appDir
+        onlyIf("an archive is built for this machine") { dir.isPresent }
+    }
 
     companion object {
         const val VERIFICATION_GROUP = "verification"
@@ -260,10 +294,7 @@ class AppWiring(
          * Strips an archive's single top-level directory (`node-v24.../`, `<app>-<version>/`) while
          * copying, or renames it to [replacement].
          */
-        fun dropTopLevelDirectory(
-            spec: CopySpec,
-            replacement: String? = null,
-        ) {
+        fun dropTopLevelDirectory(spec: CopySpec, replacement: String? = null) {
             spec.eachFile {
                 val segments = listOfNotNull(replacement) + relativePath.segments.drop(1)
                 relativePath = RelativePath.parse(!isDirectory, segments.joinToString("/"))

@@ -17,18 +17,15 @@ import java.net.URI
  * The compile toolchain resolver and the archive's runtime both ask this class, so compilation and
  * packaging can never disagree about where a JDK comes from.
  */
-class JdkSources(
-    val distribution: JdkDistribution,
-    private val location: JdkLocation = JdkLocation.Public(),
-) {
+class JdkSources(val distribution: JdkDistribution, private val location: JdkLocation = JdkLocation.Public()) {
     val repository: RuntimeRepository
         get() =
             when (location) {
                 is JdkLocation.Public -> {
                     RuntimeRepository(
                         name = "${distribution.id}Jdks",
-                        baseUrl = RuntimeRepository.slash(location.url ?: distribution.defaultBaseUrl),
-                        artifactPattern = location.pattern ?: distribution.defaultPattern,
+                        baseUrl = RuntimeRepository.slash(location.url ?: distribution.site.baseUrl),
+                        artifactPattern = location.pattern ?: distribution.site.pattern,
                         group = distribution.group,
                     )
                 }
@@ -43,21 +40,14 @@ class JdkSources(
                 }
             }
 
-    fun artifact(
-        version: JdkVersion,
-        target: Target,
-    ): RuntimeArtifact =
-        when (location) {
-            is JdkLocation.Public -> distribution.artifact(version, target)
+    fun artifact(version: JdkVersion, target: Target): RuntimeArtifact = when (location) {
+        is JdkLocation.Public -> distribution.artifact(version, target)
 
-            // Renamed on upload, so the vendor's own naming is irrelevant here.
-            is JdkLocation.Curated -> RuntimeArtifact.curated(distribution.group, "jdk", version.underscored, target)
-        }
+        // Renamed on upload, so the vendor's own naming is irrelevant here.
+        is JdkLocation.Curated -> RuntimeArtifact.curated(distribution.group, "jdk", version.underscored, target)
+    }
 
-    fun downloadUri(
-        version: JdkVersion,
-        target: Target,
-    ): URI = repository.downloadUri(artifact(version, target))
+    fun downloadUri(version: JdkVersion, target: Target): URI = repository.downloadUri(artifact(version, target))
 
     companion object {
         /** Which JDK vendor to compile with and embed: see [JdkDistribution]. */
@@ -84,53 +74,36 @@ class JdkSources(
          * `javaApp.jdk.21.linux-x64.path`: one JDK, as an installed directory or an archive. It wins
          * over every other source for that feature release and target.
          */
-        fun pathProperty(
-            feature: Int,
-            target: Target,
-        ) = "$VERSION_PREFIX$feature.${target.id}.path"
+        fun pathProperty(feature: Int, target: Target) = "$VERSION_PREFIX$feature.${target.id}.path"
 
         /** The JDK configured at [pathProperty], if any. */
-        fun localJdk(
-            providers: ProviderFactory,
-            feature: Int,
-            target: Target,
-        ): File? = providers.setting(pathProperty(feature, target))?.let(::File)
+        fun localJdk(providers: ProviderFactory, feature: Int, target: Target): File? =
+            providers.setting(pathProperty(feature, target))?.let(::File)
 
-        fun from(providers: ProviderFactory): JdkSources {
+        fun from(providers: ProviderFactory) = JdkSources(
+            providers.setting(DISTRIBUTION)?.let(JdkDistribution::parse) ?: JdkDistribution.DEFAULT,
+            location(providers),
+        )
+
+        /** First match wins: a shared local directory, then Artifactory, then the vendor's own site. */
+        private fun location(providers: ProviderFactory): JdkLocation {
             val localPath = providers.setting(LOCAL_PATH)
             val artifactory = Artifactory.from(providers)
-            val location =
-                when {
-                    localPath != null -> {
-                        JdkLocation.Curated(
-                            "localJdks",
-                            RuntimeRepository.slash(File(localPath).absoluteFile.toURI().toString()),
-                            providers.setting(LOCAL_PATTERN),
-                        )
-                    }
-
-                    artifactory != null -> {
-                        JdkLocation.artifactory(artifactory, providers.setting(ARTIFACTORY_PATTERN))
-                    }
-
-                    else -> {
-                        JdkLocation.Public(providers.setting(PUBLIC_URL), providers.setting(PUBLIC_PATTERN))
-                    }
-                }
-            return JdkSources(providers.setting(DISTRIBUTION)?.let(JdkDistribution::parse) ?: JdkDistribution.DEFAULT, location)
+            return when {
+                localPath != null -> JdkLocation.local(File(localPath), providers.setting(LOCAL_PATTERN))
+                artifactory != null -> JdkLocation.artifactory(artifactory, providers.setting(ARTIFACTORY_PATTERN))
+                else -> JdkLocation.Public(providers.setting(PUBLIC_URL), providers.setting(PUBLIC_PATTERN))
+            }
         }
     }
 }
 
 /** Where a distribution's JDK archives are read from. */
 sealed interface JdkLocation {
-    /** The vendor's own site, or a mirror of it: the vendor's file names, under an optional URL and pattern override. */
-    data class Public(
-        val url: String? = null,
-        val pattern: String? = null,
-    ) : JdkLocation
+    /** The vendor's own site, or a mirror of it: the vendor's file names, under an optional URL and pattern. */
+    data class Public(val url: String? = null, val pattern: String? = null) : JdkLocation
 
-    /** A tree of archives renamed to the curated layout: Artifactory's runtimes repository, or a local directory. */
+    /** Archives renamed to the curated layout: Artifactory's runtimes repository, or a local directory. */
     data class Curated(
         val name: String,
         val baseUrl: URI,
@@ -139,9 +112,10 @@ sealed interface JdkLocation {
     ) : JdkLocation
 
     companion object {
-        fun artifactory(
-            artifactory: Artifactory,
-            pattern: String? = null,
-        ) = Curated("artifactoryJdks", artifactory.runtimesUrl, pattern)
+        fun artifactory(artifactory: Artifactory, pattern: String? = null) =
+            Curated("artifactoryJdks", artifactory.runtimesUrl, pattern)
+
+        fun local(directory: File, pattern: String? = null) =
+            Curated("localJdks", RuntimeRepository.slash(directory.absoluteFile.toURI().toString()), pattern)
     }
 }

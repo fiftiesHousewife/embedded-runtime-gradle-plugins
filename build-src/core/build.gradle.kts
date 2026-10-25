@@ -3,7 +3,8 @@ plugins {
     `java-test-fixtures`
 }
 
-description = "Shared machinery of the java-app and node-app plugins, and the app-smoke-test plugin for consuming builds"
+description =
+    "Shared machinery of the java-app and node-app plugins, and the app-smoke-test plugin for consuming builds"
 
 gradlePlugin {
     plugins {
@@ -22,7 +23,8 @@ gradlePlugin {
 // The settings plugins align project-plugin versions with their own, read from this resource.
 val versionResource =
     tasks.register<WriteProperties>("versionResource") {
-        destinationFile = layout.buildDirectory.file("generated/version/io/github/fiftieshousewife/appcore/version.properties")
+        destinationFile =
+            layout.buildDirectory.file("generated/version/io/github/fiftieshousewife/appcore/version.properties")
         property("version", project.version.toString())
     }
 sourceSets.main {
@@ -30,6 +32,11 @@ sourceSets.main {
 }
 
 dependencies {
+    // The SBOM is built with the CycloneDX reference model and package-url's purl builder, so it is
+    // valid by construction rather than by hand-written JSON.
+    implementation(libs.cyclonedx.core)
+    implementation(libs.packageurl)
+
     // TestProject: the TestKit harness both plugins' functional tests build fixture projects with.
     testFixturesApi(gradleTestKit())
     testFixturesImplementation(platform(libs.junit.bom))

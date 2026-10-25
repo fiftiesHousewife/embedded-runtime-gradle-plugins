@@ -136,6 +136,11 @@ orders-service-1.4.2/
 
 Archives are reproducible: rebuilding the same commit gives a byte-identical file.
 
+The SBOM lists the embedded runtime and every library, with their hashes, in the CycloneDX format
+that vulnerability scanners such as Dependency-Track, Grype and Snyk read. It is also published next
+to each archive. Listing the runtime matters: a JDK or Node.js inside an archive is invisible to a
+scanner that looks only at the operating system's packages.
+
 ## Which JDK modules go in
 
 The embedded runtime holds only the JDK modules your app uses. By default these are what `jdeps`
@@ -155,6 +160,49 @@ javaApp { additionalModules.addAll("jdk.crypto.ec") }
 ```
 
 To choose the modules yourself instead, set `jlinkModules = listOf(...)`.
+
+`jlinkOptions` passes options straight to `jlink`. Besides the defaults (no debug information, man
+pages or headers; compressed), some are worth knowing: `--include-locales=en,de` keeps only the
+locales you need when `jdk.localedata` is linked, `--dedup-legal-notices=error-if-not-same-content`
+removes duplicate licence files, and on Java 21 and later `--generate-cds-archive` speeds up startup
+for an archive built on its own target.
+
+## Hardening the runtime
+
+A JDK straight from a vendor is configured for the open internet. Your organisation's changes are
+configuration in the build, applied to every target's runtime after `jlink`:
+
+```kotlin
+javaApp {
+    security {
+        trustedCertificates.from("security/certs")          // approved CAs, added to cacerts
+        propertiesFiles.from("security/java.security")      // your policy, applied over the JDK's
+        properties.put("networkaddress.cache.ttl", "30")
+        disabledTlsAlgorithms.addAll("TLS_RSA_WITH_AES_128_GCM_SHA256", "TLS_RSA_WITH_AES_256_GCM_SHA384")
+        lockProperties = true                                // no -Djava.security.properties at runtime
+    }
+}
+```
+
+| Setting | Does |
+|---|---|
+| `trustedCertificates` | PEM or DER files (or directories of them) added to the runtime's `cacerts` |
+| `replaceDefaultTrust` | Trust only those certificates, instead of adding them to the JDK's own CAs |
+| `propertiesFiles`, `properties` | Security properties set in `conf/security/java.security`, files first |
+| `disabledTlsAlgorithms`, `disabledCertPathAlgorithms`, `disabledJarAlgorithms` | Added to the JDK's own lists, never replacing them |
+| `lockProperties` | Sets `security.overridePropertiesFile=false` |
+| `forbiddenModules` | Modules the runtime must never contain; default `jdk.jdwp.agent`, the remote debugger |
+
+Properties worth considering for your policy file: `jdk.serialFilter` (which classes may be
+deserialized), `networkaddress.cache.ttl` (how long DNS answers are cached),
+`jdk.includeInExceptions` (whether host names and file paths appear in exception messages; the
+default leaves them out), `ocsp.enable` (certificate revocation checking) and `securerandom.source`.
+
+Every setting takes any Gradle file source, so certificates and policy can come from the repository,
+a shared directory, or a versioned artifact in Artifactory. Anything not modelled here goes in
+`src/deploy/runtime/`, which is copied over the runtime as it is (`runtimeOverlay` to change it).
+Each runtime records what was changed, with every certificate's SHA-256 fingerprint, in
+`runtime/conf/security/java-app-customisations.txt`.
 
 ## Choosing a JDK
 
@@ -303,8 +351,9 @@ Per-server settings such as `APP_PORT` go in `conf/env`.
 **As a container image:** `./gradlew appDockerContext` writes `build/docker-context/` with a
 Dockerfile and a Linux archive under `app/`, ready for `docker build`. It uses your project's own
 `Dockerfile` (or `src/deploy/docker/Dockerfile`, or whatever `dockerfile` is set to) if there is
-one, and otherwise generates one whose base image needs only glibc and a shell. It needs a Linux
-target, and prefers the one matching your machine's CPU.
+one, and otherwise generates one whose base image needs only glibc and a shell, labelled with the
+standard OCI annotations for the app's name, version and commit. It needs a Linux target, and
+prefers the one matching your machine's CPU.
 
 ## Smoke-testing a published app
 
@@ -341,6 +390,8 @@ javaApp {                                       // nodeApp {} has the same first
     jdkVersion = "21.0.13+9"                    // default: the plugin's pin
     additionalModules = listOf("jdk.crypto.ec") // added to what jdeps finds
     jlinkModules = listOf("java.base")          // instead: exactly these modules
+    runtimeOverlay = file("src/deploy/runtime") // copied over the runtime as it is
+    security { … }                              // see Hardening the runtime
     jlinkOptions = listOf("--strip-debug", "--no-man-pages", "--no-header-files", "--compress=zip-6")
     jvmArgs = listOf("-XX:MaxRAMPercentage=75") // before $APP_JAVA_OPTS
 }
@@ -368,6 +419,7 @@ nodeApp {
 | `jdeps` | Java: lists the JDK modules the code uses |
 | `jlinkFindModules` | Java: finds the modules jdeps can't see, by running the app |
 | `jlinkLinuxX64`, … | Java: builds one target's trimmed runtime |
+| `customiseRuntimeLinuxX64`, … | Java: applies `security {}` and the overlay to it |
 | `npmInstall`, `npmBuild`, `npmTest` | Node: `npm ci`, your build script, your test script |
 
 ### Configuration

@@ -79,6 +79,6 @@ abstract class GitCommitValueSource : ValueSource<String, GitCommitValueSource.P
                     isIgnoreExitValue = true
                 }
             }.getOrNull()
-        return out.toString().trim().takeIf { result?.exitValue == 0 && it.isNotEmpty() }
+        return out.toString(Charsets.UTF_8).trim().takeIf { result?.exitValue == 0 && it.isNotEmpty() }
     }
 }

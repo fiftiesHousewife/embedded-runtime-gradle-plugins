@@ -45,7 +45,8 @@ and `./gradlew aiSkills` to install them in a project. Prompt files were dropped
 - The company's RPM-packaged JDK: real file name, install path, and whether it ships `jmods/`
   (naming described as `jdk<major>_<patch>-64_linux.x86_64.rpm`).
 - Publishing to Maven Central and the Gradle Plugin Portal (needs the owner's credentials).
-- Proposals awaiting a decision: Jib, SLSA provenance, CDS/AOT cache opt-in.
+- Proposals awaiting a decision: Jib (the roadmap recommends leaving it out), SLSA provenance
+  (roadmap: High), CDS/AOT cache opt-in (roadmap: Medium).
 - Article: the "HUFs" anecdote is unsourced; "Try it" uses version 1.0.0, which is not published.
 - Gradle deprecation warnings in this repository's own build: detekt 2.0.0-alpha.6 removed the
   only one due in Gradle 10 (`ReportingExtension.file`). `Configuration.setVisible`, due in Gradle 11,

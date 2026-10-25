@@ -1,0 +1,32 @@
+package io.github.fiftieshousewife.appcore
+
+import org.gradle.api.NamedDomainObjectProvider
+import org.gradle.api.Project
+import org.gradle.api.artifacts.DependencyScopeConfiguration
+import org.gradle.nativeplatform.MachineArchitecture
+import org.gradle.nativeplatform.OperatingSystemFamily
+
+/**
+ * Resolves published app archives for this machine's OS and CPU, using the attributes the java-app
+ * and node-app publications carry in their Gradle Module Metadata. Only the target is requested, so
+ * a module published without Gradle Module Metadata still resolves when its dependency names the
+ * classifier and extension instead.
+ */
+internal object MachineArchives {
+    fun resolvable(project: Project, name: String, declared: NamedDomainObjectProvider<DependencyScopeConfiguration>) =
+        project.configurations.resolvable(name) {
+            extendsFrom(declared.get())
+            isTransitive = false
+            val host = Target.host()
+            attributes {
+                attribute(
+                    OperatingSystemFamily.OPERATING_SYSTEM_ATTRIBUTE,
+                    project.objects.named(OperatingSystemFamily::class.java, AppPublishing.osFamilyOf(host)),
+                )
+                attribute(
+                    MachineArchitecture.ARCHITECTURE_ATTRIBUTE,
+                    project.objects.named(MachineArchitecture::class.java, AppPublishing.architectureOf(host)),
+                )
+            }
+        }
+}

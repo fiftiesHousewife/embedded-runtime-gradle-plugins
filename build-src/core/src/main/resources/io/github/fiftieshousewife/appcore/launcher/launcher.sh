@@ -4,8 +4,8 @@
 # Usage: @APP_NAME@ run [args...] | healthcheck | version
 #
 # Environment (all optional):
-#   APP_ROOT        install root; defaults to the directory above releases/ when installed
-#                   with deploy/install.sh, else to the app directory itself
+#   APP_ROOT        install root; defaults to the directory above releases/ when the app is
+#                   unpacked in releases/<app>-<version>/, else to the app directory itself
 #   APP_CONF_DIR    default $APP_ROOT/conf
 #   APP_DATA_DIR    default $APP_ROOT/data
 #   APP_LOG_DIR     default $APP_ROOT/logs

@@ -7,6 +7,12 @@ javaApp {                                       // nodeApp {} has the same first
     appName = "orders-service"                  // launcher and archive name; default: project name
     targets("linux-x64", "windows-x64")         // default: -PjavaApp.targets, else this machine
     archiveFormat("tar.gz")                     // or "tar", "zip"; default: -PjavaApp.archiveFormat
+    install {                                   // appInstall; see Packaging and deploying
+        dir = file("/srv/orders")               // default: -PjavaApp.installDir, else build/install
+        keep = 3                                // releases kept, including current and previous
+        restartCommand("systemctl", "--user", "restart", "orders")
+        healthTimeout = Duration.ofSeconds(60)
+    }
     rpm {                                       // see Packaging and deploying
         enabled = false                         // default: -PjavaApp.rpm
         packageName = "orders-service"          // default: appName
@@ -56,6 +62,8 @@ nodeApp {
 | `appPublishRpm` | Uploads the RPMs to `rpm.repositoryUrl`; part of `publish` when that is set |
 | `appSmokeTest` | Starts this machine's archive and waits for its health check; part of `check` |
 | `runApp` | Runs this machine's packaged app; pass arguments with `-Pargs="…"` |
+| `appInstall` | Installs this machine's archive into `install.dir`, switching to it only after it starts healthy; see [Packaging and deploying](packaging.md#installing-with-gradle) |
+| `appRollback` | Points the install back at its previous release |
 | `appDockerfile` | Writes the Dockerfile: the project's own (`Dockerfile`, `src/deploy/docker/Dockerfile` or `dockerfile`) if there is one, else a generated one |
 | `appDockerContext` | Writes a container build context: that Dockerfile plus a Linux archive under `app/` |
 | `jdeps` | Java: lists the JDK modules the code uses |
@@ -82,6 +90,8 @@ Gradle properties, set in `gradle.properties`, `~/.gradle/gradle.properties` or 
 | `javaApp.targets`, `nodeApp.targets` | this machine | Comma-separated targets to build |
 | `javaApp.archiveFormat`, `nodeApp.archiveFormat` | `tar.gz` | `tar.gz`, `tar` or `zip` |
 | `javaApp.rpm`, `nodeApp.rpm` | `false` | Also build an RPM per Linux target |
+| `javaApp.installDir`, `nodeApp.installDir`, `appDeploy.installDir` | `build/install` | Where `appInstall` installs |
+| `javaApp.runtimeOptions`, `nodeApp.runtimeOptions` | `open` | `locked` refuses to start while anything would add runtime options |
 | `javaApp.allowUntestedPublish`, `nodeApp.allowUntestedPublish` | `false` | Allow publishing an archive that was never started |
 | `artifactory.url` | | Download everything through this Artifactory |
 | `artifactory.repo.maven` | `maven-virtual` | |

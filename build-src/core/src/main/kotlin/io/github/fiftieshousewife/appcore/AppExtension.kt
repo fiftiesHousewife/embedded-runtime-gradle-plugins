@@ -48,6 +48,12 @@ abstract class AppExtension {
 
     fun rpm(action: Action<RpmPackaging>) = action.execute(rpm)
 
+    /** Where `appInstall` installs this machine's archive; see [InstallSettings]. */
+    @get:Nested
+    abstract val install: InstallSettings
+
+    fun install(action: Action<InstallSettings>) = action.execute(install)
+
     /**
      * `open` (default) lets whoever runs the app add runtime options; `locked` refuses to start
      * while anything would. Defaults to `-PjavaApp.runtimeOptions` / `-PnodeApp.runtimeOptions`.

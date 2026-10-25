@@ -1,11 +1,13 @@
 package io.github.fiftieshousewife.javaapp
 
+import io.github.fiftieshousewife.appcore.InstallLayout
 import io.github.fiftieshousewife.appcore.Target
 import io.github.fiftieshousewife.appcore.TestProject
 import io.github.fiftieshousewife.appcore.checks
 import org.gradle.testkit.runner.TaskOutcome
 import org.junit.jupiter.api.Assertions.assertAll
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
@@ -68,29 +70,25 @@ class JavaAppPluginTest {
     }
 
     @Test
-    fun `the archive installs, keeps an operator's configuration through an upgrade, and rolls back`() {
+    fun `appInstall switches to a release only after it starts healthy, keeps configuration, and rolls back`() {
         val project = javaService(tmp)
-        project.build("appArchive")
-        project.build("appArchive", "-PappVersion=2.1.0")
-        val installer = Installer(tmp.resolve("srv/svc"))
-        try {
-            installer.install(archive(project))
-            val seeded = installer.config("app.properties").readText()
-            installer.config("app.properties").writeText("key=edited\n")
-            installer.install(archive(project, "2.1.0"))
-            val upgraded = installer.current
-            val status = installer.status()
-            installer.rollback()
-            assertAll(
-                { assertEquals("key=value\n", seeded) },
-                { assertEquals("2.1.0", upgraded) },
-                { assertEquals("key=edited\n", installer.config("app.properties").readText()) },
-                { assertTrue(status.contains("health:   healthy"), status) },
-                { assertEquals("2.0.0", installer.current) },
-            )
-        } finally {
-            installer.stop()
-        }
+        val srv = tmp.resolve("srv")
+        val dir = "-PjavaApp.installDir=${srv.absolutePath}"
+        project.build("appInstall", dir)
+        srv.resolve("conf/app.properties").writeText("key=edited\n")
+        project.build("appInstall", dir, "-PappVersion=2.1.0")
+        val upgraded = InstallLayout(srv).current?.name to InstallLayout(srv).previous?.name
+        srv.resolve("conf/jvm.options").writeText("-XX:+NoSuchOptionAnywhere\n")
+        val broken = project.buildAndFail("appInstall", dir, "-PappVersion=2.2.0")
+        srv.resolve("conf/jvm.options").delete()
+        project.build("appRollback", dir)
+        assertAll(
+            { assertEquals("svc-2.1.0" to "svc-2.0.0", upgraded) },
+            { assertEquals("key=edited\n", srv.resolve("conf/app.properties").readText()) },
+            { assertTrue(broken.output.contains("it was not installed and current is unchanged"), broken.output) },
+            { assertFalse(srv.resolve("releases/svc-2.2.0").exists()) },
+            { assertEquals("svc-2.0.0", InstallLayout(srv).current?.name) },
+        )
     }
 
     private fun sha256(file: File) =

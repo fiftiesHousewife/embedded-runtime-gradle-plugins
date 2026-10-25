@@ -1,12 +1,16 @@
 package io.github.fiftieshousewife.appcore
 
+import io.github.fiftieshousewife.appcore.tasks.AppInstall
 import io.github.fiftieshousewife.appcore.tasks.AppSmokeTest
 import io.github.fiftieshousewife.appcore.tasks.RunApp
 import org.gradle.api.Project
 import org.gradle.api.tasks.TaskProvider
 import java.time.Duration
 
-/** `appSmokeTest` and `runApp`: the tasks that start this machine's archive, once it is known. */
+/**
+ * `appSmokeTest`, `runApp`, `appInstall` and `appRollback`: the tasks that use this machine's
+ * archive, once it is known.
+ */
 internal class HostTasks(private val project: Project, private val wiring: AppWiring) {
     private val extension = wiring.extension
 
@@ -35,9 +39,18 @@ internal class HostTasks(private val project: Project, private val wiring: AppWi
             onlyIf("an archive is built for this machine") { dir.isPresent }
         }
 
-    /** This machine's archive is the one `appSmokeTest` starts and `runApp` runs. */
+    private val install: TaskProvider<AppInstall>
+
+    init {
+        val settings = extension.install
+        settings.applyConventions(project, wiring.ecosystem.property("installDir"))
+        install = Installation.register(project, settings, wiring.ecosystem.extensionName)
+    }
+
+    /** This machine's archive is the one `appSmokeTest` starts, `runApp` runs and `appInstall` installs. */
     fun use(hostTasks: TargetTasks) {
         smoke.configure { archiveFiles.from(hostTasks.archive.flatMap { it.archiveFile }) }
+        install.configure { archiveFiles.from(hostTasks.archive.flatMap { it.archiveFile }) }
         runApp.configure {
             dependsOn(hostTasks.assemble)
             appDir.set(project.layout.dir(hostTasks.assemble.map { it.destinationDir }))

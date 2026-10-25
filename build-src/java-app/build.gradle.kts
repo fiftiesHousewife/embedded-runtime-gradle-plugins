@@ -64,10 +64,3 @@ dependencies {
 tasks.pluginUnderTestMetadata {
     pluginClasspath.from(nodeAppPluginClasspath)
 }
-
-// The deployment test installs a built archive with the repository's own installer.
-val installScript = layout.settingsDirectory.file("../deploy/install.sh")
-tasks.named<Test>("functionalTest") {
-    inputs.file(installScript).withPropertyName("installScript").withPathSensitivity(PathSensitivity.NONE)
-    systemProperty("installScript", installScript.asFile.absolutePath)
-}

@@ -14,6 +14,7 @@ installed, and the archive that passes CI is the archive that runs in production
 | `io.github.fiftieshousewife.java-app` | Java and Kotlin/JVM apps | A jlink-trimmed JDK from Temurin, Oracle, Corretto, Zulu, Liberica, Microsoft or SapMachine |
 | `io.github.fiftieshousewife.node-app` | Node.js apps | The official Node.js runtime |
 | `io.github.fiftieshousewife.app-smoke-test` | Any build checking a published app | |
+| `io.github.fiftieshousewife.app-deploy` | A deployment build installing a published app | |
 
 The first two each come with a settings plugin (`….java-app.settings`, `….node-app.settings`) that
 sets up every repository the build needs, so projects declare none of their own.
@@ -67,7 +68,7 @@ read `APP_PORT` and answer `--healthcheck`; see [What your app needs to do](docs
 | [What your app needs to do](docs/your-app.md) | The launcher, environment, configuration, what's in the archive, the SBOM |
 | [Building for Linux, Mac and Windows](docs/targets.md) | Several targets from one build, and which ones are tested |
 | [Java: modules, hardening and JDKs](docs/java.md) | jdeps and jlink, certificates and security policy, choosing a JDK distribution |
-| [Packaging and deploying](docs/packaging.md) | tar.gz, tar, zip, RPM and container images; installing on servers |
+| [Packaging and deploying](docs/packaging.md) | tar.gz, tar, zip, RPM and container images; `appInstall` and rollback |
 | [Publishing](docs/publishing.md) | Maven repositories, signing, smoke-testing a published app |
 | [Behind a corporate Artifactory](docs/artifactory.md) | One setting per machine; the repositories to create |
 | [Reference](docs/reference.md) | Every setting, task and Gradle property |

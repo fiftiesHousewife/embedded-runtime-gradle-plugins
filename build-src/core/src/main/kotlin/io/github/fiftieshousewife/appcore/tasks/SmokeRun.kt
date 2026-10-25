@@ -37,18 +37,20 @@ class SmokeRun(
 
     private val log = workDir.resolve("run.log")
 
-    fun run(expectedVersion: String): Result {
+    /** [env] is added to what every start gets, e.g. the install's `APP_CONF_DIR`. */
+    fun run(expectedVersion: String, env: Map<String, String> = emptyMap()): Result {
         val root =
             workDir.resolve("root").apply {
                 deleteRecursively()
                 mkdirs()
             }
         val env =
-            mapOf(
-                "APP_ROOT" to root.absolutePath,
-                "APP_PORT" to ServerSocket(0).use { it.localPort }.toString(),
-                "APP_LOG_TARGET" to "stdout",
-            )
+            env +
+                mapOf(
+                    "APP_ROOT" to root.absolutePath,
+                    "APP_PORT" to ServerSocket(0).use { it.localPort }.toString(),
+                    "APP_LOG_TARGET" to "stdout",
+                )
         checkVersion(env, expectedVersion)?.let { return it }
 
         val app =

@@ -17,6 +17,15 @@ gradlePlugin {
                 "waits for its health check"
             tags = listOf("smoke-test", "deployment", "verification")
         }
+        register("appDeploy") {
+            id = "io.github.fiftieshousewife.app-deploy"
+            implementationClass = "io.github.fiftieshousewife.appcore.AppDeployPlugin"
+            displayName = "Install published app archives"
+            description =
+                "Installs the java-app or node-app archive built for this machine into a releases/current layout, " +
+                "switching to it only after it starts healthy, with rollback"
+            tags = listOf("deployment", "install", "rollback")
+        }
     }
 }
 

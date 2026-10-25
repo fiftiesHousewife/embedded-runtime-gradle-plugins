@@ -242,7 +242,7 @@ The same check is available to any other build. A deployment pipeline applies `i
 
 Testing the real deployment path paid off quickly. Two bugs had sat unnoticed:
 
-- The server installer pruned old releases with `head -n -3`, which macOS's `head` rejects. Every install on a Mac failed after the app was already healthy. A new test that installs, upgrades and rolls back an archive found it on the first run.
+- The server installer pruned old releases with `head -n -3`, which macOS's `head` rejects. Every install on a Mac failed after the app was already healthy. A new test that installs, upgrades and rolls back an archive found it on the first run. The lesson stuck: that installer has since been replaced by an RPM, where dnf does the work, and a handful of documented commands.
 - The Windows launcher added `--healthcheck` without the leading space every other argument had, so it ran `Main--healthcheck`. The health check could never pass on Windows. CI's Windows job, the first place that launcher ever ran, caught it; a unit test now checks the rule on every OS.
 
 ## Behind a corporate firewall

@@ -148,4 +148,27 @@ class JavaAppTargetsTest {
         val result = consumer.build("appSmokeTest")
         assertTrue(result.output.contains("Smoke test passed: svc-2.0.0-$host.tar.gz"), result.output)
     }
+
+    @Test
+    fun `a deployment build installs the published archive for its own machine`() {
+        val producer = javaService(tmp.resolve("producer"), twoTargets)
+        producer.build("publish", "-PjavaApp.allowUntestedPublish=true")
+        val srv = tmp.resolve("srv")
+        val deploy =
+            TestProject(tmp.resolve("deploy")).apply {
+                gradleProperties()
+                file("settings.gradle.kts", """rootProject.name = "deploy"""")
+                file(
+                    "build.gradle.kts",
+                    fixture("deploy/build.gradle.kts.template")
+                        .replace("@REPO@", producer.project.resolve("build/repo").toURI().toString())
+                        .replace("@DIR@", srv.invariantSeparatorsPath),
+                )
+            }
+        val result = deploy.build("appInstall")
+        assertAll(
+            { assertTrue(result.output.contains("svc-2.0.0 started against"), result.output) },
+            { assertEquals("svc-2.0.0", io.github.fiftieshousewife.appcore.InstallLayout(srv).current?.name) },
+        )
+    }
 }

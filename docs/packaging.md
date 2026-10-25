@@ -87,22 +87,63 @@ Two caveats. RPMs are not byte-reproducible, unlike the archives. The RPM is bui
 directory as this target's archive, but only the archive for the build machine is smoke-tested;
 publishing checks that as for archives.
 
-## To a server without root
+## Installing with Gradle
 
-[`deploy/install.sh`](../deploy/install.sh) installs an archive into a directory the account owns:
+`appInstall` installs this machine's archive into a directory, from the app's own build or from a
+small deployment build on a server or deployment agent. It needs no root, and works the same on
+Linux, macOS and Windows:
 
-```bash
-deploy/install.sh install --app-root ~/orders \
-    --archive https://artifactory.example.com/artifactory/libs-release-local/com/example/orders-service/1.4.2/orders-service-1.4.2-linux-x64.tar.gz
-deploy/install.sh rollback --app-root ~/orders
-deploy/install.sh status   --app-root ~/orders
+1. unpacks the archive as `releases/<app>-<version>/`;
+2. copies each file of `conf.defaults/` into `conf/` unless it is already there;
+3. starts the new release once, against that `conf/`, and waits for its health check: a release
+   that fails is deleted and never becomes current;
+4. points `current` at it and `previous` at the release it replaces, runs your restart command,
+   and deletes all but the newest `keep` releases.
+
+`appRollback` points `current` back at `previous` and runs the restart command.
+
+```
+/srv/orders/
+  releases/orders-service-1.4.2/
+  current -> releases/orders-service-1.4.2
+  previous -> releases/orders-service-1.4.1
+  conf/                  yours: app configuration, jvm.options (Java), env
 ```
 
-It verifies the archive against the `.sha256` published beside it, keeps each release under
-`releases/` with `current` pointing at the active one, creates `conf/` from `conf.defaults/` once,
-starts the app (as a systemd user service where available, otherwise in the background), waits for
-its health check, and goes back to the previous release if that fails. Per-server settings such as
-`APP_PORT` go in `conf/env`. Repository credentials come from `~/.netrc`.
+The launcher recognises this layout (an app directory inside `releases/` takes the directory above
+as `APP_ROOT`), so configuration, data and logs live outside any one release.
+
+**From the app's build**, on the machine that runs it:
+
+```kotlin
+javaApp {                                            // or nodeApp
+    install {
+        dir = file("/srv/orders")                    // or -PjavaApp.installDir=/srv/orders
+        restartCommand("systemctl", "--user", "restart", "orders")
+        keep = 3
+    }
+}
+```
+
+**From a deployment build**, which needs only the published coordinates:
+
+```kotlin
+// build.gradle.kts of the deployment build
+plugins { id("io.github.fiftieshousewife.app-deploy") version "1.0.0" }
+repositories { maven("https://artifactory.example.com/artifactory/libs-release-local") }
+dependencies { app("com.example:orders-service:1.4.2") }
+appDeploy {
+    dir = file("/srv/orders")
+    restartCommand("systemctl", "--user", "restart", "orders")
+}
+```
+
+`./gradlew appInstall` resolves the archive built for this machine's OS and CPU and installs it;
+`./gradlew appRollback` goes back. The restart command is how the running process changes: point it
+at whatever supervises the app (a systemd user unit whose `ExecStart` is
+`/srv/orders/current/bin/orders-service run`, a Windows service, a process manager).
+
+Gradle, and so a JVM, must be on that machine. Where there is none, use the [RPM](#rpm).
 
 ## As a container image
 

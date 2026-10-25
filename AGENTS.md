@@ -13,7 +13,7 @@ build-src/                  the plugin build, included by the root build
   java-app/                 io.github.fiftieshousewife:java-app      package …javaapp
   node-app/                 io.github.fiftieshousewife:node-app      package …nodeapp
   config/detekt/detekt.yml  deviations from detekt's defaults only
-deploy/                     install.sh (servers without root), curate-runtimes.sh (Artifactory)
+deploy/                     curate-runtimes.sh (mirrors approved runtimes into Artifactory)
 docs/                       user documentation, linked from the README; article.md is the article's home
 .github/scripts/            verify-rpm.sh: CI installs the sample's RPM in a Rocky Linux container
 .claude-plugin/, claude-plugin/   Claude Code marketplace and the embedded-runtime plugin's skills; keep the
@@ -46,10 +46,12 @@ plugin from the portal.
 
 Where things are tested:
 
-- `JavaAppPluginTest`: the archive's contents and reproducibility, and `deploy/install.sh` end to
-  end (install, upgrade keeping `conf/`, status, rollback), so an installer change is tested there.
+- `JavaAppPluginTest`: the archive's contents and reproducibility, re-extracting a JDK with
+  read-only files, and `appInstall` end to end (upgrade keeping `conf/`, a release that fails its
+  health check never becoming current, rollback). `InstallLayout` has its own unit tests.
 - `JavaAppTargetsTest`: several targets in one build and one publication, the container context,
-  JDKs from a directory and from a shared local path, and the `app-smoke-test` consumer plugin.
+  JDKs from a directory and from a shared local path, and the `app-smoke-test` and `app-deploy`
+  consumer plugins.
 - `JavaAppModulesTest`: the jdeps default and `jlinkFindModules` fixing a missing module.
 - `JavaAppSecurityTest`: certificates, policy and ciphers seen by the running JVM (a probe program run
   on the built runtime), the customisation record and overlay, and the forbidden-module guard.

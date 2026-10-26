@@ -51,6 +51,9 @@ jobs:
       # while building, so the arm64 archive is only copied in.
       - if: runner.os == 'Linux'
         run: docker buildx build --platform linux/arm64 --tag docker-service:arm64 samples/docker-service/build/docker-context
+      # The Maven Central release, staged unsigned and checked: POM names and metadata, checksums.
+      - if: runner.os == 'Linux'
+        run: ./gradlew verifyMavenCentralBundle -PreleaseVersion=0.0.0-ci
       # The post-edit hook shared by Claude Code, Copilot and Devin, called as each calls it.
       - if: runner.os == 'Linux'
         run: .github/scripts/test-agent-hooks.sh

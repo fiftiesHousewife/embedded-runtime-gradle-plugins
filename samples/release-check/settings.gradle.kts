@@ -1,6 +1,6 @@
 pluginManagement {
     // Inside this repository the sample builds against the plugin source.
-    // A real pipeline pins a published version: id("io.github.fiftieshousewife.app-smoke-test") version "0.0.2"
+    // A real pipeline pins a published version: id("io.github.fiftieshousewife.app-smoke-test") version "0.0.3"
     includeBuild("../../build-src")
 }
 

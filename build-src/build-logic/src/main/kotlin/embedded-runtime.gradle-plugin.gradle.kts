@@ -37,17 +37,28 @@ testing {
 }
 tasks.named("check") { dependsOn(testing.suites.named("functionalTest")) }
 
-// Maven Central, as the Clean Code plugin publishes: the module, its plugin markers (so builds that
-// list mavenCentral() in pluginManagement resolve the plugin ids), sources and the Dokka javadoc,
-// released without a manual step. `./gradlew publishToMavenCentral -PreleaseVersion=x.y.z` with
-// mavenCentralUsername/mavenCentralPassword and a signing key in ~/.gradle/gradle.properties or
-// ORG_GRADLE_PROJECT_* variables; nothing is baked in.
+// Maven Central: the module, its plugin markers (so builds that list mavenCentral() in
+// pluginManagement resolve the plugin ids), sources and the Dokka javadoc, each signed when a key
+// is configured (signingInMemoryKey, signing.keyId or signing.gnupg.keyName in
+// ~/.gradle/gradle.properties or ORG_GRADLE_PROJECT_* variables; nothing is baked in). Every module
+// publishes into one staging repository, which the plugin build's root checks and uploads as a single
+// deployment (embedded-runtime.central-release).
 mavenPublishing {
-    publishToMavenCentral(automaticRelease = true)
     configure(GradlePublishPlugin())
     val signingConfigured = listOf("signingInMemoryKey", "signing.keyId", "signing.gnupg.keyName")
         .any { providers.gradleProperty(it).isPresent }
     if (signingConfigured) signAllPublications()
+}
+publishing {
+    repositories {
+        maven {
+            name = "centralStaging"
+            url = uri(rootDir.resolve("build/central-staging"))
+        }
+    }
+}
+tasks.withType<PublishToMavenRepository>().matching { it.name.endsWith("ToCentralStagingRepository") }.configureEach {
+    mustRunAfter(":cleanMavenCentralStaging")
 }
 
 // What Maven Central and search show for each POM, under the project's own name: the module by what

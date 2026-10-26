@@ -190,14 +190,19 @@ with `-PjavaApp.jdk.distribution=<id>`.
 are published Maven classifiers: never change an existing one.
 
 **Release.** As the Clean Code plugin does: `./gradlew publishToMavenLocal -PreleaseVersion=x.y.z`
-to try it, then `./gradlew publishToMavenCentral -PreleaseVersion=x.y.z`, which publishes all three
-modules with their plugin markers, sources and Dokka javadoc through the Vanniktech plugin and
-releases them without a manual step. Credentials come from `~/.gradle/gradle.properties` or
+to try it, `./gradlew verifyMavenCentralBundle -PreleaseVersion=x.y.z` to stage the release into
+`build-src/build/central-staging` and check it (every POM named "Embedded Runtime: …" with the
+metadata Central requires, every file with checksums and, when a key is set, a signature; CI runs
+it unsigned on every push), then `./gradlew publishToMavenCentral -PreleaseVersion=x.y.z`, which
+uploads that bundle through the Central Portal's Publisher API as one deployment named
+`embedded-runtime-gradle-plugins-x.y.z` and waits until Central has published it. Vanniktech's plugin
+still builds the POMs, sources and Dokka javadoc jars and signs them, but not the upload: it names a
+multi-module deployment after a group and a timestamp, with no way to change it. Credentials come from `~/.gradle/gradle.properties` or
 `ORG_GRADLE_PROJECT_*`: `mavenCentralUsername`/`mavenCentralPassword` (a Central Portal token for
 the `io.github.fiftieshousewife` namespace) and a signing key (`signing.keyId`/`signing.password`/
 `signing.secretKeyRingFile`, or `signingInMemoryKey`/`signingInMemoryKeyPassword`); every artifact
 is signed when one is set. Users then list `mavenCentral()` in `pluginManagement`. Plain `publish`
-publishes to every repository, Central included. `./gradlew publishPlugins` would add the Gradle
+publishes to the staging directory and, when `binaryRepo.url` is set, the corporate repository. `./gradlew publishPlugins` would add the Gradle
 Plugin Portal, with its own key and a manual review of each new plugin.
 
 ## Conventions

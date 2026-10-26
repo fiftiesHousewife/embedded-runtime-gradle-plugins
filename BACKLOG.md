@@ -40,13 +40,12 @@ and `./gradlew aiSkills` to install them in a project. Prompt files were dropped
 
 ## Older open items
 
-- **Publishing 0.0.2.** 0.0.1 is on Maven Central (2026-10-26) with bare POM names (`app-core`,
-  `java-app`, …); 0.0.2 names every POM "Embedded Runtime: …". Set up like the Clean
-  Code plugin (Vanniktech, Maven Central with plugin markers). Verified 2026-10-25: a release to a
-  scratch local repository is complete and signed, and a fresh project applying the plugins by id
-  and version from it builds and smoke-tests. Run `./gradlew publishToMavenCentral
-  -PreleaseVersion=0.0.2` (needs `mavenCentralUsername`/`mavenCentralPassword`). The Gradle Plugin
-  Portal is optional on top (`publishPlugins`, its own key, manual review).
+- **Publishing 0.0.3.** 0.0.1 and 0.0.2 are on Maven Central (2026-10-26); their Central Portal
+  deployments carry no project name, because Vanniktech's upload names a multi-module deployment
+  after a group and a timestamp. The upload is now our own (`publishToMavenCentral`, deployment
+  `embedded-runtime-gradle-plugins-<version>`), after `verifyMavenCentralBundle` checks the staged
+  release. Run `./gradlew publishToMavenCentral -PreleaseVersion=0.0.3` outside the sandbox. The
+  Gradle Plugin Portal is optional on top (`publishPlugins`, its own key, manual review).
 - Signing RPMs: the plugin doesn't sign the RPMs it builds (archives are signed with Sigstore).
   dnf can check them through the repository's GPG-signed metadata (`repo_gpgcheck=1`, documented
   in docs/packaging.md); signing each package (`gpgcheck=1`) needs `rpm --addsign` in CI for now.

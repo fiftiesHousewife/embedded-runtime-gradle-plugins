@@ -10,20 +10,28 @@ val pluginBuild = gradle.includedBuild("build-src")
 val modules = listOf(":app-core", ":java-app", ":node-app")
 
 tasks.named("assemble") { dependsOn(modules.map { pluginBuild.task("$it:assemble") }) }
-tasks.named("check") { dependsOn(modules.map { pluginBuild.task("$it:check") }) }
+tasks.named("check") { dependsOn(modules.map { pluginBuild.task("$it:check") } + pluginBuild.task(":check")) }
 tasks.named("clean") { dependsOn(modules.map { pluginBuild.task("$it:clean") }) }
 
 // Release entry points, forwarded so the repository root is the only directory anyone needs:
-//   ./gradlew publishToMavenCentral -PreleaseVersion=1.2.0   → Maven Central, released automatically
-//   ./gradlew publishToMavenLocal   -PreleaseVersion=1.2.0   → ~/.m2, to try a release first
-//   ./gradlew publish               -PreleaseVersion=1.2.0   → every repository, Central included, and
-//                                                              the corporate one when binaryRepo.url is set
-//   ./gradlew publishPlugins        -PreleaseVersion=1.2.0   → the Gradle Plugin Portal
-listOf("publish", "publishToMavenLocal", "publishToMavenCentral").forEach { name ->
+//   ./gradlew verifyMavenCentralBundle -PreleaseVersion=1.2.0   → stage the release and check it
+//   ./gradlew publishToMavenCentral    -PreleaseVersion=1.2.0   → and release it, as one deployment
+//   ./gradlew publishToMavenLocal      -PreleaseVersion=1.2.0   → ~/.m2, to try a release first
+//   ./gradlew publish                  -PreleaseVersion=1.2.0   → the staging directory, and the
+//                                                                  corporate repository when binaryRepo.url is set
+//   ./gradlew publishPlugins           -PreleaseVersion=1.2.0   → the Gradle Plugin Portal
+listOf("publish", "publishToMavenLocal").forEach { name ->
     tasks.register(name) {
         group = "publishing"
         description = "Runs $name in every module of the build-src plugin build"
         dependsOn(modules.map { pluginBuild.task("$it:$name") })
+    }
+}
+listOf("verifyMavenCentralBundle", "publishToMavenCentral").forEach { name ->
+    tasks.register(name) {
+        group = "publishing"
+        description = "Runs $name in the build-src plugin build: every module as one Maven Central deployment"
+        dependsOn(pluginBuild.task(":$name"))
     }
 }
 tasks.register("publishPlugins") {

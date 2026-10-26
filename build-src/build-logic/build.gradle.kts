@@ -17,3 +17,10 @@ dependencies {
     implementation(libs.gradle.forbiddenapis)
     implementation(libs.gradle.dokka)
 }
+
+// The release logic (CentralBundle, CentralPortal) is tested like any other code.
+testing {
+    suites {
+        named<JvmTestSuite>("test") { useJUnitJupiter(libs.versions.junit.get()) }
+    }
+}

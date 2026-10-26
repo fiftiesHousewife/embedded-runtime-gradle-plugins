@@ -77,7 +77,8 @@ project's hands, publish a **runtime policy** once and point every build machine
 ```properties
 # ~/.gradle/gradle.properties on each machine, or ORG_GRADLE_PROJECT_... on CI. A property here
 # overrides the same property in a project, so a project cannot unset it.
-javaApp.securityPolicyArtifact=com.acme.platform:java-runtime-policy:7      # a zip in your binary repository
+# a zip in your binary repository
+javaApp.securityPolicyArtifact=com.acme.platform:java-runtime-policy:7
 # or javaApp.securityPolicy=/shared/policy                                  # a directory or zip on disk
 ```
 
@@ -88,12 +89,16 @@ in [your-app.md](your-app.md#the-organisations-runtime-policy):
 ```properties
 id=acme-java-runtime
 version=7
-lockProperties=true                                  # security.overridePropertiesFile=false
-runtimeOptions=locked                                # see "Runtime options" below
+# security.overridePropertiesFile=false
+lockProperties=true
+# see "Runtime options" below
+runtimeOptions=locked
 forbiddenModules=jdk.jdwp.agent,jdk.management.agent
 forbiddenJvmArgs=-javaagent,-agentlib,-agentpath,-Djava.security.properties,-Djdk.tls.
-forbiddenLibraries=pkg:maven/org.bouncycastle/bctls  # package URL prefixes, matched against the SBOM
-set.networkaddress.cache.ttl=30                      # a security property, exactly this value
+# package URL prefixes, matched against the SBOM
+forbiddenLibraries=pkg:maven/org.bouncycastle/bctls
+# a security property, exactly this value
+set.networkaddress.cache.ttl=30
 append.jdk.tls.disabledAlgorithms=TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA384
 ```
 
@@ -204,7 +209,8 @@ To use JDKs you already have instead of downloading them, point at a shared dire
 laid out like the [binary repository's runtimes repository](binary-repository.md#repositories-to-create):
 
 ```properties
-javaApp.jdk.localPath=/shared/jdks     # /shared/jdks/temurin/jdk/21.0.12.1_1/jdk-21.0.12.1_1-linux-x64.tar.gz
+# /shared/jdks/temurin/jdk/21.0.12.1_1/jdk-21.0.12.1_1-linux-x64.tar.gz
+javaApp.jdk.localPath=/shared/jdks
 ```
 
 or configure one JDK at a time, as an installed directory or an archive:

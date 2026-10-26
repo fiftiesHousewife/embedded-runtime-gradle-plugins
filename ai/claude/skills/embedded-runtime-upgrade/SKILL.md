@@ -40,7 +40,8 @@ its health check: an upgrade is only done when that passes.
 Only when a security fix can't wait. In `gradle.properties`:
 
 ```properties
-javaApp.jdk.21=21.0.13+9          # in the configured distribution's own version form
+# in the configured distribution's own version form
+javaApp.jdk.21=21.0.13+9
 nodeApp.node.version=24.18.2
 ```
 

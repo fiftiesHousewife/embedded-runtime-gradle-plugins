@@ -144,9 +144,12 @@ Put the machine's settings in `gradle.properties` or `~/.gradle/gradle.propertie
 `ORG_GRADLE_PROJECT_…` variables in CI:
 
 ```properties
-javaApp.jdk.distribution=temurin                                    # the JDK vendor
-binaryRepo.url=https://artifactory.example.com/artifactory          # download and publish everything here
-javaApp.securityPolicyArtifact=com.example.platform:java-runtime-policy:7   # the organisation's runtime policy
+# the JDK vendor
+javaApp.jdk.distribution=temurin
+# download and publish everything here
+binaryRepo.url=https://artifactory.example.com/artifactory
+# the organisation's runtime policy
+javaApp.securityPolicyArtifact=com.example.platform:java-runtime-policy:7
 ```
 
 `./gradlew build` then gives three archives in `build/distributions/` and two RPMs. `publish` uploads
@@ -173,7 +176,7 @@ nodeApp {
     entryPoint = "server.mjs"                  // under app/; started by `bin/<app> run`
     buildScript = "build"                      // npm script run before packaging (then dist/ is packaged)
     testScript = "test"                        // npm script run by `check`
-    nodeVersion = "24.18.1"                    // default: the plugin's pin
+    nodeVersion = "24.22.1"                    // default: the plugin's pin
 
     targets("linux-x64", "linux-aarch64")
     ignoreInstallScripts = true                // npm --ignore-scripts for production dependencies
@@ -215,8 +218,9 @@ alone. The runtime grows with the modules the app needs: Spring's `java.desktop`
 `java.beans`, is its largest. Details in the article's [Spring Boot
 measurements](docs/article.md#what-it-does-to-a-spring-boot-service).
 
-The [samples](samples) are a plain Java HTTP service, a Spring Boot service, a Node.js service, and a
-service built and run as a container image when Docker is available.
+The [samples](samples) are a plain Java HTTP service, a Spring Boot service, a Node.js service, a
+service built and run as a container image when Docker is available, and a deployment check that
+verifies a release's Sigstore signature before starting it.
 
 ## Tasks
 

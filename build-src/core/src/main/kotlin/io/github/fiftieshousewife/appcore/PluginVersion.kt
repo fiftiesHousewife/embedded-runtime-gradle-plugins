@@ -24,4 +24,10 @@ object PluginVersion {
 
     /** The digest [dockerBaseImage] is pinned to: its multi-arch index, so it holds for every CPU. */
     val dockerBaseDigest: String get() = properties.getProperty("dockerBaseDigest")
+
+    /** sigstore-java, which `app-smoke-test` resolves to verify Sigstore bundles. */
+    val sigstoreJava: String get() = properties.getProperty("sigstoreJava")
+
+    /** The Bouncy Castle release on the plugins' classpath, which the Sigstore verifier is aligned with. */
+    val bouncycastle: String get() = properties.getProperty("bouncycastle")
 }

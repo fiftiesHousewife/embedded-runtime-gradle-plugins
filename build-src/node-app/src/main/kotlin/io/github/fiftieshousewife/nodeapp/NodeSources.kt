@@ -56,7 +56,7 @@ class NodeSources(private val binaryRepo: BinaryRepository?, private val overrid
         const val DEFAULT_NPM_REGISTRY = "https://registry.npmjs.org/"
         const val DEFAULT_BINARY_REPO_NPM = "api/npm/npm-virtual"
 
-        /** `nodeApp.node.version=24.18.1` overrides the catalogue pin. */
+        /** `nodeApp.node.version=24.22.1` overrides the catalogue pin. */
         const val VERSION = "nodeApp.node.version"
 
         /** Where Node archives live without BinaryRepository, and how they are laid out under that root. */

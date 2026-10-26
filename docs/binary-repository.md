@@ -37,7 +37,8 @@ and to RPM uploads:
 # ~/.gradle/gradle.properties
 systemProp.https.proxyHost=proxy.example.com
 systemProp.https.proxyPort=3128
-systemProp.https.proxyUser=build-user          # if the proxy needs a login
+# if the proxy needs a login
+systemProp.https.proxyUser=build-user
 systemProp.https.proxyPassword=<password>
 systemProp.http.nonProxyHosts=localhost|*.example.com
 ```
@@ -60,7 +61,7 @@ JDK and Node.js archives are read from `runtimes` in this layout:
 
 ```
 runtimes/temurin/jdk/21.0.12.1_1/jdk-21.0.12.1_1-linux-x64.tar.gz
-runtimes/nodejs/node/24.18.1/node-24.18.1-linux-x64.tar.gz
+runtimes/nodejs/node/24.22.1/node-24.22.1-linux-x64.tar.gz
 ```
 
 [`scripts/curate-runtimes.sh`](../scripts/curate-runtimes.sh) downloads a JDK of any supported
@@ -91,8 +92,10 @@ repackaging. Give a pattern that ends in `.rpm`, and if the RPMs live in a repos
 name it with `javaApp.jdk.binaryRepo`:
 
 ```properties
-javaApp.jdk.binaryRepo=yum-local                                        # default: binaryRepo.repo.runtimes
-javaApp.jdk.binaryRepoPattern=java/jdk[revision]-64_linux.x86_64.rpm    # yum-local/java/jdk21_5-64_linux.x86_64.rpm
+# default: binaryRepo.repo.runtimes
+javaApp.jdk.binaryRepo=yum-local
+# yum-local/java/jdk21_5-64_linux.x86_64.rpm
+javaApp.jdk.binaryRepoPattern=java/jdk[revision]-64_linux.x86_64.rpm
 javaApp.jdk.revisionFormat=[feature]_[update]
 ```
 
@@ -115,7 +118,8 @@ binaryRepo.url=https://repo.example.com
 binaryRepoUsername=build-user
 binaryRepoPassword=<token>
 javaApp.jdk.distribution=oracle
-javaApp.jdk.21=21.0.5                                                   # the exact release you have approved
+# the exact release you have approved
+javaApp.jdk.21=21.0.5
 
 # Linux agents: the JDK RPM from Artifactory
 javaApp.jdk.binaryRepo=yum-local

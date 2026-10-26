@@ -18,6 +18,8 @@ commons-compress = "1.28.0"
 xz = "1.12"
 zstd-jni = "1.5.7-24"
 bouncycastle = "1.86"
+# Verifies Sigstore bundles in app-smoke-test, in an isolated worker resolved only when asked for.
+sigstore = "2.3.0"
 
 # Used by samples/spring-boot-service only.
 spring-boot = "4.1.2"
@@ -35,7 +37,9 @@ plugin-jvm = "17"
 #
 # A pin must resolve on every supported target: vendors upload a release one OS and CPU at a time
 # over several days, so the newest complete release can lag the newest announced one. Check for
-# newer CPU / security releases before publishing (pins as of 2026-10-24):
+# newer CPU / security releases before publishing (checked 2026-10-26: Node.js moved to the
+# 2026-10-20 security release; the October JDK CPU builds are not yet on every target, e.g. Temurin
+# 21.0.13+9 has no Windows x64 build, so the JDK pins stay):
 #   Temurin:    https://adoptium.net/temurin/releases/
 #   Oracle:     https://www.oracle.com/java/technologies/downloads/archive/
 #   Corretto:   https://github.com/corretto/corretto-21/releases (one repository per feature)
@@ -87,7 +91,7 @@ jdk-sapmachine-21 = "21.0.13"
 jdk-sapmachine-25 = "25.0.5"
 jdk-sapmachine-26 = "26.0.2"
 jdk-sapmachine-27 = "27.0.1.0.2"
-node = "24.18.1"
+node = "24.22.1"
 # The generated Dockerfile's default base image (registry.access.redhat.com/ubi9/ubi-minimal), by tag
 # and by the digest of its multi-arch index, so every build of a release starts from the same bytes.
 # Bump both together: the digest is the Docker-Content-Digest of
@@ -105,6 +109,7 @@ commons-compress = { module = "org.apache.commons:commons-compress", version.ref
 xz = { module = "org.tukaani:xz", version.ref = "xz" }
 zstd-jni = { module = "com.github.luben:zstd-jni", version.ref = "zstd-jni" }
 bouncycastle-pg = { module = "org.bouncycastle:bcpg-jdk18on", version.ref = "bouncycastle" }
+sigstore-java = { module = "dev.sigstore:sigstore-java", version.ref = "sigstore" }
 junit-bom = { module = "org.junit:junit-bom", version.ref = "junit" }
 junit-jupiter-api = { module = "org.junit.jupiter:junit-jupiter-api" }
 # Gradle plugins applied from build-src/build-logic convention plugins, as ordinary dependencies.

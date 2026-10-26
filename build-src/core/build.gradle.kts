@@ -58,6 +58,8 @@ val versionResource =
             "registry.access.redhat.com/ubi9/ubi-minimal:${libs.versions.ubi.minimal.tag.get()}",
         )
         property("dockerBaseDigest", libs.versions.ubi.minimal.digest.get())
+        property("sigstoreJava", libs.versions.sigstore.get())
+        property("bouncycastle", libs.versions.bouncycastle.get())
     }
 sourceSets.main {
     resources.srcDir(versionResource.map { layout.buildDirectory.dir("generated/version").get() })
@@ -82,6 +84,10 @@ dependencies {
     // zstd-jni backs Commons Compress for zstd payloads, the default of RHEL 9 and later.
     implementation(libs.commons.compress)
     implementation(libs.zstd.jni)
+    // Sigstore verification runs in a worker whose classpath app-smoke-test resolves only when a
+    // signer identity is set, so builds that don't verify never download it.
+    compileOnly(libs.sigstore.java)
+    testImplementation(libs.sigstore.java)
     constraints {
         implementation(libs.commons.compress) { because("Redline 1.2.10 asks for 1.21, which has known CVEs") }
         implementation(libs.xz) { because("Redline 1.2.10 asks for 1.4") }

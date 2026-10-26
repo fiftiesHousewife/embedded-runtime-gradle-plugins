@@ -54,3 +54,46 @@ jobs:
       # The post-edit hook shared by Claude Code, Copilot and Devin, called as each calls it.
       - if: runner.os == 'Linux'
         run: .github/scripts/test-agent-hooks.sh
+
+  # A release as it should be done, end to end: the Java sample's archive is signed with Sigstore
+  # (keyless: this workflow's own identity is the signing certificate) and given SLSA build
+  # provenance, then checked as a deployment pipeline would check it. Pushes only: a pull request
+  # from a fork gets no identity token.
+  signed-release:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write      # Sigstore's certificate is issued for this workflow's identity token
+      attestations: write  # GitHub artifact attestations
+    env:
+      REPO: samples/java-service/build/repo/io/github/fiftieshousewife/samples/java-service/1.0.0
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: |
+            17
+            21
+      - name: Build, then publish with a Sigstore bundle beside every file
+        run: ./gradlew -p samples/java-service build publishAllPublicationsToSampleRepository -PsigstoreSign=true
+      - name: SLSA build provenance for the archive
+        uses: actions/attest-build-provenance@v4.2.2
+        with:
+          subject-path: ${{ env.REPO }}/java-service-1.0.0-linux-x64.tar.gz
+      - name: The provenance verifies
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh attestation verify "$REPO/java-service-1.0.0-linux-x64.tar.gz" --repo "${{ github.repository }}"
+      - name: app-smoke-test verifies the signature, then starts the archive
+        run: >
+          ./gradlew -p samples/release-check appSmokeTest
+          "-PappSmokeTest.signerIdentity=^https://github\.com/${{ github.repository }}/\.github/workflows/ci\.yml@${{ github.ref }}$"
+      - name: An archive signed by anyone else is refused
+        run: |
+          if ./gradlew -p samples/release-check appSmokeTest \
+              "-PappSmokeTest.signerIdentity=^https://github\.com/someone-else/.*$" > refused.txt 2>&1; then
+            cat refused.txt; echo "::error::an archive signed by another identity was accepted"; exit 1
+          fi
+          grep "is not signed by" refused.txt

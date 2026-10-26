@@ -84,5 +84,8 @@ the plugins themselves are updated by Renovate's own Gradle support.
 - [`renovate/nodejs.json`](../renovate/nodejs.json): `nodeApp.node.version=…` and
   `nodeVersion = "…"`, from nodejs.org.
 
+Self-hosted Renovate needs a GitHub token (`RENOVATE_GITHUB_COM_TOKEN`, read-only) to look up
+Adoptium's releases; the hosted Renovate app has one already.
+
 Both stay within the release line: moving from Java 21 to 25 or Node.js 24 to 26 is a decision,
 not an update.

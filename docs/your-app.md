@@ -91,10 +91,12 @@ One policy can hold both ecosystems' keys; these are the ones that apply to Node
 ```properties
 id=acme-node-runtime
 version=3
-tlsMinVersion=1.3                                    # the launcher must pass --tls-min-v1.3
+# the launcher must pass --tls-min-v1.3
+tlsMinVersion=1.3
 forbiddenNodeArgs=--inspect,--require,--import,--loader,--experimental-loader
 runtimeOptions=locked
-forbiddenLibraries=pkg:npm/request                   # package URL prefixes, matched against the SBOM
+# package URL prefixes, matched against the SBOM
+forbiddenLibraries=pkg:npm/request
 ```
 
 The policy's `certificates/` are added to `security/trusted-cas.pem` after the project's own. Every

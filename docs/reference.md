@@ -47,7 +47,7 @@ javaApp {                                       // nodeApp {} has the same first
 }
 
 nodeApp {
-    nodeVersion = "24.18.1"                     // default: the plugin's pin
+    nodeVersion = "24.22.1"                     // default: the plugin's pin
     entryPoint = "main.js"                      // under app/; started by `run`
     appFiles = files("dist")                    // default: src/ (minus src/deploy/), or dist/ with buildScript
     buildScript = "build"                       // npm script run before packaging
@@ -103,6 +103,9 @@ Gradle properties, set in `gradle.properties`, `~/.gradle/gradle.properties` or 
 | `nodeApp.npm.caFile` | | PEM file of corporate CAs for npm |
 | `javaApp.targets`, `nodeApp.targets` | this machine | Comma-separated targets to build |
 | `javaApp.securityPolicy`, `javaApp.securityPolicyArtifact`, `nodeApp.securityPolicy`, `nodeApp.securityPolicyArtifact` | | The organisation's runtime policy: a directory or zip, or its `group:name:version` |
+| `appSmokeTest.signerIdentity` | | In a build applying `app-smoke-test`: a regex every archive's Sigstore certificate identity must match, checked before it is started; see [Publishing](publishing.md#only-archives-your-release-workflow-signed) |
+| `appSmokeTest.signerIssuer` | `https://token.actions.githubusercontent.com` | The OIDC issuer that identity must come from |
+| `appSmokeTest.sigstoreTrustedRoot` | fetched from Sigstore | A copy of Sigstore's `trusted_root.json`, for machines that can't fetch it |
 | `appSmokeTest.securityPolicy`, `appSmokeTest.securityPolicyArtifact` | | In a build applying `app-smoke-test`: the policy every archive must comply with before it is started |
 | `javaApp.archiveFormat`, `nodeApp.archiveFormat` | `tar.gz` | `tar.gz`, `tar` or `zip` |
 | `javaApp.rpm`, `nodeApp.rpm` | `false` | Also build an RPM per Linux target |

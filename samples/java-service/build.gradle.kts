@@ -1,5 +1,6 @@
 plugins {
     id("io.github.fiftieshousewife.java-app")
+    id("dev.sigstore.sign") version "2.3.0" apply false
 }
 
 group = "io.github.fiftieshousewife.samples"
@@ -18,4 +19,12 @@ javaApp {
         enabled = true
         summary = "Sample HTTP service with its own Java runtime"
     }
+}
+
+// Published to build/repo, where samples/release-check finds it. With -PsigstoreSign=true every
+// published file is also signed with Sigstore, keyless, as CI's release job does with the workflow's
+// own identity; anywhere else that would open a browser to sign in, so it is off by default.
+publishing { repositories { maven { name = "sample"; url = uri(layout.buildDirectory.dir("repo")) } } }
+if (providers.gradleProperty("sigstoreSign").map(String::toBoolean).getOrElse(false)) {
+    apply(plugin = "dev.sigstore.sign")
 }

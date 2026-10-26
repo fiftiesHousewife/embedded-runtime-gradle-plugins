@@ -1,7 +1,7 @@
 # Working on this repository
 
-Notes for anyone (human or agent) changing the plugins. What has been asked for and not yet done is in [BACKLOG.md](BACKLOG.md) (keep it current);
-researched gaps are in [ROADMAP.md](ROADMAP.md). The [README](README.md) and [`docs/`](docs)
+Notes for anyone (human or agent) changing the plugins. What has been asked for and not yet done is in [BACKLOG.md](BACKLOG.md) (keep it current).
+The [README](README.md) and [`docs/`](docs)
 are for people *using* them and must stay free of anything below. Keep the README a short overview
 that links into `docs/`.
 

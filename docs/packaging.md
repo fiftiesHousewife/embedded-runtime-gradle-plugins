@@ -79,9 +79,17 @@ Servers then need a `.repo` file pointing dnf at it, such as `/etc/yum.repos.d/a
 [apps]
 name=Our apps
 baseurl=https://repo.example.com/rpm-local
-# gpgcheck=1 and gpgkey=… once the RPMs or the repository metadata are signed
+# The repository signs its metadata with its own GPG key (Artifactory: "GPG Signing" on the
+# repository; Nexus: a signing key on the yum-hosted repository), and dnf refuses metadata it can't
+# verify. The RPMs themselves are not signed by the plugin.
+repo_gpgcheck=1
+gpgkey=https://repo.example.com/api/gpg/key/public
 gpgcheck=0
 ```
+
+RPM signatures are PGP by design, so this is where an RPM install is checked: the repository's key
+vouches for the metadata, which holds every package's checksum. To sign the packages themselves as
+well, run `rpm --addsign` in CI before `appPublishRpm` and set `gpgcheck=1`.
 
 Two caveats. RPMs are not byte-reproducible, unlike the archives. The RPM is built from the same
 directory as this target's archive, but only the archive for the build machine is smoke-tested;

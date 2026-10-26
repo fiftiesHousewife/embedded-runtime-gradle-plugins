@@ -3,6 +3,7 @@ package io.github.fiftieshousewife.javaapp
 import io.github.fiftieshousewife.appcore.TestProject
 import org.junit.jupiter.api.Assertions.assertAll
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
@@ -51,4 +52,41 @@ class ConsumerPluginsTest {
             refused.output,
         )
     }
+
+    @Test
+    fun `a pipeline that requires a signer refuses an archive with no Sigstore bundle`() {
+        val refused = verifyingConsumer(published())
+            .buildAndFail("appSmokeTest", "-PappSmokeTest.signerIdentity=^https://github\\.com/example/.*$")
+        assertAll(
+            { assertTrue(refused.output.contains("svc-2.0.0-$host.tar.gz has no Sigstore bundle"), refused.output) },
+            { assertFalse(refused.output.contains("Smoke test passed"), refused.output) },
+        )
+    }
+
+    @Test
+    fun `a pipeline that requires a signer refuses an archive whose bundle signs something else`() {
+        val repo = published()
+        // A genuine bundle, but for another file (sigstore-java's own jar): the signature can't match.
+        val beside = File(java.net.URI(repo)).resolve("com/example/test/svc/2.0.0/svc-2.0.0-$host.tar.gz.sigstore.json")
+        sigstoreFixture("sigstore-java-2.3.0.jar.sigstore.json").copyTo(beside)
+        val refused = verifyingConsumer(repo).buildAndFail(
+            "appSmokeTest",
+            "-PappSmokeTest.signerIdentity=^https://github\\.com/sigstore/sigstore-java/.*$",
+            "-PappSmokeTest.sigstoreTrustedRoot=${sigstoreFixture("trusted_root.json").absolutePath}",
+        )
+        assertAll(
+            { assertTrue(refused.output.contains("svc-2.0.0-$host.tar.gz is not signed by"), refused.output) },
+            { assertFalse(refused.output.contains("Smoke test passed"), refused.output) },
+        )
+    }
+
+    /** A consumer that can also fetch sigstore-java, as a real one would from its binary repository. */
+    private fun verifyingConsumer(repo: String) =
+        consumer("deploy-check", "consumer/build.gradle.kts.template", "@REPO@" to repo).apply {
+            val build = project.resolve("build.gradle.kts")
+            file("build.gradle.kts", build.readText() + "\nrepositories { mavenCentral() }\n")
+        }
+
+    private fun sigstoreFixture(name: String) =
+        File(ConsumerPluginsTest::class.java.getResource("/fixtures/sigstore/$name")!!.toURI())
 }

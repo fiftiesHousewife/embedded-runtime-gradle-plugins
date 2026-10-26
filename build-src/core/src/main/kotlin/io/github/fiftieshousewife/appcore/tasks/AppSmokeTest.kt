@@ -11,7 +11,9 @@ import org.gradle.api.file.ConfigurableFileCollection
 import org.gradle.api.file.FileSystemOperations
 import org.gradle.api.file.RegularFileProperty
 import org.gradle.api.provider.Property
+import org.gradle.api.tasks.Classpath
 import org.gradle.api.tasks.Input
+import org.gradle.api.tasks.InputFile
 import org.gradle.api.tasks.InputFiles
 import org.gradle.api.tasks.Optional
 import org.gradle.api.tasks.OutputFile
@@ -19,6 +21,7 @@ import org.gradle.api.tasks.PathSensitive
 import org.gradle.api.tasks.PathSensitivity
 import org.gradle.api.tasks.TaskAction
 import org.gradle.work.DisableCachingByDefault
+import org.gradle.workers.WorkerExecutor
 import java.io.File
 import java.time.Duration
 import javax.inject.Inject
@@ -38,6 +41,7 @@ abstract class AppSmokeTest
 constructor(
     private val fs: FileSystemOperations,
     private val archives: ArchiveOperations,
+    private val workers: WorkerExecutor,
 ) : DefaultTask() {
     @get:InputFiles
     @get:PathSensitive(PathSensitivity.NONE)
@@ -57,6 +61,25 @@ constructor(
     @get:PathSensitive(PathSensitivity.RELATIVE)
     abstract val requiredPolicy: ConfigurableFileCollection
 
+    /**
+     * Who must have signed every archive. When set, each archive needs a Sigstore bundle in
+     * [signatures] (`<archive>.sigstore.json`) that verifies against it, or nothing is started.
+     */
+    @get:Input @get:Optional
+    abstract val signer: Property<SignerIdentity>
+
+    @get:InputFiles
+    @get:PathSensitive(PathSensitivity.NAME_ONLY)
+    abstract val signatures: ConfigurableFileCollection
+
+    /** Sigstore's `trusted_root.json`, for a machine that can't fetch it; see [SigstoreVerification]. */
+    @get:InputFile @get:Optional
+    @get:PathSensitive(PathSensitivity.NONE)
+    abstract val trustedRoot: RegularFileProperty
+
+    /** sigstore-java and its dependencies, loaded only by the verifying worker. */
+    @get:Classpath abstract val verifierClasspath: ConfigurableFileCollection
+
     @get:OutputFile abstract val resultFile: RegularFileProperty
 
     init {
@@ -65,6 +88,7 @@ constructor(
 
     @TaskAction
     fun smokeTest() {
+        signer.orNull?.let(::verifySignatures)
         val results = archiveFiles.files.sortedBy { it.name }.mapIndexed(::test)
         resultFile.get().asFile.writeText(results.joinToString("\n") + "\n")
     }
@@ -83,6 +107,27 @@ constructor(
         }
         logger.lifecycle("Smoke test passed: ${archiveFile.name} started and reported healthy")
         return "healthy ${manifest.name} ${manifest.version}"
+    }
+
+    private fun verifySignatures(signer: SignerIdentity) {
+        val bundles = signatures.files.associateBy { it.name }
+        val queue = workers.classLoaderIsolation { classpath.from(verifierClasspath) }
+        archiveFiles.files.sortedBy { it.name }.forEach { archive ->
+            val bundle = bundles[archive.name + BUNDLE_SUFFIX]
+                ?: throw GradleException(
+                    "${archive.name} has no Sigstore bundle: ${archive.name}$BUNDLE_SUFFIX was not found beside " +
+                        "it in the repository, so it can't be shown to come from ${signer.identity}",
+                )
+            queue.submit(VerifySigstoreBundle::class.java) {
+                this.archive.set(archive)
+                this.bundle.set(bundle)
+                identity.set(signer.identity)
+                issuer.set(signer.issuer)
+                this.trustedRoot.set(this@AppSmokeTest.trustedRoot)
+            }
+        }
+        queue.await()
+        logger.lifecycle("Signatures verified: every archive was signed by ${signer.identity}")
     }
 
     private fun launcher(home: File, manifest: AppManifest, host: Target): File {
@@ -116,5 +161,10 @@ constructor(
         }
         return into.listFiles()?.singleOrNull { it.isDirectory }
             ?: throw GradleException("Archive $archiveFile must contain exactly one top-level directory")
+    }
+
+    companion object {
+        /** What `dev.sigstore.sign` and Maven Central name a file's bundle: `<file>.sigstore.json`. */
+        const val BUNDLE_SUFFIX = ".sigstore.json"
     }
 }

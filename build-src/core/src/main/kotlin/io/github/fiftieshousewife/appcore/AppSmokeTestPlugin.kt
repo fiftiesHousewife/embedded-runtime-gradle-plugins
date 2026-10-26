@@ -17,6 +17,10 @@ import java.time.Duration
  * java-app and node-app publications carry in their Gradle Module Metadata, then starts it exactly
  * as the producing build's own smoke test does. With `-PappSmokeTest.securityPolicy` (or
  * `…securityPolicyArtifact`) it first checks the archive against the organisation's runtime policy.
+ *
+ * With `-PappSmokeTest.signerIdentity` it first verifies each archive's Sigstore bundle, published
+ * beside it as `<archive>.sigstore.json`: only an archive signed by that identity (a regex, such as
+ * one release workflow of one repository) is started. See [SigstoreBundles].
  */
 abstract class AppSmokeTestPlugin : Plugin<Project> {
     override fun apply(project: Project) {
@@ -25,11 +29,13 @@ abstract class AppSmokeTestPlugin : Plugin<Project> {
             project.configurations.dependencyScope("smokeTest") {
                 description = "Published app archives to smoke-test on this machine"
             }
+        val machineArchives = MachineArchives.resolvable(project, "smokeTestArchives", declared)
         val smoke =
             project.tasks.register("appSmokeTest", AppSmokeTest::class.java) {
                 group = AppWiring.VERIFICATION_GROUP
                 description = "Starts the smokeTest archives built for this machine and waits for their healthcheck"
-                archiveFiles.from(MachineArchives.resolvable(project, "smokeTestArchives", declared))
+                archiveFiles.from(machineArchives)
+                SigstoreBundles.requireSigner(project, machineArchives, this)
                 healthTimeout.convention(DEFAULT_TIMEOUT)
                 requiredPolicy.from(RuntimePolicySource.files(project, "appSmokeTest"))
                 resultFile.set(project.layout.buildDirectory.file("app-smoke-test/result.txt"))

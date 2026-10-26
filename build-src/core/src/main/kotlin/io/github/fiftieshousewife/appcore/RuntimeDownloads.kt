@@ -41,7 +41,7 @@ data class RuntimeRepository(
          * so every runtime, whatever vendor it came from, sits at a predictable path:
          * ```
          * runtimes/temurin/jdk/21.0.12.1_1/jdk-21.0.12.1_1-linux-x64.tar.gz
-         * runtimes/nodejs/node/24.18.1/node-24.18.1-linux-x64.tar.gz
+         * runtimes/nodejs/node/24.22.1/node-24.22.1-linux-x64.tar.gz
          * ```
          */
         const val CURATED_PATTERN = "[organisation]/[module]/[revision]/[artifact]-[revision]-[classifier].[ext]"

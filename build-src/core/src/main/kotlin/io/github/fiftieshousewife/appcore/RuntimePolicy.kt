@@ -16,14 +16,19 @@ import java.util.Properties
  * ```properties
  * id=acme-java-runtime
  * version=7
- * lockProperties=true                 # security.overridePropertiesFile=false
- * runtimeOptions=locked               # launchers refuse JAVA_TOOL_OPTIONS, APP_JAVA_OPTS, …
+ * # security.overridePropertiesFile=false
+ * lockProperties=true
+ * # launchers refuse JAVA_TOOL_OPTIONS, APP_JAVA_OPTS, …
+ * runtimeOptions=locked
  * forbiddenModules=jdk.jdwp.agent,jdk.management.agent
  * forbiddenJvmArgs=-javaagent,-agentlib,-agentpath,-Djava.security.properties,-Djdk.tls.
- * forbiddenLibraries=pkg:maven/org.bouncycastle/bctls    # purl prefixes: no TLS stack of the app's own
- * set.networkaddress.cache.ttl=30     # a security property, exactly
+ * # purl prefixes: no TLS stack of the app's own
+ * forbiddenLibraries=pkg:maven/org.bouncycastle/bctls
+ * # a security property, exactly
+ * set.networkaddress.cache.ttl=30
  * append.jdk.tls.disabledAlgorithms=TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA384
- * tlsMinVersion=1.3                   # Node: the launcher passes --tls-min-v1.3
+ * # Node: the launcher passes --tls-min-v1.3
+ * tlsMinVersion=1.3
  * forbiddenNodeArgs=--inspect,--require,--import,--loader,--experimental-loader
  * ```
  *
@@ -59,11 +64,30 @@ data class RuntimePolicy(
         private const val DIGEST_SHOWN = 12
         private val TLS_VERSIONS = setOf("1.2", "1.3")
 
+        /**
+         * A `.properties` file has no end-of-line comments: `lockProperties=true  # why` reads as a
+         * value that isn't `true`, quietly weakening the policy. Refused rather than guessed at.
+         */
+        private fun requireNoTrailingComments(file: File, props: Properties) {
+            val commented =
+                props.stringPropertyNames().sorted().filter { TRAILING_COMMENT.containsMatchIn(props.getProperty(it)) }
+            if (commented.isNotEmpty()) {
+                val verb = if (commented.size == 1) "has" else "have"
+                throw GradleException(
+                    "$file: ${commented.joinToString()} $verb a comment after the value, which a " +
+                        ".properties file reads as part of it; put the comment on its own line",
+                )
+            }
+        }
+
+        private val TRAILING_COMMENT = Regex("""\s#""")
+
         /** Loads the policy in [dir], which holds [FILE]. */
         fun load(dir: File): RuntimePolicy {
             val file = dir.resolve(FILE)
             if (!file.isFile) throw GradleException("$dir is not a runtime policy: it has no $FILE")
             val props = Properties().apply { Files.newInputStream(file.toPath()).use(::load) }
+            requireNoTrailingComments(file, props)
             fun list(key: String) =
                 props.getProperty(key).orEmpty().split(',').map(String::trim).filter(String::isNotEmpty)
             fun prefixed(prefix: String) = props.stringPropertyNames().filter { it.startsWith(prefix) }.sorted()

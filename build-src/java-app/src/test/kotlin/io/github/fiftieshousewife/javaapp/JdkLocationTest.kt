@@ -55,7 +55,7 @@ class JdkLocationTest {
     }
 
     @Test
-    fun `the curated BinaryRepository layout names every vendor's archive the same way`() {
+    fun `the curated binary repository layout names every vendor's archive the same way`() {
         val curated = JdkSources(JdkDistribution.ORACLE, JdkLocation.binaryRepo(binaryRepo))
         val reshaped =
             JdkSources(

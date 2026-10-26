@@ -10,7 +10,7 @@ import java.io.File
 /**
  * Where a build gets the [RuntimePolicy] from: `-P<block>.securityPolicy`, a directory or zip on
  * disk, or `-P<block>.securityPolicyArtifact`, the `group:name:version` of a zip in the build's
- * Maven repositories (normally BinaryRepository, so the policy is versioned and reviewed like any
+ * Maven repositories (normally a binary repository, so the policy is versioned and reviewed like any
  * release). Set it per machine or CI agent, in `~/.gradle/gradle.properties` or as an
  * `ORG_GRADLE_PROJECT_…` variable, where it overrides anything a project sets.
  */

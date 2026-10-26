@@ -22,7 +22,7 @@ class NodeAppSettingsPluginTest {
     }
 
     @Test
-    fun `without BinaryRepository Node comes from nodejs-org and no JDK repository is added`() {
+    fun `without a binary repository Node comes from nodejs-org and no JDK repository is added`() {
         val repos = repositories("")
         assertAll(
             { assertTrue(repos.contains("REPO MavenRepo https://repo.maven.apache.org/maven2/"), repos.toString()) },
@@ -32,7 +32,7 @@ class NodeAppSettingsPluginTest {
     }
 
     @Test
-    fun `BinaryRepository serves Node from the curated runtimes repository`() {
+    fun `a binary repository serves Node from the curated runtimes repository`() {
         val repos = repositories("binaryRepo.url=https://repo.example.com")
         assertAll(
             {

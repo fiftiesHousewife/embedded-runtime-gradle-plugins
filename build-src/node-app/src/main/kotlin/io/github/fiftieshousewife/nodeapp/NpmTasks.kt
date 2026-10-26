@@ -80,7 +80,7 @@ internal class NpmTasks(
     }
 
     companion object {
-        /** The npm user config: the configured registry, a corporate CA, and BinaryRepository credentials. */
+        /** The npm user config: the configured registry, a corporate CA, and binary repository credentials. */
         fun npmrc(project: Project, wiring: AppWiring, sources: NodeSources) =
             project.tasks.register("npmrc", GenerateNpmrc::class.java) {
                 group = NodeAppPlugin.ECOSYSTEM.taskGroup

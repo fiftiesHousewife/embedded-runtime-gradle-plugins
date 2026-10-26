@@ -11,7 +11,7 @@ import java.net.URI
 
 /**
  * Where JDK archives come from, first match wins: a JDK configured by path for one feature release
- * and target ([localJdk]); a shared local directory ([LOCAL_PATH]); the curated BinaryRepository tree;
+ * and target ([localJdk]); a shared local directory ([LOCAL_PATH]); the curated binary repository tree;
  * the chosen [distribution]'s own site.
  *
  * The compile toolchain resolver and the archive's runtime both ask this class, so compilation and
@@ -82,13 +82,13 @@ class JdkSources(val distribution: JdkDistribution, private val location: JdkLoc
         const val VERSION_PREFIX = "javaApp.jdk."
 
         /**
-         * Where JDK archives live without BinaryRepository, and how they are laid out under that root.
+         * Where JDK archives live without a binary repository, and how they are laid out under that root.
          * Together these reach any tree — a mirror, an internal build server — without a plugin release.
          */
         const val PUBLIC_URL = "javaApp.jdk.url"
         const val PUBLIC_PATTERN = "javaApp.jdk.pattern"
 
-        /** Ivy pattern for the curated BinaryRepository tree, when it cannot use the default layout. */
+        /** Ivy pattern for the curated binary repository tree, when it cannot use the default layout. */
         const val BINARY_REPO_PATTERN = "javaApp.jdk.binaryRepoPattern"
 
         /** The binary repository's repository holding JDKs, when it isn't `binaryRepo.repo.runtimes`: `yum-local`. */
@@ -100,7 +100,7 @@ class JdkSources(val distribution: JdkDistribution, private val location: JdkLoc
          */
         const val REVISION_FORMAT = "javaApp.jdk.revisionFormat"
 
-        /** An absolute path to a shared directory of JDK archives, laid out like the curated BinaryRepository tree. */
+        /** An absolute path to a shared directory of JDK archives, laid out like the curated binary repository tree. */
         const val LOCAL_PATH = "javaApp.jdk.localPath"
         const val LOCAL_PATTERN = "javaApp.jdk.localPattern"
 
@@ -119,7 +119,7 @@ class JdkSources(val distribution: JdkDistribution, private val location: JdkLoc
             location(providers),
         )
 
-        /** First match wins: a shared local directory, then BinaryRepository, then the vendor's own site. */
+        /** First match wins: a shared local directory, then the binary repository, then the vendor's own site. */
         private fun location(providers: ProviderFactory): JdkLocation {
             val localPath = providers.setting(LOCAL_PATH)
             val binaryRepo = BinaryRepository.from(providers)

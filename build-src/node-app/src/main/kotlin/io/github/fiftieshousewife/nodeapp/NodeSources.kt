@@ -12,7 +12,7 @@ import java.net.URI
 
 /**
  * Where Node.js archives and npm packages come from: nodejs.org and the public npm registry, or the
- * curated BinaryRepository tree and its npm repository when one is configured.
+ * curated binary repository tree and its npm repository when one is configured.
  */
 class NodeSources(private val binaryRepo: BinaryRepository?, private val overrides: NodeOverrides = NodeOverrides()) {
     val repository: RuntimeRepository
@@ -59,11 +59,11 @@ class NodeSources(private val binaryRepo: BinaryRepository?, private val overrid
         /** `nodeApp.node.version=24.22.1` overrides the catalogue pin. */
         const val VERSION = "nodeApp.node.version"
 
-        /** Where Node archives live without BinaryRepository, and how they are laid out under that root. */
+        /** Where Node archives live without a binary repository, and how they are laid out under that root. */
         const val PUBLIC_URL = "nodeApp.node.url"
         const val PUBLIC_PATTERN = "nodeApp.node.pattern"
 
-        /** Ivy pattern for the curated BinaryRepository tree, when it cannot use the default layout. */
+        /** Ivy pattern for the curated binary repository tree, when it cannot use the default layout. */
         const val BINARY_REPO_PATTERN = "nodeApp.node.binaryRepoPattern"
 
         const val NPM_REGISTRY = "nodeApp.npm.registry"

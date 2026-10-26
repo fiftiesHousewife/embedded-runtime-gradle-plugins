@@ -33,7 +33,7 @@ gradlePlugin {
             displayName = "Java app repositories and JDK toolchains"
             description =
                 "Routes Maven, plugin and JDK resolution to the public internet or a corporate " +
-                "BinaryRepository, and provisions compile JDKs at the exact version that gets embedded"
+                "binary repository, and provisions compile JDKs at the exact version that gets embedded"
             tags = listOf("toolchains", "jdk", "binaryRepo")
         }
         register("javaApp") {

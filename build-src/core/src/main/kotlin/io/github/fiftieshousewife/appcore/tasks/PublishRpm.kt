@@ -24,7 +24,7 @@ import javax.inject.Inject
 
 /**
  * `appPublishRpm`: uploads each RPM to a YUM repository with an HTTP PUT, the deploy API of
- * BinaryRepository and Nexus RPM repositories, which rebuild their `repodata/` themselves. Credentials
+ * Artifactory and Nexus RPM repositories, which rebuild their `repodata/` themselves. Credentials
  * are the publication's own, `binaryRepoUsername` and `binaryRepoPassword`, read only when the
  * upload runs so they never reach the configuration cache.
  */

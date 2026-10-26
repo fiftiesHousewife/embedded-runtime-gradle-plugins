@@ -1,5 +1,5 @@
 // This build produces the plugins, so it is the one build that cannot apply them: it declares
-// public repositories itself. Behind BinaryRepository, gradle/init.d/embedded-runtime-binary-repo.init.gradle.kts
+// public repositories itself. Behind a binary repository, gradle/init.d/embedded-runtime-binary-repo.init.gradle.kts
 // redirects them.
 pluginManagement {
     includeBuild("build-logic")

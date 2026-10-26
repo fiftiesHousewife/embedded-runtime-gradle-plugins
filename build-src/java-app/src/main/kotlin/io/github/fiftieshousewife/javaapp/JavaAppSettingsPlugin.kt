@@ -41,7 +41,7 @@ constructor(
         val jvm = (settings.toolchainManagement as ExtensionAware).extensions.getByType(
             JvmToolchainManagement::class.java,
         )
-        // Named `binaryRepo` behind BinaryRepository so Gradle supplies the credentials by convention.
+        // Named `binaryRepo` behind a binary repository so Gradle supplies the credentials by convention.
         jvm.javaRepositories.repository(if (binaryRepo != null) BinaryRepository.CREDENTIALS_NAME else "javaAppJdks") {
             resolverClass.set(JdkToolchainResolver::class.java)
             if (binaryRepo != null) AppSettings.authenticate(this)

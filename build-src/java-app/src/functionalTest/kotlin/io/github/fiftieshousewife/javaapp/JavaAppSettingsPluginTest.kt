@@ -26,7 +26,7 @@ class JavaAppSettingsPluginTest {
     }
 
     @Test
-    fun `without BinaryRepository it uses Maven Central, the plugin portal and the vendor's own site`() {
+    fun `without a binary repository it uses Maven Central, the plugin portal and the vendor's own site`() {
         val repos = repositories("")
         assertAll(
             { assertTrue(repos.contains("REPO MavenRepo https://repo.maven.apache.org/maven2/"), repos.toString()) },
@@ -36,7 +36,7 @@ class JavaAppSettingsPluginTest {
     }
 
     @Test
-    fun `BinaryRepository routes everything through the configured instance`() {
+    fun `a binary repository routes everything through the configured instance`() {
         val repos =
             repositories(
                 "binaryRepo.url=https://repo.example.com\nbinaryRepo.repo.maven=maven-remote",

@@ -4,8 +4,8 @@ import org.gradle.api.provider.ProviderFactory
 import java.net.URI
 
 /**
- * A corporate BinaryRepository that every external input is resolved through: Maven libraries, Gradle
- * plugins, runtime archives, and (for Node) npm packages.
+ * A corporate binary repository (Artifactory, Nexus, …) that every external input is resolved
+ * through: Maven libraries, Gradle plugins, runtime archives, and (for Node) npm packages.
  *
  * Machine configuration, never project configuration: set [URL] once per machine or CI agent in
  * `~/.gradle/gradle.properties` (or as `ORG_GRADLE_PROJECT_...` environment variables) and the same
@@ -43,7 +43,7 @@ data class BinaryRepository(
 
         /**
          * Name of the Gradle credentials identity. Gradle reads `binaryRepoUsername` and
-         * `binaryRepoPassword` (an BinaryRepository identity or reference token) lazily, at execution
+         * `binaryRepoPassword` (an Artifactory identity or reference token) lazily, at execution
          * time, so secrets never land in the configuration cache.
          */
         const val CREDENTIALS_NAME = "binaryRepo"

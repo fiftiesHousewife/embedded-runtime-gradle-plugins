@@ -54,6 +54,10 @@ jobs:
       # The Maven Central release, staged unsigned and checked: POM names and metadata, checksums.
       - if: runner.os == 'Linux'
         run: ./gradlew verifyMavenCentralBundle -PreleaseVersion=0.0.0-ci
+      # The release task itself, planned but not run: the configuration cache must be able to store it,
+      # or a real release fails after uploading.
+      - if: runner.os == 'Linux'
+        run: ./gradlew publishToMavenCentral -PreleaseVersion=0.0.0-ci --dry-run
       # The post-edit hook shared by Claude Code, Copilot and Devin, called as each calls it.
       - if: runner.os == 'Linux'
         run: .github/scripts/test-agent-hooks.sh

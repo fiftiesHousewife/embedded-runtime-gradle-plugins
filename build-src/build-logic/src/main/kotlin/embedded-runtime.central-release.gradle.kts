@@ -8,7 +8,6 @@ import io.github.fiftieshousewife.buildlogic.VerifyCentralBundle
 //   ./gradlew -p build-src verifyMavenCentralBundle -PreleaseVersion=1.2.0   → stage and check only
 //   ./gradlew -p build-src publishToMavenCentral   -PreleaseVersion=1.2.0   → and release
 val stagingDir = layout.buildDirectory.dir("central-staging")
-val releaseVersion = providers.gradleProperty("releaseVersion")
 
 val cleanStaging = tasks.register<Delete>("cleanMavenCentralStaging") { delete(stagingDir) }
 val stage =
@@ -34,7 +33,10 @@ tasks.register<PublishCentralBundle>("publishToMavenCentral") {
     description = "Releases the checked bundle to Maven Central as one deployment named after the project"
     dependsOn(verify)
     staging.set(stagingDir)
-    deploymentName.set(releaseVersion.map { "${rootProject.name}-$it" })
+    // A local copy: a lambda reading the script's own values would hold the script, which the
+    // configuration cache can't store.
+    val projectName = rootProject.name
+    deploymentName.set(providers.gradleProperty("releaseVersion").map { "$projectName-$it" })
     automatic.set(true)
     username.set(providers.gradleProperty("mavenCentralUsername"))
     password.set(providers.gradleProperty("mavenCentralPassword"))

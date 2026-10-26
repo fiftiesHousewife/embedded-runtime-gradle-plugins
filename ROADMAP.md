@@ -20,7 +20,10 @@ Also on 2026-10-25, and not repeated below: Node.js trusted CAs and TLS settings
 `NODE_TLS_REJECT_UNAUTHORIZED`; a Java Flight Recorder guide ([docs/performance.md](docs/performance.md))
 and skill; a Docker sample whose container is built and health-checked in CI; and every target as
 a standard Gradle distribution, with the custom installer replaced by RPMs; production JVM defaults
-(`javaApp { runtimeDefaults {} }`).
+(`javaApp { runtimeDefaults {} }`). On 2026-10-26, the container image: the base image pinned by
+digest, the full set of OCI labels, one build context for every CPU (`buildx`, no emulation),
+`healthcheck live|ready` with a Kubernetes probe snippet, and SIGTERM handling, all proved in CI
+with Testcontainers.
 
 ## High
 
@@ -28,5 +31,4 @@ a standard Gradle distribution, with the custom installer replaced by RPMs; prod
 |---|---|---|
 | **Sigstore signing and SLSA provenance:** cosign bundles for archives, RPMs and images; a CI recipe with GitHub artifact attestations; signature checks before installation | `.sha256` from the same server gives integrity, not authenticity; Maven Central now validates Sigstore bundles. Keep PGP for air-gapped sites. The checks belong in the RPM install and in `app-smoke-test`, now the deployment path | M |
 | **Runtime end-of-life and patch tracking:** a `checkRuntimeSupport` task (endoflife.date API), a Renovate preset for the pins and overrides, a documented rebuild cadence for each JDK CPU and Node security release | Embedding a runtime makes patching the app team's job; nothing reminds them | S–M |
-| **Container image:** document that Node apps handle SIGTERM (or add tini); live/ready modes for `--healthcheck` and a Kubernetes probe snippet; OCI labels `created`, `source`, `licenses`, `base.name`, `base.digest`; base image by digest; a `buildx` multi-arch recipe | `HEALTHCHECK` is dropped in OCI-format builds (Podman's default) and ignored by Kubernetes. The Docker sample now proves the image starts and passes its health check in CI; the rest is open | S–M |
 

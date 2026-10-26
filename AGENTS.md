@@ -171,7 +171,7 @@ the same container (the runtime Ivy repositories) set credentials explicitly ins
 
 **Every version lives in `gradle/libs.versions.toml`:** libraries and build plugins, the build's
 JaCoCo and bytecode level, and what the plugins embed. The JDK pins (`jdk-<distribution>-<feature>`),
-the Node.js pin (`node`) and the Dockerfile base image tag (`ubi-minimal`) are written into
+the Node.js pin (`node`) and the Dockerfile base image (`ubi-minimal-tag` and `ubi-minimal-digest`) are written into
 `jdks.properties`, `node.properties` and `version.properties` in the jars by `jdkPins`, `nodePin` and
 `versionResource`. Outside it by necessity: the Gradle version (`gradle-wrapper.properties`), Kotlin
 (embedded in Gradle, used by `kotlin-dsl`), and CI's setup versions (`.github/workflows/ci.yml`).

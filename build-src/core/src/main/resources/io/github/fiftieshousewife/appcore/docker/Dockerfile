@@ -3,16 +3,23 @@
 # project's own (at its root, or src/deploy/docker/Dockerfile) is used instead when there is one.
 #
 # The base image needs only glibc and /bin/sh — the Java or Node runtime is inside the archive,
-# so there is exactly one runtime version to track. Point BASE_IMAGE at your registry mirror.
+# so there is exactly one runtime version to track. It is pinned by digest, so every build of this
+# release starts from the same bytes. Point BASE_IMAGE at your registry mirror: a mirror keeps the
+# digest, so BASE_DIGEST stays as it is. Nothing is run while building, so one context builds every
+# CPU without emulation: docker buildx build --platform linux/amd64,linux/arm64 .
 ARG BASE_IMAGE=@BASE_IMAGE@
-FROM ${BASE_IMAGE}
+ARG BASE_DIGEST=@BASE_DIGEST@
+FROM ${BASE_IMAGE}@${BASE_DIGEST}
 
-# OCI image annotations: which app, release and commit this image holds.
-LABEL org.opencontainers.image.title="@APP_NAME@" \
-      org.opencontainers.image.version="@APP_VERSION@" \
-      org.opencontainers.image.revision="@GIT_COMMIT@"
+# Set by BuildKit, Buildah and Podman to the CPU being built: amd64 or arm64.
+ARG TARGETARCH
+ARG BASE_IMAGE
+ARG BASE_DIGEST
 
-COPY --chown=1001:0 app/ /app/
+# OCI image annotations: which app, release and commit this image holds, and what it was built on.
+LABEL @LABELS@
+
+COPY --chown=1001:0 app/${TARGETARCH}/ /app/
 
 ENV APP_ROOT=/var/lib/app \
     APP_CONF_DIR=/config \
@@ -23,5 +30,8 @@ ENV APP_ROOT=/var/lib/app \
 
 USER 1001
 EXPOSE 8080
-HEALTHCHECK --interval=30s --timeout=10s --start-period=30s CMD ["/app/bin/@APP_NAME@", "healthcheck"]
+# Docker only: OCI-format builds (Podman's default) drop HEALTHCHECK and Kubernetes ignores it, so
+# give Kubernetes exec probes running `healthcheck live` and `healthcheck ready` instead.
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s CMD ["/app/bin/@APP_NAME@", "healthcheck", "ready"]
+STOPSIGNAL SIGTERM
 ENTRYPOINT ["/app/bin/@APP_NAME@", "run"]

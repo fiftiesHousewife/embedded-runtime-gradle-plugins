@@ -27,6 +27,18 @@ abstract class AppExtension {
     fun targets(vararg ids: String) = targets.set(ids.map(Target::parse))
 
     /**
+     * The app's licence, as an SPDX expression (`Apache-2.0`, `LicenseRef-Proprietary`). Labels the
+     * container image and is the RPM's licence. Default `LicenseRef-Proprietary`.
+     */
+    abstract val license: Property<String>
+
+    /**
+     * Where the app's source code lives, for the container image's `org.opencontainers.image.source`
+     * label. Defaults to the `origin` git remote, as an https URL without any credentials in it.
+     */
+    abstract val sourceUrl: Property<String>
+
+    /**
      * The Dockerfile `appDockerContext` copies. Defaults to the project's own `Dockerfile`, else
      * `src/deploy/docker/Dockerfile`; with neither, a generated one is used.
      */

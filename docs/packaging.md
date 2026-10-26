@@ -121,9 +121,86 @@ take the archive as it is.
 
 ## As a container image
 
-`./gradlew appDockerContext` writes `build/docker-context/` with a Dockerfile and a Linux archive
-under `app/`, ready for `docker build`. It uses your project's own `Dockerfile` (or
-`src/deploy/docker/Dockerfile`, or whatever `dockerfile` is set to) if there is one, and otherwise
-generates one whose base image needs only glibc and a shell, labelled with the standard OCI
-annotations for the app's name, version and commit. It needs a Linux target, and prefers the one
-matching your machine's CPU.
+`./gradlew appDockerContext` writes `build/docker-context/` with a Dockerfile and every Linux
+archive, one per CPU under `app/amd64/` and `app/arm64/` (the names container platforms use), ready
+for `docker build`. It needs at least one Linux target. It uses your project's own `Dockerfile` (or
+`src/deploy/docker/Dockerfile`, or whatever `dockerfile` is set to) if there is one; copy the app
+with `COPY app/${TARGETARCH}/ /app/` after `ARG TARGETARCH`, which BuildKit, Buildah and Podman set
+to the CPU being built.
+
+Otherwise it generates one:
+
+- **Base image by digest.** `registry.access.redhat.com/ubi9/ubi-minimal`, which needs only glibc
+  and a shell since the runtime is in the archive, pinned to the digest of its multi-arch index, so
+  every build of a plugin release starts from the same bytes. A plugin release moves the pin. To use
+  a registry mirror, pass `--build-arg BASE_IMAGE=mirror.example.com/ubi9/ubi-minimal:9.8`; a mirror
+  keeps the digest, so `BASE_DIGEST` stays as it is.
+- **OCI labels.** `title`, `version`, `revision` (the commit), `created` (the commit's time, so the
+  same commit builds the same image), `source` (the `origin` remote with any credentials removed, or
+  `sourceUrl`), `licenses` (`license`, default `LicenseRef-Proprietary`), and `base.name` and
+  `base.digest` (the base image actually used).
+- **Health checks.** `HEALTHCHECK` runs `bin/<app> healthcheck ready`. Docker uses it; OCI-format
+  builds (Podman's and Buildah's default) drop it and Kubernetes ignores it, so give Kubernetes
+  probes of its own (below).
+- **Runs as user 1001** in group 0, logs to standard output and reads its configuration from
+  `/config`, as OpenShift's restricted policy expects.
+
+```kotlin
+javaApp {                                    // or nodeApp
+    targets("linux-x64", "linux-aarch64")
+    license = "Apache-2.0"
+    sourceUrl = "https://github.com/example/orders"   // default: the origin remote
+}
+```
+
+### Every CPU from one context
+
+Nothing runs while the image is built, so `buildx` builds every CPU from the same context with no
+emulation, and pushes one multi-arch image:
+
+```bash
+./gradlew appDockerContext
+docker buildx create --use                                 # once: a builder that can push multi-arch images
+docker buildx build --platform linux/amd64,linux/arm64 \
+    --tag registry.example.com/orders:1.4.2 --push build/docker-context
+```
+
+### Kubernetes probes
+
+`bin/<app> healthcheck live` asks whether the process is working (if not, Kubernetes restarts it);
+`healthcheck ready` asks whether it can take requests now (if not, it gets no traffic). Your app
+receives `--healthcheck live` or `--healthcheck ready`; see [What your app needs to do](your-app.md).
+
+```yaml
+containers:
+  - name: orders
+    image: registry.example.com/orders:1.4.2
+    ports: [{ containerPort: 8080 }]
+    startupProbe:   { exec: { command: [/app/bin/orders, healthcheck, live] }, periodSeconds: 2, failureThreshold: 60 }
+    livenessProbe:  { exec: { command: [/app/bin/orders, healthcheck, live] }, periodSeconds: 10, timeoutSeconds: 5 }
+    readinessProbe: { exec: { command: [/app/bin/orders, healthcheck, ready] }, periodSeconds: 5, timeoutSeconds: 5 }
+```
+
+Each exec probe starts a second runtime inside the container. That is cheap for Node.js; a JVM takes
+a moment and some memory, so give Java probes a `timeoutSeconds` of 5 or more, or point an
+`httpGet` probe at the app's own health endpoint when it has one.
+
+### Stopping
+
+`docker stop` and Kubernetes send SIGTERM, then SIGKILL when the grace period ends. The launcher
+execs the runtime, so the app is PID 1 and gets the signal directly. A JVM runs its shutdown hooks
+(Spring Boot shuts down gracefully). Node.js as PID 1 does nothing: Linux gives PID 1 no default
+action for SIGTERM, so a Node.js app must handle it, or it is killed only when the grace period
+runs out:
+
+```js
+for (const signal of ['SIGTERM', 'SIGINT']) {
+  process.once(signal, () => server.close(() => process.exit(0)));
+}
+```
+
+Alternatively run the container with `docker run --init`. The Docker sample in
+[`samples/docker-service`](../samples/docker-service) is built in CI and tested with
+[Testcontainers](https://testcontainers.com) (a `dockerTest` suite): started, probed with both
+modes, checked for its labels and stopped with SIGTERM. Its arm64 image is built on an x64 machine.
+The same suite is a starting point for testing your own image.

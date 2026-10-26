@@ -277,7 +277,7 @@ setting and its default is in the [reference](docs/reference.md).
 | `appRpm`, `appRpm<Target>` | Builds an RPM for each Linux target; part of `assemble` when enabled | `rpm { enabled, packageName, release, summary, license, vendor, url, user, systemd }`; `-PjavaApp.rpm` |
 | `appPublishRpm` | Uploads the RPMs to a YUM repository; part of `publish` when one is set | `rpm { repositoryUrl }`; `-PbinaryRepo.repo.rpm`, `-PbinaryRepoUsername`, `-PbinaryRepoPassword` |
 | `appDockerfile` | Writes the Dockerfile: your own if there is one, else a generated one | `dockerfile` |
-| `appDockerContext` | Writes a container build context: the Dockerfile plus a Linux archive | `dockerfile`, `targets(…)` |
+| `appDockerContext` | Writes a container build context: the Dockerfile plus each Linux archive, by CPU | `dockerfile`, `targets(…)`, `license`, `sourceUrl` |
 | `publish` | Gradle's own: publishes every target's archive under one version, with the target as the classifier | `-PbinaryRepo.url`, `-PbinaryRepo.repo.releases`, `-PbinaryRepo.repo.snapshots` |
 | `aiSkills` | Writes the AI assistant skills and the build-check hook into the project | |
 

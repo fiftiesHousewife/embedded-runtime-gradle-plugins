@@ -29,7 +29,7 @@ abstract class RpmPackaging {
     /** One line for `dnf info`. Defaults to `<app> with its own runtime`. */
     abstract val summary: Property<String>
 
-    /** An SPDX licence expression. Default `LicenseRef-Proprietary`. */
+    /** An SPDX licence expression. Defaults to the app's `license`. */
     abstract val license: Property<String>
     abstract val vendor: Property<String>
     abstract val url: Property<String>

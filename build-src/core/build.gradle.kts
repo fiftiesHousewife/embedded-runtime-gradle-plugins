@@ -53,7 +53,11 @@ val versionResource =
         destinationFile =
             layout.buildDirectory.file("generated/version/io/github/fiftieshousewife/appcore/version.properties")
         property("version", project.version.toString())
-        property("dockerBaseImage", "registry.access.redhat.com/ubi9/ubi-minimal:${libs.versions.ubi.minimal.get()}")
+        property(
+            "dockerBaseImage",
+            "registry.access.redhat.com/ubi9/ubi-minimal:${libs.versions.ubi.minimal.tag.get()}",
+        )
+        property("dockerBaseDigest", libs.versions.ubi.minimal.digest.get())
     }
 sourceSets.main {
     resources.srcDir(versionResource.map { layout.buildDirectory.dir("generated/version").get() })

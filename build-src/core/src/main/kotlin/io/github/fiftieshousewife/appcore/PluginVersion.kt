@@ -19,6 +19,9 @@ object PluginVersion {
 
     val current: String get() = properties.getProperty("version")
 
-    /** The generated Dockerfile's default base image, pinned in the version catalogue. */
+    /** The generated Dockerfile's default base image (`name:tag`), pinned in the version catalogue. */
     val dockerBaseImage: String get() = properties.getProperty("dockerBaseImage")
+
+    /** The digest [dockerBaseImage] is pinned to: its multi-arch index, so it holds for every CPU. */
+    val dockerBaseDigest: String get() = properties.getProperty("dockerBaseDigest")
 }

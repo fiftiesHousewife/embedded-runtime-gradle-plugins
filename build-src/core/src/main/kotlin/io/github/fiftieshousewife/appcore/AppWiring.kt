@@ -3,7 +3,7 @@ package io.github.fiftieshousewife.appcore
 import io.github.fiftieshousewife.appcore.tasks.GenerateAppManifest
 import io.github.fiftieshousewife.appcore.tasks.GenerateLaunchers
 import io.github.fiftieshousewife.appcore.tasks.GenerateSbom
-import io.github.fiftieshousewife.appcore.tasks.GitCommitValueSource
+import io.github.fiftieshousewife.appcore.tasks.GitValueSource
 import io.github.fiftieshousewife.appcore.tasks.InstallAiSkills
 import io.github.fiftieshousewife.appcore.tasks.WriteTextFile
 import org.gradle.api.GradleException
@@ -127,14 +127,18 @@ class AppWiring(
 
     /** `-P<ecosystem>.gitCommit`, else `git rev-parse HEAD`, else `unknown` outside a checkout. */
     val gitCommit: Provider<String> =
-        providers
-            .gradleProperty(ecosystem.property("gitCommit"))
-            .orElse(
-                providers.of(GitCommitValueSource::class.java) {
-                    parameters.workingDirectory.set(layout.projectDirectory)
-                },
-            )
-            .orElse("unknown")
+        providers.gradleProperty(ecosystem.property("gitCommit")).orElse(git("rev-parse", "HEAD")).orElse("unknown")
+
+    /**
+     * When the commit was made (ISO 8601), the image's `created` label: rebuilding the same commit
+     * then produces the same image. Absent outside a checkout.
+     */
+    val gitCommitTime: Provider<String> = git("log", "-1", "--format=%cI")
+
+    private fun git(vararg arguments: String): Provider<String> = providers.of(GitValueSource::class.java) {
+        parameters.workingDirectory.set(layout.projectDirectory)
+        parameters.arguments.set(arguments.toList())
+    }
 
     private val rpmPackages by lazy { RpmPackages(project, this) }
 
@@ -158,6 +162,8 @@ class AppWiring(
             ),
         )
         extension.configDefaults.convention(projectDir.dir("src/deploy/conf"))
+        extension.license.convention("LicenseRef-Proprietary")
+        extension.sourceUrl.convention(git("remote", "get-url", "origin").map(SourceUrl::fromRemote))
         extension.archiveFormat.convention(setting("archiveFormat", ArchiveFormat::parse).orElse(ArchiveFormat.TAR_GZ))
         extension.runtimeOptions.convention(
             setting("runtimeOptions", RuntimeOptions::parse).orElse(RuntimeOptions.OPEN),
@@ -267,7 +273,7 @@ class AppWiring(
         val built = targets.map { pipeline.register(it, contribute(it)) }
         lifecycle.allArchives.configure { dependsOn(built.map { it.archive }) }
         built.firstOrNull { it.target == host }?.let(lifecycle.hostTasks::use)
-        lifecycle.dockerContext.useLinuxArchive(built)
+        lifecycle.dockerContext.useLinuxArchives(built)
         lifecycle.publishing.addTargets(built, untestedTargets(targets, host, extension.smokeTestEnabled.get()))
         rpmPackages.register(built, listOf(lifecycle.publishing.guard, lifecycle.hostTasks.smoke))
     }

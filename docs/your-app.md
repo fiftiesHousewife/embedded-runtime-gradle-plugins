@@ -5,11 +5,20 @@ The launcher, `bin/<app>`, takes three commands:
 | Command | Does |
 |---|---|
 | `run [args]` | Starts the app |
-| `healthcheck` | Starts your app with `--healthcheck`; exit 0 means healthy |
+| `healthcheck [live\|ready]` | Starts your app with `--healthcheck`, followed by `live` or `ready` if given; exit 0 means healthy |
 | `version` | Prints `META-INF/app.json` |
 
 So your app should read its port from `APP_PORT`, and exit 0 when started with `--healthcheck`
 if the running instance is healthy. The apps in [`samples/`](../samples) do this in a few lines.
+
+The mode is for Kubernetes probes, and an app may ignore it: `live` means the process is working
+and should not be restarted, `ready` (the default) that it can take requests now. Spring Boot's
+`/actuator/health/liveness` and `/actuator/health/readiness` answer exactly these; see the
+[Spring Boot sample](../samples/spring-boot-service).
+
+Stop cleanly on SIGTERM, which is how systemd, `docker stop` and Kubernetes stop the app. A JVM does
+this on its own. A Node.js app in a container must handle SIGTERM itself; see
+[Stopping](packaging.md#stopping).
 
 The launcher also sets `APP_HOME`, `APP_ROOT`, `APP_CONF_DIR`, `APP_DATA_DIR` and `APP_LOG_DIR`,
 and adds `APP_JAVA_OPTS` / `APP_NODE_OPTS` to the runtime's options.

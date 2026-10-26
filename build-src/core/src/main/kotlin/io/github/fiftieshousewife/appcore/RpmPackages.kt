@@ -36,7 +36,7 @@ internal class RpmPackages(private val project: Project, private val wiring: App
         rpm.packageName.convention(appName)
         rpm.release.convention("1")
         rpm.summary.convention(appName.map { "$it with its own runtime" })
-        rpm.license.convention("LicenseRef-Proprietary")
+        rpm.license.convention(wiring.extension.license)
         rpm.user.convention(rpm.packageName)
         rpm.systemd.convention(true)
         wiring.binaryRepo?.let { rpm.repositoryUrl.convention(it.rpmUrl) }

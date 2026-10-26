@@ -12,13 +12,15 @@ javaApp {                                       // nodeApp {} has the same first
         packageName = "orders-service"          // default: appName
         release = "1"
         summary = "…"                           // default: "<app> with its own runtime"
-        license = "LicenseRef-Proprietary"      // an SPDX expression
+        license = "LicenseRef-Proprietary"      // default: the app's license
         vendor = "Example Ltd"
         url = "https://example.com/orders"
         user = "orders-service"                 // service account; default: packageName
         systemd = true                          // install and manage a systemd unit
         repositoryUrl = uri("https://…/rpm-local") // default: binaryRepo.repo.rpm
     }
+    license = "Apache-2.0"                      // SPDX; default LicenseRef-Proprietary (image label, RPM)
+    sourceUrl = "https://github.com/example/orders" // image label; default: the origin remote
     dockerfile = file("docker/Dockerfile")      // default: Dockerfile, else src/deploy/docker/Dockerfile
     configDefaults = file("src/deploy/conf")    // shipped as conf.defaults/
     sbom = file("build/reports/bom.json")       // your own CycloneDX SBOM instead of the built-in one
@@ -75,7 +77,7 @@ nodeApp {
 | `runApp` | Runs this machine's packaged app; pass arguments with `-Pargs="…"` |
 | `appVerifyPolicyLinuxX64`, … | Checks an assembled app against the runtime policy; every archive depends on it |
 | `appDockerfile` | Writes the Dockerfile: the project's own (`Dockerfile`, `src/deploy/docker/Dockerfile` or `dockerfile`) if there is one, else a generated one |
-| `appDockerContext` | Writes a container build context: that Dockerfile plus a Linux archive under `app/` |
+| `appDockerContext` | Writes a container build context: that Dockerfile plus each Linux archive under `app/amd64/` or `app/arm64/` |
 | `jdeps` | Java: lists the JDK modules the code uses |
 | `jlinkFindModules` | Java: finds the modules jdeps can't see, by running the app |
 | `jlinkLinuxX64`, … | Java: builds one target's trimmed runtime |

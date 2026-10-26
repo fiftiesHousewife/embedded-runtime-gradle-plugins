@@ -27,7 +27,11 @@ description: Set up the java-app or node-app Gradle plugin in an existing projec
 The launcher `bin/<app>` runs `run`, `healthcheck` and `version`. Make the app:
 - listen on `APP_PORT` when set;
 - when started with `--healthcheck`, call the running instance (for example `GET /health` on
-  `APP_PORT`) and exit 0 if healthy, non-zero otherwise, within a few seconds;
+  `APP_PORT`) and exit 0 if healthy, non-zero otherwise, within a few seconds. An optional
+  second argument, `live` or `ready`, is for Kubernetes probes (Spring Boot: the actuator's
+  `liveness` and `readiness` groups); ignoring it is fine;
+- Node.js only: handle SIGTERM (close the server, then exit), since in a container node runs as
+  PID 1 and otherwise ignores it;
 - read configuration from `APP_CONF_DIR` first and fall back to the shipped `conf.defaults/`.
 Move default config files to `src/deploy/conf/`.
 

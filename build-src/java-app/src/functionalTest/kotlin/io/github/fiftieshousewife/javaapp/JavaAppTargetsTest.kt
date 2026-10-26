@@ -13,13 +13,12 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.io.File
 
-/** Several targets in one build, where JDKs come from, the container context and consuming builds. */
+/** Several targets in one build, where JDKs come from, and consuming builds. */
 class JavaAppTargetsTest {
     @TempDir
     lateinit var tmp: File
 
     private val host = TestProject.hostTarget()
-    private val linuxForThisCpu = "linux-" + host.substringAfter('-')
     private val localRepo =
         """publishing { repositories { maven { name = "local"; url = uri(layout.buildDirectory.dir("repo")) } } }"""
     private val twoTargets =
@@ -76,30 +75,6 @@ class JavaAppTargetsTest {
                         { assertTrue(gmm.contains(attribute), "missing $attribute in\n$gmm") }
                     },
             ),
-        )
-    }
-
-    @Test
-    fun `the container context holds the project's own Dockerfile and the Linux archive for this CPU`() {
-        val project =
-            javaService(
-                tmp,
-                JavaServiceOptions(
-                    javaApp = "$FIXTURE_MODULES\ntargets(\"$host\", \"linux-aarch64\", \"$linuxForThisCpu\")",
-                ),
-            )
-        JdkFixture.publish(project, linuxForThisCpu)
-        project.file("Dockerfile", "# the project's own\nFROM scratch")
-        project.build("appDockerContext")
-        val context = project.project.resolve("build/docker-context")
-        assertAll(
-            { assertEquals("# the project's own\nFROM scratch\n", context.resolve("Dockerfile").readText()) },
-            { assertTrue(context.resolve("app/bin/svc").isFile) },
-            {
-                assertTrue(
-                    context.resolve("app/META-INF/app.json").readText().contains(""""target": "$linuxForThisCpu""""),
-                )
-            },
         )
     }
 

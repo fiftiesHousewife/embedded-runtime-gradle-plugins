@@ -4,6 +4,7 @@ import groovy.json.JsonOutput
 import org.gradle.api.DefaultTask
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.file.RegularFileProperty
+import org.gradle.api.provider.ListProperty
 import org.gradle.api.provider.Property
 import org.gradle.api.provider.ValueSource
 import org.gradle.api.provider.ValueSourceParameters
@@ -58,10 +59,16 @@ abstract class GenerateAppManifest : DefaultTask() {
     }
 }
 
-/** `git rev-parse HEAD`, or absent outside a git checkout. Re-evaluated when the commit changes. */
-abstract class GitCommitValueSource : ValueSource<String, GitCommitValueSource.Parameters> {
+/**
+ * The output of one read-only git command (`git rev-parse HEAD`, say), or absent outside a git
+ * checkout or without git on the PATH. Re-evaluated whenever the output would change.
+ */
+abstract class GitValueSource : ValueSource<String, GitValueSource.Parameters> {
     interface Parameters : ValueSourceParameters {
         val workingDirectory: DirectoryProperty
+
+        /** The arguments after `git`. */
+        val arguments: ListProperty<String>
     }
 
     @get:Inject abstract val exec: ExecOperations
@@ -72,7 +79,7 @@ abstract class GitCommitValueSource : ValueSource<String, GitCommitValueSource.P
         val result =
             runCatching {
                 exec.exec {
-                    commandLine("git", "rev-parse", "HEAD")
+                    commandLine(listOf("git") + parameters.arguments.get())
                     workingDir(parameters.workingDirectory.get().asFile)
                     standardOutput = out
                     errorOutput = ByteArrayOutputStream()

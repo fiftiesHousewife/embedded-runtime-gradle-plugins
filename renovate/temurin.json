@@ -1,0 +1,62 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "description": "Update the Temurin JDK pinned for the java-app Gradle plugin's embedded runtime: javaApp.jdk.<feature> in gradle.properties and jdkVersion in build scripts. Patches only; a new feature release is a decision, not an update.",
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "javaApp.jdk.21=21.0.13+9 in gradle.properties",
+      "managerFilePatterns": [
+        "/(^|/)gradle\\.properties$/"
+      ],
+      "matchStrings": [
+        "(?:^|\\n)javaApp\\.jdk\\.(?<feature>\\d+)\\s*=\\s*(?<currentValue>\\d[^\\s#]*)"
+      ],
+      "depNameTemplate": "temurin-{{{feature}}}",
+      "packageNameTemplate": "adoptium/temurin{{{feature}}}-binaries",
+      "datasourceTemplate": "github-releases",
+      "extractVersionTemplate": "^jdk-(?<version>.+)$",
+      "versioningTemplate": "regex:^(?<major>\\d+)(?:\\.(?<minor>\\d+))?(?:\\.(?<patch>\\d+))?(?:\\.(?<build>\\d+))?\\+(?<revision>\\d+)$"
+    },
+    {
+      "customType": "regex",
+      "description": "jdkVersion = \"21.0.13+9\" in build scripts",
+      "managerFilePatterns": [
+        "/(^|/)build\\.gradle\\.kts$/"
+      ],
+      "matchStrings": [
+        "jdkVersion\\s*=\\s*\"(?<currentValue>(?<feature>\\d+)[^\"]*)\""
+      ],
+      "depNameTemplate": "temurin-{{{feature}}}",
+      "packageNameTemplate": "adoptium/temurin{{{feature}}}-binaries",
+      "datasourceTemplate": "github-releases",
+      "extractVersionTemplate": "^jdk-(?<version>.+)$",
+      "versioningTemplate": "regex:^(?<major>\\d+)(?:\\.(?<minor>\\d+))?(?:\\.(?<patch>\\d+))?(?:\\.(?<build>\\d+))?\\+(?<revision>\\d+)$"
+    }
+  ],
+  "packageRules": [
+    {
+      "description": "A new feature release (21 to 25) is a decision, not an update.",
+      "matchDatasources": [
+        "github-releases"
+      ],
+      "matchPackageNames": [
+        "/^adoptium/temurin\\d+-binaries$/"
+      ],
+      "matchUpdateTypes": [
+        "major"
+      ],
+      "enabled": false
+    },
+    {
+      "matchDatasources": [
+        "github-releases"
+      ],
+      "matchPackageNames": [
+        "/^adoptium/temurin\\d+-binaries$/"
+      ],
+      "minimumReleaseAge": "7 days",
+      "groupName": "embedded JDK",
+      "description": "Adoptium uploads a release one OS and CPU at a time over several days: wait until every target has it."
+    }
+  ]
+}

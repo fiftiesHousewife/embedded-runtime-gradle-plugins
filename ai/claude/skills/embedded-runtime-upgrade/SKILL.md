@@ -18,6 +18,8 @@ its health check: an upgrade is only done when that passes.
   binary repository when `binaryRepo.url` is set).
 - The plugins: find `io.github.fiftieshousewife.java-app.settings` / `.node-app.settings` in
   `settings.gradle.kts` and compare with the latest release.
+- Whether the embedded runtime is supported and current: `./gradlew checkRuntimeSupport` fails
+  when its release line has reached end of life and warns when a newer patch is out.
 - The runtime the current release embeds: run `./gradlew appArchive` and read
   `build/app/<target>/<app>-<version>/META-INF/app.json` (laid out by `install<Target>Dist`) (`runtime.name` and `runtime.version`).
 

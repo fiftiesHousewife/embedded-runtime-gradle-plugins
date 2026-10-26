@@ -3,6 +3,7 @@ package io.github.fiftieshousewife.javaapp
 import io.github.fiftieshousewife.appcore.AppServices
 import io.github.fiftieshousewife.appcore.AppWiring
 import io.github.fiftieshousewife.appcore.Ecosystem
+import io.github.fiftieshousewife.appcore.EmbeddedRuntime
 import io.github.fiftieshousewife.appcore.RuntimeOptions
 import io.github.fiftieshousewife.appcore.tasks.AppSmokeTest
 import io.github.fiftieshousewife.javaapp.tasks.JdepsModules
@@ -55,6 +56,12 @@ constructor(
             detectedModules.set(runtimeTasks.jdeps().flatMap { it.outputFile }.map { JdepsModules.read(it.asFile) })
             runtimeTasks.findModules()
         }
+        val distribution = JdkSources.from(project.providers).distribution
+        wiring.registerRuntimeSupportCheck(
+            extension.javaVersion.zip(extension.jdkVersion) { feature, version ->
+                EmbeddedRuntime(distribution.supportProduct, feature.toString(), version)
+            },
+        )
         val ecosystem = JavaEcosystem(project, extension)
         wiring.register { target -> ecosystem.spec(runtimeTasks.customise(target, runtimeTasks.jlink(target))) }
         project.tasks.named("appSmokeTest", AppSmokeTest::class.java) {

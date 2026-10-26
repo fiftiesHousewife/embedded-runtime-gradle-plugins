@@ -1,5 +1,6 @@
 package io.github.fiftieshousewife.appcore
 
+import io.github.fiftieshousewife.appcore.tasks.CheckRuntimeSupport
 import io.github.fiftieshousewife.appcore.tasks.GenerateAppManifest
 import io.github.fiftieshousewife.appcore.tasks.GenerateLaunchers
 import io.github.fiftieshousewife.appcore.tasks.GenerateSbom
@@ -225,6 +226,10 @@ class AppWiring(
     /** The single file a [runtimeArchive] configuration resolves to. */
     fun singleFile(configuration: NamedDomainObjectProvider<ResolvableConfiguration>): Provider<File> =
         configuration.flatMap { it.elements }.map { it.single().asFile }
+
+    /** `checkRuntimeSupport`, for the runtime this ecosystem embeds; see [CheckRuntimeSupport]. */
+    fun registerRuntimeSupportCheck(runtime: Provider<EmbeddedRuntime>) =
+        CheckRuntimeSupport.register(project, ecosystem, runtime)
 
     /**
      * Registers the whole pipeline. [contribute] is called once per target, after the build script

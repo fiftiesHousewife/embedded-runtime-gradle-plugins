@@ -78,6 +78,7 @@ nodeApp {
 | `appVerifyPolicyLinuxX64`, … | Checks an assembled app against the runtime policy; every archive depends on it |
 | `appDockerfile` | Writes the Dockerfile: the project's own (`Dockerfile`, `src/deploy/docker/Dockerfile` or `dockerfile`) if there is one, else a generated one |
 | `appDockerContext` | Writes a container build context: that Dockerfile plus each Linux archive under `app/amd64/` or `app/arm64/` |
+| `checkRuntimeSupport` | Fails if the embedded runtime's release line has reached end of life; warns if it will within 90 days or a newer patch is out. Not part of `check`; see [Keeping the runtime patched](runtime-updates.md) |
 | `jdeps` | Java: lists the JDK modules the code uses |
 | `jlinkFindModules` | Java: finds the modules jdeps can't see, by running the app |
 | `jlinkLinuxX64`, … | Java: builds one target's trimmed runtime |
@@ -107,6 +108,9 @@ Gradle properties, set in `gradle.properties`, `~/.gradle/gradle.properties` or 
 | `javaApp.rpm`, `nodeApp.rpm` | `false` | Also build an RPM per Linux target |
 | `javaApp.runtimeOptions`, `nodeApp.runtimeOptions` | `open` | `locked` refuses to start while anything would add runtime options |
 | `javaApp.allowUntestedPublish`, `nodeApp.allowUntestedPublish` | `false` | Allow publishing an archive that was never started |
+| `javaApp.runtimeSupportUrl`, `nodeApp.runtimeSupportUrl` | `https://endoflife.date/api/v1/products/` | Where `checkRuntimeSupport` reads end-of-life data; a mirror behind a corporate network |
+| `javaApp.endOfLifeWarningDays`, `nodeApp.endOfLifeWarningDays` | `90` | How early `checkRuntimeSupport` warns of an end of life |
+| `javaApp.allowEndOfLife`, `nodeApp.allowEndOfLife` | `false` | `checkRuntimeSupport` warns instead of failing on an end-of-life runtime |
 | `binaryRepo.url` | | Download everything through this binary repository (Artifactory, Nexus, …) |
 | `binaryRepo.repo.maven` | `maven-virtual` | |
 | `binaryRepo.repo.gradlePlugins` | `gradle-plugins-virtual` | |

@@ -3,6 +3,7 @@ package io.github.fiftieshousewife.nodeapp
 import io.github.fiftieshousewife.appcore.AppServices
 import io.github.fiftieshousewife.appcore.AppWiring
 import io.github.fiftieshousewife.appcore.Ecosystem
+import io.github.fiftieshousewife.appcore.EmbeddedRuntime
 import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.gradle.api.component.SoftwareComponentFactory
@@ -33,6 +34,9 @@ constructor(
         val extension = project.extensions.create(ECOSYSTEM.extensionName, NodeAppExtension::class.java)
         val wiring = AppWiring(project, ECOSYSTEM, extension, AppServices(archives, components))
         wiring.applyConventions()
+        wiring.registerRuntimeSupportCheck(
+            extension.nodeVersion.map { EmbeddedRuntime("nodejs", it.substringBefore('.'), it) },
+        )
         NodeConventions.apply(project, extension)
 
         val sources = NodeSources.from(project.providers)

@@ -3,6 +3,8 @@
 *.sh        text eol=lf
 gradlew     text eol=lf
 *.service   text eol=lf
+# A Dockerfile is built on Linux: CRLF would break its `\` line continuations.
+Dockerfile  text eol=lf
 *.bat       text eol=crlf
 *.jar       binary
 *.tar.gz    binary

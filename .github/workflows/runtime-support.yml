@@ -1,0 +1,30 @@
+# Weekly: are the runtimes this release pins still supported, and still the newest patch? Runs
+# checkRuntimeSupport on the samples, which embed the default pins. An end of life fails the run;
+# a newer patch or an end of life within 90 days shows as a warning on the run.
+name: runtime-support
+on:
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        sample: [java-service, node-service]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: |
+            17
+            21
+      - name: checkRuntimeSupport
+        shell: bash
+        run: |
+          set -o pipefail
+          ./gradlew -p samples/${{ matrix.sample }} checkRuntimeSupport --console=plain | tee out.txt
+          sed -n 's/^Warning: \(.*\)/::warning title=${{ matrix.sample }}::\1/p' out.txt

@@ -226,6 +226,17 @@ enum class JdkDistribution(
     /** Ivy organisation, and the top-level directory of the curated repository. */
     val group: String get() = id
 
+    /** The product's name on endoflife.date, which `checkRuntimeSupport` asks. */
+    val supportProduct: String get() = when (this) {
+        TEMURIN -> "eclipse-temurin"
+        ORACLE -> "oracle-jdk"
+        CORRETTO -> "amazon-corretto"
+        ZULU -> "azul-zulu"
+        LIBERICA -> "bellsoft-liberica"
+        MICROSOFT -> "microsoft-build-of-openjdk"
+        SAPMACHINE -> "sapmachine"
+    }
+
     /** How one archive of this distribution is addressed as an Ivy module plus explicit artifact. */
     abstract fun artifact(version: JdkVersion, target: Target): RuntimeArtifact
 

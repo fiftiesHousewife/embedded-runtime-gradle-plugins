@@ -247,6 +247,7 @@ setting and its default is in the [reference](docs/reference.md).
 |---|---|---|
 | `appSmokeTest` | Unpacks this machine's archive, checks `version`, starts the app on a free port and waits for its health check; part of `check` | `smokeTestEnabled`, `smokeTestTimeout` |
 | `runApp` | Runs this machine's packaged app in the foreground | `-Pargs="…"` (arguments for the app) |
+| `checkRuntimeSupport` | Fails if the embedded runtime's release line has reached end of life; warns if it soon will or a newer patch is out. Run it on a schedule; not part of `check` | `-PjavaApp.runtimeSupportUrl`, `-PjavaApp.endOfLifeWarningDays`, `-PjavaApp.allowEndOfLife` (`nodeApp.…` for Node) |
 | `appVerifyPublishable` | Stops `publish` for archives that were never started on this machine | `allowUntestedPublish`; `-PjavaApp.allowUntestedPublish` |
 
 ### Java runtime
@@ -295,6 +296,7 @@ built for the machine it runs on. It takes `-PappSmokeTest.securityPolicy` or
 | [Java: modules, hardening and JDKs](docs/java.md) | jdeps and jlink, certificates and security policy, choosing a JDK distribution |
 | [Packaging and deploying](docs/packaging.md) | tar.gz, tar, zip, RPM and container images; Gradle distributions and launchers |
 | [Performance tuning](docs/performance.md) | Java Flight Recorder on the embedded runtime, heap, GC and startup |
+| [Keeping the runtime patched](docs/runtime-updates.md) | When runtime fixes come out, `checkRuntimeSupport`, Renovate presets |
 | [Publishing](docs/publishing.md) | Maven repositories, signing, smoke-testing a published app |
 | [Behind a corporate binary repository](docs/binary-repository.md) | One setting per machine; the repositories to create |
 | [Reference](docs/reference.md) | Every setting and its default, every Gradle property |

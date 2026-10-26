@@ -1,0 +1,50 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "description": "Update the Node.js pinned for the node-app Gradle plugin's embedded runtime: nodeApp.node.version in gradle.properties and nodeVersion in build scripts. Within the major release only; a new major is a decision, not an update.",
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "nodeApp.node.version=24.22.1 in gradle.properties",
+      "managerFilePatterns": [
+        "/(^|/)gradle\\.properties$/"
+      ],
+      "matchStrings": [
+        "(?:^|\\n)nodeApp\\.node\\.version\\s*=\\s*(?<currentValue>\\d[^\\s#]*)"
+      ],
+      "depNameTemplate": "node",
+      "datasourceTemplate": "node-version",
+      "versioningTemplate": "node"
+    },
+    {
+      "customType": "regex",
+      "description": "nodeVersion = \"24.22.1\" in build scripts",
+      "managerFilePatterns": [
+        "/(^|/)build\\.gradle\\.kts$/"
+      ],
+      "matchStrings": [
+        "nodeVersion\\s*=\\s*\"(?<currentValue>\\d[^\"]*)\""
+      ],
+      "depNameTemplate": "node",
+      "datasourceTemplate": "node-version",
+      "versioningTemplate": "node"
+    }
+  ],
+  "packageRules": [
+    {
+      "matchDatasources": [
+        "node-version"
+      ],
+      "matchUpdateTypes": [
+        "major"
+      ],
+      "enabled": false,
+      "description": "A new major release (24 to 26) is a decision, not an update."
+    },
+    {
+      "matchDatasources": [
+        "node-version"
+      ],
+      "groupName": "embedded Node.js"
+    }
+  ]
+}

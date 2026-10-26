@@ -23,12 +23,13 @@ a standard Gradle distribution, with the custom installer replaced by RPMs; prod
 (`javaApp { runtimeDefaults {} }`). On 2026-10-26, the container image: the base image pinned by
 digest, the full set of OCI labels, one build context for every CPU (`buildx`, no emulation),
 `healthcheck live|ready` with a Kubernetes probe snippet, and SIGTERM handling, all proved in CI
-with Testcontainers.
+with Testcontainers; and runtime end-of-life tracking: `checkRuntimeSupport` (endoflife.date, or a
+mirror or copy of it), Renovate presets for Temurin and Node.js pins, a weekly workflow for this
+repository's own pins, and the rebuild cadence in [docs/runtime-updates.md](docs/runtime-updates.md).
 
 ## High
 
 | What | Why | Effort |
 |---|---|---|
 | **Sigstore signing and SLSA provenance:** cosign bundles for archives, RPMs and images; a CI recipe with GitHub artifact attestations; signature checks before installation | `.sha256` from the same server gives integrity, not authenticity; Maven Central now validates Sigstore bundles. Keep PGP for air-gapped sites. The checks belong in the RPM install and in `app-smoke-test`, now the deployment path | M |
-| **Runtime end-of-life and patch tracking:** a `checkRuntimeSupport` task (endoflife.date API), a Renovate preset for the pins and overrides, a documented rebuild cadence for each JDK CPU and Node security release | Embedding a runtime makes patching the app team's job; nothing reminds them | S–M |
 

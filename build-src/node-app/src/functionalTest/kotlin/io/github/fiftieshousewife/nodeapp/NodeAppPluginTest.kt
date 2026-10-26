@@ -75,6 +75,26 @@ class NodeAppPluginTest {
     }
 
     /** A throwaway self-signed CA, made with the JDK's keytool. */
+    @Test
+    fun `checkRuntimeSupport fails for a Node release past its end of life`() {
+        val project = webApp()
+        val major = NodeFixture.nodeVersion.substringBefore('.')
+        // A copy of endoflife.date's data, as an air-gapped site would keep one.
+        project.file(
+            "eol/products/nodejs",
+            """{"result": {"releases": [{"name": "$major", "isEol": true, "eolFrom": "2026-04-30", "latest": null},
+               {"name": "99", "isEol": false, "eolFrom": null, "latest": {"name": "99.0.0"}}]}}""",
+        )
+        val url = "-PnodeApp.runtimeSupportUrl=${project.project.resolve("eol/products").toURI()}"
+        val failed = project.buildAndFail("checkRuntimeSupport", url)
+        val allowed = project.build("checkRuntimeSupport", url, "-PnodeApp.allowEndOfLife=true")
+        assertAll(
+            { assertTrue(failed.output.contains("nodejs $major reached end of life on 2026-04-30"), failed.output) },
+            { assertTrue(failed.output.contains("move to a supported release (99)"), failed.output) },
+            { assertTrue(allowed.output.contains("Warning: nodejs $major reached end of life"), allowed.output) },
+        )
+    }
+
     private fun certificate(): String {
         val store = tmp.resolve("ca.p12")
         val keytool = File(System.getProperty("java.home"), "bin/keytool").absolutePath

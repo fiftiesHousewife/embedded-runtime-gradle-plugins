@@ -50,6 +50,24 @@ mavenPublishing {
     if (signingConfigured) signAllPublications()
 }
 
+// What Maven Central and search show for each POM, under the project's own name: the module by what
+// it is, each plugin marker by its plugin's display name and description.
+val moduleTitle =
+    mapOf(
+        "app-core" to "shared core and app-smoke-test plugin",
+        "java-app" to "Java app plugin",
+        "node-app" to "Node.js app plugin",
+    ).getValue(project.name)
+publishing.publications.withType<MavenPublication>().configureEach {
+    val pluginName = name.removeSuffix("PluginMarkerMaven").takeIf { it != name }
+    val plugin = providers.provider { pluginName?.let { gradlePlugin.plugins.findByName(it) } }
+    pom {
+        name = plugin.map { "Embedded Runtime: ${it.displayName} (${it.id})" }
+            .orElse("Embedded Runtime: $moduleTitle")
+        description = plugin.map { it.description!! }.orElse(project.description!!)
+    }
+}
+
 gradlePlugin {
     website = projectUrl
     vcsUrl = "$projectUrl.git"

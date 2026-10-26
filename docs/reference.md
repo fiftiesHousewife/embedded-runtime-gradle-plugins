@@ -114,7 +114,8 @@ Gradle properties, set in `gradle.properties`, `~/.gradle/gradle.properties` or 
 | `javaApp.runtimeSupportUrl`, `nodeApp.runtimeSupportUrl` | `https://endoflife.date/api/v1/products/` | Where `checkRuntimeSupport` reads end-of-life data; a mirror behind a corporate network |
 | `javaApp.endOfLifeWarningDays`, `nodeApp.endOfLifeWarningDays` | `90` | How early `checkRuntimeSupport` warns of an end of life |
 | `javaApp.allowEndOfLife`, `nodeApp.allowEndOfLife` | `false` | `checkRuntimeSupport` warns instead of failing on an end-of-life runtime |
-| `binaryRepo.url` | | Download everything through this binary repository (Artifactory, Nexus, …) |
+| `binaryRepo.repository` | | The name of a repository the build declares: its server and credentials are used for the runtime archives, npm, publishing and uploads, and the build's own repositories are kept |
+| `binaryRepo.url` | | With no repository declared: download everything through this binary repository (Artifactory, Nexus, …), logging in with `binaryRepoUsername` / `binaryRepoPassword` |
 | `binaryRepo.repo.maven` | `maven-virtual` | |
 | `binaryRepo.repo.gradlePlugins` | `gradle-plugins-virtual` | |
 | `binaryRepo.repo.npm` | `api/npm/npm-virtual` | |

@@ -24,27 +24,34 @@ constructor(
     private val toolchainResolvers: JavaToolchainResolverRegistry,
 ) : Plugin<Settings> {
     override fun apply(settings: Settings) {
-        val sources = JdkSources.from(settings.providers)
-        val binaryRepo = BinaryRepository.from(settings.providers)
-
-        AppSettings.configureRepositories(settings, binaryRepo)
-        AppSettings.addRuntimeRepository(settings, sources.repository, binaryRepo)
         AppSettings.alignPluginVersions(settings, PROJECT_PLUGIN_ID)
-        configureToolchains(settings, binaryRepo)
+        settings.plugins.apply("jvm-toolchain-management")
+        toolchainResolvers.register(JdkToolchainResolver::class.java)
+        AppSettings.withBinaryRepository(settings) { binaryRepo ->
+            AppSettings.configureRepositories(settings, binaryRepo)
+            AppSettings.addRuntimeRepository(settings, JdkSources.from(settings.providers).repository, binaryRepo)
+            addToolchainRepository(settings, binaryRepo)
+        }
         AppSettings.markApplied(settings, ID)
     }
 
-    private fun configureToolchains(settings: Settings, binaryRepo: BinaryRepository?) {
-        settings.plugins.apply("jvm-toolchain-management")
-        toolchainResolvers.register(JdkToolchainResolver::class.java)
-
+    private fun addToolchainRepository(settings: Settings, binaryRepo: BinaryRepository?) {
         val jvm = (settings.toolchainManagement as ExtensionAware).extensions.getByType(
             JvmToolchainManagement::class.java,
         )
-        // Named `binaryRepo` behind a binary repository so Gradle supplies the credentials by convention.
-        jvm.javaRepositories.repository(if (binaryRepo != null) BinaryRepository.CREDENTIALS_NAME else "javaAppJdks") {
+        // Configured by URL, it is named `binaryRepo` so Gradle supplies binaryRepoUsername/Password by
+        // convention; a borrowed repository's login is copied in.
+        val byIdentity = binaryRepo != null && binaryRepo.borrowedFrom == null
+        jvm.javaRepositories.repository(if (byIdentity) BinaryRepository.CREDENTIALS_NAME else "javaAppJdks") {
             resolverClass.set(JdkToolchainResolver::class.java)
-            if (binaryRepo != null) AppSettings.authenticate(this)
+            when {
+                byIdentity -> AppSettings.authenticate(this)
+
+                binaryRepo != null -> AppSettings.authenticateExplicitly(
+                    this,
+                    binaryRepo.login(settings.providers).orNull,
+                )
+            }
         }
     }
 

@@ -146,8 +146,9 @@ Put the machine's settings in `gradle.properties` or `~/.gradle/gradle.propertie
 ```properties
 # the JDK vendor
 javaApp.jdk.distribution=temurin
-# download and publish everything here
-binaryRepo.url=https://artifactory.example.com/artifactory
+# the repository settings.gradle.kts already declares: its server and credentials are used for
+# runtimes, npm and publishing (see "Behind a corporate binary repository")
+binaryRepo.repository=artifactory
 # the organisation's runtime policy
 javaApp.securityPolicyArtifact=com.example.platform:java-runtime-policy:7
 ```
@@ -258,7 +259,7 @@ setting and its default is in the [reference](docs/reference.md).
 
 | Task | What it does | Settings |
 |---|---|---|
-| `extractJdk<Target>`, `extractJmods<Target>` | Downloads and unpacks the target's pinned JDK (and, from Java 24, its separate jmods) | `javaVersion`, `jdkVersion`; `-PjavaApp.jdk.distribution`, `-PjavaApp.jdk.<feature>`, `-PjavaApp.jdk.url`, `-PjavaApp.jdk.localPath`, `-PjavaApp.jdk.<feature>.<target>.path`, `-PbinaryRepo.url` |
+| `extractJdk<Target>`, `extractJmods<Target>` | Downloads and unpacks the target's pinned JDK (and, from Java 24, its separate jmods) | `javaVersion`, `jdkVersion`; `-PjavaApp.jdk.distribution`, `-PjavaApp.jdk.<feature>`, `-PjavaApp.jdk.url`, `-PjavaApp.jdk.localPath`, `-PjavaApp.jdk.<feature>.<target>.path`, `-PbinaryRepo.repository` or `-PbinaryRepo.url` |
 | `jdeps` | Lists the JDK modules the code refers to | |
 | `jlinkFindModules` | Runs the app, adding each JDK module it turns out to need, until it is healthy | `smokeTestTimeout` |
 | `jlink<Target>` | Links the target's trimmed runtime | `additionalModules`, `jlinkModules`, `jlinkOptions` |
@@ -268,7 +269,7 @@ setting and its default is in the [reference](docs/reference.md).
 
 | Task | What it does | Settings |
 |---|---|---|
-| `extractNode<Target>`, `nodeRuntime<Target>` | Downloads the target's pinned Node.js and selects its `node` binary and licence | `nodeVersion`; `-PnodeApp.node.version`, `-PnodeApp.node.url`, `-PbinaryRepo.url` |
+| `extractNode<Target>`, `nodeRuntime<Target>` | Downloads the target's pinned Node.js and selects its `node` binary and licence | `nodeVersion`; `-PnodeApp.node.version`, `-PnodeApp.node.url`, `-PbinaryRepo.repository` or `-PbinaryRepo.url` |
 | `npmrc` | Writes the npm configuration for the registry | `-PnodeApp.npm.registry`, `-PnodeApp.npm.caFile`, `-PbinaryRepo.repo.npm` |
 | `npmInstall`, `npmBuild`, `npmTest` | `npm ci`, your build script, your test script (`npmTest` is part of `check`) | `buildScript`, `testScript` |
 | `npmInstallProduction<Target>` | `npm ci --omit=dev` for one target, away from the working tree | `ignoreInstallScripts`, `portableInstallScripts` |
@@ -280,10 +281,10 @@ setting and its default is in the [reference](docs/reference.md).
 | Task | What it does | Settings |
 |---|---|---|
 | `appRpm`, `appRpm<Target>` | Builds an RPM for each Linux target; part of `assemble` when enabled | `rpm { enabled, packageName, release, summary, license, vendor, url, user, systemd }`; `-PjavaApp.rpm` |
-| `appPublishRpm` | Uploads the RPMs to a YUM repository; part of `publish` when one is set | `rpm { repositoryUrl }`; `-PbinaryRepo.repo.rpm`, `-PbinaryRepoUsername`, `-PbinaryRepoPassword` |
+| `appPublishRpm` | Uploads the RPMs to a YUM repository; part of `publish` when one is set | `rpm { repositoryUrl }`; `-PbinaryRepo.repo.rpm`; the binary repository's login |
 | `appDockerfile` | Writes the Dockerfile: your own if there is one, else a generated one | `dockerfile` |
 | `appDockerContext` | Writes a container build context: the Dockerfile plus each Linux archive, by CPU | `dockerfile`, `targets(…)`, `license`, `sourceUrl` |
-| `publish` | Gradle's own: publishes every target's archive under one version, with the target as the classifier | `-PbinaryRepo.url`, `-PbinaryRepo.repo.releases`, `-PbinaryRepo.repo.snapshots` |
+| `publish` | Gradle's own: publishes every target's archive under one version, with the target as the classifier | `-PbinaryRepo.repository` or `-PbinaryRepo.url`, `-PbinaryRepo.repo.releases`, `-PbinaryRepo.repo.snapshots` |
 | `aiSkills` | Writes the AI assistant skills and the build-check hook into the project | |
 
 In a deployment pipeline, the `app-smoke-test` plugin adds its own `appSmokeTest`, which smoke-tests

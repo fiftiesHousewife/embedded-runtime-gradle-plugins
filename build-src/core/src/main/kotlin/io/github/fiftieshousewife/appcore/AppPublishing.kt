@@ -52,6 +52,20 @@ internal class AppPublishing(
         publishing = project.extensions.getByType(PublishingExtension::class.java)
     }
 
+    /** The binary repository's releases or snapshots repository, with its login. */
+    private fun publishTo(binaryRepo: BinaryRepository) {
+        publishing.repositories.maven {
+            name = BinaryRepository.CREDENTIALS_NAME
+            url = binaryRepo.publishUrl(project.version.toString().endsWith("-SNAPSHOT"))
+            isAllowInsecureProtocol = binaryRepo.allowInsecureProtocol
+            if (binaryRepo.borrowedFrom == null) {
+                credentials(PasswordCredentials::class.java)
+            } else {
+                AppSettings.authenticateExplicitly(this, binaryRepo.login(project.providers).orNull)
+            }
+        }
+    }
+
     fun register(smoke: TaskProvider<AppSmokeTest>) {
         publishing.publications.register(publicationName, MavenPublication::class.java) {
             artifactId = extension.appName.get()
@@ -66,15 +80,7 @@ internal class AppPublishing(
 
         // The publish URL depends on whether the version is a snapshot, which build scripts set
         // after plugins are applied; this is the one place an afterEvaluate is warranted.
-        project.afterEvaluate {
-            val binaryRepo = wiring.binaryRepo ?: return@afterEvaluate
-            publishing.repositories.maven {
-                name = BinaryRepository.CREDENTIALS_NAME
-                url = binaryRepo.publishUrl(project.version.toString().endsWith("-SNAPSHOT"))
-                isAllowInsecureProtocol = binaryRepo.allowInsecureProtocol
-                credentials(PasswordCredentials::class.java)
-            }
-        }
+        project.afterEvaluate { wiring.binaryRepo?.let(::publishTo) }
 
         project.providers.gradleProperty("signingKey").orNull?.let { key ->
             project.pluginManager.apply("signing")

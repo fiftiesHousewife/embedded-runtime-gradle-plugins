@@ -4,6 +4,7 @@ import org.gradle.api.GradleException
 import org.gradle.api.Project
 import org.gradle.api.artifacts.dsl.RepositoryHandler
 import org.gradle.api.artifacts.repositories.AuthenticationSupported
+import org.gradle.api.artifacts.repositories.IvyArtifactRepository
 import org.gradle.api.artifacts.repositories.MavenArtifactRepository
 import org.gradle.api.credentials.PasswordCredentials
 import org.gradle.api.initialization.Settings
@@ -20,16 +21,33 @@ import org.gradle.authentication.http.BasicAuthentication
  * | Runtime archives | the vendor's own site | `<url>/<repo.runtimes>/...`       |
  *
  * Projects declare no repositories of their own. A build holding both Java and Node apps applies
- * both settings plugins, so everything here is safe to run twice.
+ * both settings plugins, so everything here is safe to run twice. A build that borrows a repository
+ * it declares itself (`binaryRepo.repository`) keeps its own Maven and plugin repositories; only the
+ * runtime repositories are added.
  */
 object AppSettings {
     private const val REPOSITORIES_CONFIGURED = "io.github.fiftieshousewife.appcore.repositories"
+
+    /**
+     * Runs [configure] with the binary repository, or null for the public internet. A borrowed one
+     * is declared further down `settings.gradle.kts` than the plugins block that applies this, so
+     * [configure] then runs once the settings script has finished.
+     */
+    fun withBinaryRepository(settings: Settings, configure: (BinaryRepository?) -> Unit) {
+        val borrowed = BinaryRepository.borrowedName(settings.providers)
+        if (borrowed != null) {
+            settings.gradle.settingsEvaluated { configure(BinaryRepository.borrow(this, borrowed)) }
+        } else {
+            configure(BinaryRepository.from(settings.providers))
+        }
+    }
 
     /** Maven and plugin repositories: configured by whichever settings plugin is applied first. */
     fun configureRepositories(settings: Settings, binaryRepo: BinaryRepository?) {
         val extra = settings.gradle.extensions.extraProperties
         if (extra.has(REPOSITORIES_CONFIGURED)) return
         extra.set(REPOSITORIES_CONFIGURED, true)
+        if (binaryRepo?.borrowedFrom != null) return
 
         configurePluginRepositories(settings.pluginManagement.repositories, binaryRepo)
         val drm = settings.dependencyResolutionManagement
@@ -59,15 +77,23 @@ object AppSettings {
                         patternLayout { artifact(runtime.artifactPattern) }
                         // Plain file tree: no ivy.xml, the artifact itself is the module.
                         metadataSources { artifact() }
-                        if (binaryRepo != null) {
-                            isAllowInsecureProtocol = binaryRepo.allowInsecureProtocol
-                            authenticateExplicitly(this, settings)
-                        }
+                        binaryRepo?.let { logIn(this, runtime, it, settings) }
                     }
                 }
                 filter { includeGroup(runtime.group) }
             }
         }
+    }
+
+    private fun logIn(
+        repo: IvyArtifactRepository,
+        runtime: RuntimeRepository,
+        binaryRepo: BinaryRepository,
+        settings: Settings,
+    ) {
+        repo.isAllowInsecureProtocol = binaryRepo.allowInsecureProtocol
+        // A file tree takes no login; Gradle refuses credentials for one.
+        if (runtime.baseUrl.scheme != "file") authenticateExplicitly(repo, binaryRepo.login(settings.providers).orNull)
     }
 
     /**
@@ -110,16 +136,15 @@ object AppSettings {
     }
 
     /**
-     * Same credentials, for further repositories in the same container (the runtime archives).
-     * The values are read at configuration time, so they are stored, encrypted, in the
-     * configuration cache entry.
+     * The binary repository's login, for repositories that can't take it by identity: the runtime
+     * archives, and every repository of a borrowing build. The values are read at configuration
+     * time, so they are stored, encrypted, in the configuration cache entry.
      */
-    private fun authenticateExplicitly(repo: AuthenticationSupported, settings: Settings) {
-        val user = settings.providers.gradleProperty("${BinaryRepository.CREDENTIALS_NAME}Username")
-        val password = settings.providers.gradleProperty("${BinaryRepository.CREDENTIALS_NAME}Password")
+    fun authenticateExplicitly(repo: AuthenticationSupported, login: RepositoryLogin?) {
+        login ?: return
         repo.credentials {
-            username = user.orNull
-            this.password = password.orNull
+            username = login.username
+            password = login.password
         }
         repo.authentication { create("basic", BasicAuthentication::class.java) }
     }

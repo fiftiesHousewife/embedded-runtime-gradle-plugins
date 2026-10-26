@@ -26,6 +26,7 @@ internal class RpmPackages(private val project: Project, private val wiring: App
             group = "publishing"
             description = "Uploads every RPM to the YUM repository rpm.repositoryUrl"
             repositoryUrl.set(rpm.repositoryUrl)
+            login.set(wiring.binaryRepo?.login(providers) ?: BinaryRepository.identityLogin(providers))
         }
 
     fun applyConventions() {

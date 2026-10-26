@@ -1,12 +1,10 @@
 package io.github.fiftieshousewife.nodeapp
 
 import io.github.fiftieshousewife.appcore.AppWiring
-import io.github.fiftieshousewife.appcore.BinaryRepository
 import io.github.fiftieshousewife.nodeapp.tasks.GenerateNpmrc
 import io.github.fiftieshousewife.nodeapp.tasks.NodeLayout
 import io.github.fiftieshousewife.nodeapp.tasks.NpmTask
 import org.gradle.api.Project
-import org.gradle.api.credentials.PasswordCredentials
 import org.gradle.api.file.Directory
 import org.gradle.api.provider.Provider
 import org.gradle.api.tasks.Sync
@@ -87,14 +85,7 @@ internal class NpmTasks(
                 description = "Writes the npm user config for the configured npm registry"
                 registry.set(sources.npmRegistry.toString())
                 caFile.set(project.providers.gradleProperty(NodeSources.NPM_CA_FILE))
-                if (sources.usesBinaryRepo) {
-                    credentials.set(
-                        project.providers.credentials(
-                            PasswordCredentials::class.java,
-                            BinaryRepository.CREDENTIALS_NAME,
-                        ),
-                    )
-                }
+                wiring.binaryRepo?.let { credentials.set(it.login(project.providers)) }
                 outputFile.set(wiring.workDir.map { it.file("npm/npmrc") })
             }
     }

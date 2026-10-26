@@ -44,10 +44,13 @@ smoke test fails on a missing JDK class, use the `embedded-runtime-jlink-modules
 
 - Every OS/CPU deployed to: `targets("linux-x64", "linux-aarch64", "windows-x64")`.
 - An RPM for Linux servers: `rpm { enabled = true }`; a zip instead of tar.gz: `archiveFormat("zip")`.
-- Behind a corporate binary repository (Artifactory, Nexus): set `binaryRepo.url` (and credentials) once per machine in
-  `~/.gradle/gradle.properties`, never in the project.
+- Behind a corporate binary repository (Artifactory, Nexus): if `settings.gradle.kts` already
+  declares the repository, set `binaryRepo.repository=<its name>` in the project's
+  `gradle.properties`; its URL and credentials are reused, whatever the credential properties are
+  called, so don't copy them anywhere. Otherwise set `binaryRepo.url` (and `binaryRepoUsername` /
+  `binaryRepoPassword`) once per machine in `~/.gradle/gradle.properties`, never in the project.
 - An existing Dockerfile at the project root is used as-is by `appDockerContext`; otherwise one is
-  generated. Its `COPY` should take the extracted archive from `app/`.
+  generated. Its `COPY` should take the archive for the CPU being built: `app/${TARGETARCH}/`.
 
 ## 5. Done when
 

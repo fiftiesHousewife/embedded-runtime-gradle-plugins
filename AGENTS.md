@@ -163,9 +163,15 @@ intact; disabled-algorithm lists are extended, never replaced), copies the overl
 the CycloneDX reference model and package-url's purl builder (no timestamp, so rebuilds are
 byte-identical); `DockerfileTemplate` fills in the OCI `org.opencontainers.image.*` annotations.
 
-**Binary repository credentials** come from Gradle's `binaryRepoUsername`/`binaryRepoPassword` by
-repository *name*, which must be `artifactory` and is unique per container. Other repositories in
-the same container (the runtime Ivy repositories) set credentials explicitly instead.
+**Binary repository credentials** come one of two ways. With `binaryRepo.repository`, the settings
+plugins wait for the settings script (`AppSettings.withBinaryRepository`), find that repository,
+and record its server and login (`BinaryRepository.borrow`), read with the public
+`getCredentials(org.gradle.api.artifacts.repositories.PasswordCredentials)`. That call gives a
+repository without credentials empty ones, which breaks it, so borrowing one without a user name
+stops the build: there is no login to lend, and `binaryRepo.url` serves anonymous servers. The record is kept by name in `BinaryRepository` because the JDK toolchain resolver
+can't see the settings. With `binaryRepo.url`, Gradle reads `binaryRepoUsername`/`binaryRepoPassword`
+by repository *name* (`binaryRepo`, unique per container). Every other consumer (runtime Ivy
+repositories, npm, publishing, RPM upload, certificate downloads) takes `BinaryRepository.login`.
 
 ## Common changes
 
@@ -202,7 +208,7 @@ multi-module deployment after a group and a timestamp, with no way to change it.
 the `io.github.fiftieshousewife` namespace) and a signing key (`signing.keyId`/`signing.password`/
 `signing.secretKeyRingFile`, or `signingInMemoryKey`/`signingInMemoryKeyPassword`); every artifact
 is signed when one is set. Users then list `mavenCentral()` in `pluginManagement`. Plain `publish`
-publishes to the staging directory and, when `binaryRepo.url` is set, the corporate repository. `./gradlew publishPlugins` would add the Gradle
+publishes to the staging directory and, when a binary repository is configured, the corporate repository. `./gradlew publishPlugins` would add the Gradle
 Plugin Portal, with its own key and a manual review of each new plugin.
 
 ## Conventions

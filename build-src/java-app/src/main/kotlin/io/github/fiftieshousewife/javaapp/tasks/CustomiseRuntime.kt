@@ -1,6 +1,7 @@
 package io.github.fiftieshousewife.javaapp.tasks
 
 import io.github.fiftieshousewife.appcore.AppCopySpecs
+import io.github.fiftieshousewife.appcore.RepositoryLogin
 import io.github.fiftieshousewife.appcore.RuntimePolicy
 import io.github.fiftieshousewife.appcore.RuntimePolicySource
 import org.gradle.api.DefaultTask
@@ -12,11 +13,11 @@ import org.gradle.api.file.FileSystemOperations
 import org.gradle.api.provider.ListProperty
 import org.gradle.api.provider.MapProperty
 import org.gradle.api.provider.Property
-import org.gradle.api.provider.ProviderFactory
 import org.gradle.api.tasks.CacheableTask
 import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.InputDirectory
 import org.gradle.api.tasks.InputFiles
+import org.gradle.api.tasks.Internal
 import org.gradle.api.tasks.Optional
 import org.gradle.api.tasks.OutputDirectory
 import org.gradle.api.tasks.PathSensitive
@@ -45,7 +46,6 @@ abstract class CustomiseRuntime
 constructor(
     private val fs: FileSystemOperations,
     private val archives: ArchiveOperations,
-    private val providers: ProviderFactory,
 ) : DefaultTask() {
     @get:InputDirectory
     @get:PathSensitive(PathSensitivity.RELATIVE)
@@ -63,6 +63,11 @@ constructor(
     @get:Input abstract val trustedCertificateUris: MapProperty<String, String>
 
     @get:Input abstract val replaceDefaultTrust: Property<Boolean>
+
+    /** The binary repository's server: certificates fetched from under it are fetched with [binaryRepoLogin]. */
+    @get:Internal abstract val binaryRepoServer: Property<String>
+
+    @get:Internal abstract val binaryRepoLogin: Property<RepositoryLogin>
 
     @get:InputFiles
     @get:PathSensitive(PathSensitivity.NONE)
@@ -111,7 +116,7 @@ constructor(
 
     private fun trust(out: File): List<String> {
         val fetched = trustedCertificateUris.get().map { (uri, sha256) ->
-            PinnedDownload(::binaryRepoLogin).fetch(URI.create(uri), sha256, temporaryDir.resolve("fetched"))
+            PinnedDownload(::loginFor).fetch(URI.create(uri), sha256, temporaryDir.resolve("fetched"))
         }
         val files = TrustedCertificates.certificateFiles(trustedCertificates.asFileTree.files + fetched)
         val replace = replaceDefaultTrust.get()
@@ -178,15 +183,12 @@ constructor(
         )
     }
 
-    /** The binary repository's credentials, only for URIs under `binaryRepo.url`. */
-    private fun binaryRepoLogin(uri: URI): PasswordAuthentication? {
-        val repo = providers.gradleProperty("binaryRepo.url").orNull ?: return null
-        val user = providers.gradleProperty("binaryRepoUsername").orNull ?: return null
-        if (!uri.toString().startsWith(repo.trimEnd('/') + "/")) return null
-        return PasswordAuthentication(
-            user,
-            providers.gradleProperty("binaryRepoPassword").orNull.orEmpty().toCharArray(),
-        )
+    /** The binary repository's login, only for URIs on its server. */
+    private fun loginFor(uri: URI): PasswordAuthentication? {
+        val server = binaryRepoServer.orNull ?: return null
+        val login = binaryRepoLogin.orNull ?: return null
+        if (!uri.toString().startsWith(server.trimEnd('/') + "/")) return null
+        return PasswordAuthentication(login.username, login.password.toCharArray())
     }
 
     private fun load(file: File) = Properties().apply { Files.newInputStream(file.toPath()).use(::load) }

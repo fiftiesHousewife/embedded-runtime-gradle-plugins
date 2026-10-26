@@ -1,13 +1,14 @@
 package io.github.fiftieshousewife.appcore.tasks
 
 import io.github.fiftieshousewife.appcore.ProxySettings
+import io.github.fiftieshousewife.appcore.RepositoryLogin
 import org.gradle.api.DefaultTask
 import org.gradle.api.GradleException
 import org.gradle.api.file.ConfigurableFileCollection
 import org.gradle.api.provider.Property
-import org.gradle.api.provider.ProviderFactory
 import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.InputFiles
+import org.gradle.api.tasks.Internal
 import org.gradle.api.tasks.PathSensitive
 import org.gradle.api.tasks.PathSensitivity
 import org.gradle.api.tasks.TaskAction
@@ -20,23 +21,22 @@ import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import java.time.Duration
-import javax.inject.Inject
 
 /**
  * `appPublishRpm`: uploads each RPM to a YUM repository with an HTTP PUT, the deploy API of
- * Artifactory and Nexus RPM repositories, which rebuild their `repodata/` themselves. Credentials
- * are the publication's own, `binaryRepoUsername` and `binaryRepoPassword`, read only when the
- * upload runs so they never reach the configuration cache.
+ * Artifactory and Nexus RPM repositories, which rebuild their `repodata/` themselves, with the
+ * binary repository's [login].
  */
 @DisableCachingByDefault(because = "Uploads to a remote repository")
-abstract class PublishRpm
-@Inject
-constructor(private val providers: ProviderFactory) : DefaultTask() {
+abstract class PublishRpm : DefaultTask() {
     @get:InputFiles
     @get:PathSensitive(PathSensitivity.NAME_ONLY)
     abstract val packages: ConfigurableFileCollection
 
     @get:Input abstract val repositoryUrl: Property<URI>
+
+    /** The binary repository's login: a borrowed repository's, else `binaryRepoUsername` / `binaryRepoPassword`. */
+    @get:Internal abstract val login: Property<RepositoryLogin>
 
     @TaskAction
     fun publish() {
@@ -63,11 +63,8 @@ constructor(private val providers: ProviderFactory) : DefaultTask() {
         logger.lifecycle("Published ${rpm.name} to $target")
     }
 
-    private fun login(): PasswordAuthentication? {
-        val user = providers.gradleProperty("binaryRepoUsername").orNull ?: return null
-        val password = providers.gradleProperty("binaryRepoPassword").orNull.orEmpty()
-        return PasswordAuthentication(user, password.toCharArray())
-    }
+    private fun login(): PasswordAuthentication? =
+        login.orNull?.let { PasswordAuthentication(it.username, it.password.toCharArray()) }
 
     private companion object {
         val TIMEOUT: Duration = Duration.ofSeconds(30)

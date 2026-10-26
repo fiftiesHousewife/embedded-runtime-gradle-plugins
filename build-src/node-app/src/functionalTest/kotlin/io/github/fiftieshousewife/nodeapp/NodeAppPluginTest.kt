@@ -107,6 +107,45 @@ class NodeAppPluginTest {
         )
     }
 
+    @Test
+    fun `npm logs in to the npm repository beside a borrowed one, with its credentials`() {
+        val server = "https://repo.example.com/artifactory"
+        val project = webApp()
+        project.file("settings.gradle.kts", settingsBorrowing(server))
+        project.gradleProperties(
+            *NodeFixture.properties(project),
+            "binaryRepo.repository" to "artifactory",
+            "artifactory_user" to "dev",
+            "artifactory_token" to "s3cret",
+        )
+        project.build("npmrc")
+        val npmrc = project.project.resolve("build/app-work/npm/npmrc").readText()
+        val auth = java.util.Base64.getEncoder().encodeToString("dev:s3cret".toByteArray())
+        assertAll(
+            { assertTrue(npmrc.contains("registry=$server/api/npm/npm-virtual/"), npmrc) },
+            { assertTrue(npmrc.contains("//repo.example.com/artifactory/api/npm/npm-virtual/:_auth=$auth"), npmrc) },
+        )
+    }
+
+    /** Settings declaring the build's own repository, logging in under its own property names. */
+    private fun settingsBorrowing(server: String) =
+        """
+        plugins { id("${NodeAppSettingsPlugin.ID}") }
+        rootProject.name = "web"
+        dependencyResolutionManagement {
+            repositories {
+                maven {
+                    name = "artifactory"
+                    url = uri("$server/maven-virtual")
+                    credentials {
+                        username = providers.gradleProperty("artifactory_user").get()
+                        password = providers.gradleProperty("artifactory_token").get()
+                    }
+                }
+            }
+        }
+        """
+
     private fun webApp() = TestProject(tmp).apply {
         NodeFixture.publish(this)
         gradleProperties(*NodeFixture.properties(this))

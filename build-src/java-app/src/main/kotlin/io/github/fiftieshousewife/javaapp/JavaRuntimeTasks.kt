@@ -57,6 +57,10 @@ internal class JavaRuntimeTasks(
             trustedCertificates.from(security.trustedCertificates)
             trustedCertificateUris.set(security.trustedCertificateUris)
             replaceDefaultTrust.set(security.replaceDefaultTrust)
+            wiring.binaryRepo?.let {
+                binaryRepoServer.set(it.baseUrl)
+                binaryRepoLogin.set(it.login(project.providers))
+            }
             propertiesFiles.from(security.propertiesFiles)
             properties.set(security.properties)
             appendToLists.put("jdk.tls.disabledAlgorithms", security.disabledTlsAlgorithms)

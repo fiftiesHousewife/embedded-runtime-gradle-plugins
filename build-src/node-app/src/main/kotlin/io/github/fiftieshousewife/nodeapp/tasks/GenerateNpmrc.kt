@@ -1,8 +1,8 @@
 package io.github.fiftieshousewife.nodeapp.tasks
 
 import io.github.fiftieshousewife.appcore.ProxySettings
+import io.github.fiftieshousewife.appcore.RepositoryLogin
 import org.gradle.api.DefaultTask
-import org.gradle.api.credentials.PasswordCredentials
 import org.gradle.api.file.RegularFileProperty
 import org.gradle.api.provider.Property
 import org.gradle.api.tasks.Input
@@ -29,13 +29,13 @@ abstract class GenerateNpmrc : DefaultTask() {
     @get:Input @get:Optional
     abstract val caFile: Property<String>
 
-    @get:Internal abstract val credentials: Property<PasswordCredentials>
+    @get:Internal abstract val credentials: Property<RepositoryLogin>
 
     @get:OutputFile abstract val outputFile: RegularFileProperty
 
     @TaskAction
     fun write() {
-        val user = credentials.orNull?.let { NpmUser(it.username.orEmpty(), it.password.orEmpty()) }
+        val user = credentials.orNull?.let { NpmUser(it.username, it.password) }
         val path = outputFile.get().asFile.toPath()
         Files.createDirectories(path.parent)
         val lines = Npmrc.lines(registry.get(), caFile.orNull, user) + ProxySettings.fromSystem().npmrcLines()

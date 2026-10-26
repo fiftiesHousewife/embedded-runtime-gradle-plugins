@@ -15,7 +15,7 @@ its health check: an upgrade is only done when that passes.
   `./gradlew dependencyUpdates -Drevision=release` and read `build/dependencyUpdates/report.txt`.
   Otherwise list the versions in `gradle/libs.versions.toml` (or the build scripts) and check each
   against its repository (Maven Central, the Gradle Plugin Portal, or the organisation's
-  binary repository when `binaryRepo.url` is set).
+  binary repository when `binaryRepo.repository` or `binaryRepo.url` is set).
 - The plugins: find `io.github.fiftieshousewife.java-app.settings` / `.node-app.settings` in
   `settings.gradle.kts` and compare with the latest release.
 - Whether the embedded runtime is supported and current: `./gradlew checkRuntimeSupport` fails

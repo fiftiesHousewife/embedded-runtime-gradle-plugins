@@ -3,7 +3,64 @@
 Artifactory, Nexus or any server with Maven-layout repositories. The examples use Artifactory's
 repository names; use your own with the `binaryRepo.repo.*` properties.
 
-Set this once per machine or CI agent in `~/.gradle/gradle.properties`, never in a project:
+There are two ways to point the plugins at it. Pick the first if your build already declares the
+repository, as most corporate builds do.
+
+## Your build already declares the repository
+
+Name it, and the plugins use its server and its credentials, whatever your developers called them.
+Nothing is copied into a new property, and your build's own repositories are left as they are:
+
+```kotlin
+// settings.gradle.kts: what your build already has
+plugins {
+    id("io.github.fiftieshousewife.java-app.settings") version "0.0.3"
+}
+dependencyResolutionManagement {
+    repositories {
+        maven {
+            name = "artifactory"
+            url = uri("https://acme.jfrog.io/artifactory/maven-virtual")
+            credentials {
+                username = providers.gradleProperty("artifactory_user").get()
+                password = providers.gradleProperty("artifactory_password").get()
+            }
+        }
+    }
+}
+```
+
+```properties
+# gradle.properties of the project: no secrets, so it can be committed
+binaryRepo.repository=artifactory
+```
+
+Credentials given either way work: a `credentials { … }` block reading any property or environment
+variable, or `credentials(PasswordCredentials::class)`, which reads `artifactoryUsername` and
+`artifactoryPassword` by the repository's name. The repository may also be declared in
+`pluginManagement`. It must log in with a user name and password (or token): borrowing exists to
+reuse that login, so a repository without one stops the build, and a server that needs no login is
+set with `binaryRepo.url` instead.
+
+The plugins add only the repositories for the runtime archives, on the same server as the named
+one, beside it: `https://acme.jfrog.io/artifactory/runtimes/` with the layout below, or the
+repository and layout you set (see [JDKs packaged as RPMs](#jdks-packaged-as-rpms)):
+
+```properties
+# → https://acme.jfrog.io/artifactory/yum-local/
+javaApp.jdk.binaryRepo=yum-local
+javaApp.jdk.binaryRepoPattern=java/jdk[revision]-64_linux.x86_64.rpm
+```
+
+The same login is used for compile JDKs, npm (`binaryRepo.repo.npm`, beside it too), publishing
+archives (`binaryRepo.repo.releases`/`snapshots`), uploading RPMs (`binaryRepo.repo.rpm`) and
+fetching approved certificates. If `binaryRepo.repository` names a repository the build doesn't
+declare, the build stops and lists the ones it does.
+
+## No repository declared: one setting per machine
+
+For machines and CI agents whose builds declare no repository, set this once in
+`~/.gradle/gradle.properties`, never in a project:
 
 ```properties
 binaryRepo.url=https://repo.example.com
@@ -112,21 +169,24 @@ downloads one instead; without an installed JDK the build stops and says so.
 
 ### Example: Oracle JDK, RPMs on Linux, installed JDKs on Windows
 
+The build already declares its Artifactory repository, named `artifactory`, with the developers'
+own credentials, as in [the first section](#your-build-already-declares-the-repository).
+
 ```properties
-# ~/.gradle/gradle.properties on every build machine
-binaryRepo.url=https://repo.example.com
-binaryRepoUsername=build-user
-binaryRepoPassword=<token>
+# gradle.properties of the project
+binaryRepo.repository=artifactory
 javaApp.jdk.distribution=oracle
 # the exact release you have approved
 javaApp.jdk.21=21.0.5
-
-# Linux agents: the JDK RPM from Artifactory
+# Linux: the JDK RPM, from the yum-local repository beside it
 javaApp.jdk.binaryRepo=yum-local
 javaApp.jdk.binaryRepoPattern=java/jdk[revision]-64_linux.x86_64.rpm
 javaApp.jdk.revisionFormat=[feature]_[update]
+```
 
-# Windows agents: the JDK already installed (forward slashes: in this file a backslash escapes)
+```properties
+# ~/.gradle/gradle.properties on Windows machines: the JDK already installed
+# (forward slashes: in this file a backslash escapes)
 javaApp.jdk.21.windows-x64.path=C:/Program Files/Java/jdk-21
 org.gradle.java.installations.paths=C:/Program Files/Java/jdk-21
 ```

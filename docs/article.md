@@ -371,7 +371,7 @@ The smallest Java build is two files:
 
 ```kotlin
 // settings.gradle.kts
-plugins { id("io.github.fiftieshousewife.java-app.settings") version "1.0.0" }
+plugins { id("io.github.fiftieshousewife.java-app.settings") version "0.0.1" }
 ```
 
 ```kotlin

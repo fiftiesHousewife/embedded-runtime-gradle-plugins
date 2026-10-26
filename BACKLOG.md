@@ -40,16 +40,16 @@ and `./gradlew aiSkills` to install them in a project. Prompt files were dropped
 
 ## Older open items
 
-- **Publishing 1.0.0: ready, held by the owner until this backlog is clear.** Set up like the Clean
+- **Publishing 0.0.1: ready, waiting for the owner's go-ahead.** Set up like the Clean
   Code plugin (Vanniktech, Maven Central with plugin markers). Verified 2026-10-25: a release to a
   scratch local repository is complete and signed, and a fresh project applying the plugins by id
   and version from it builds and smoke-tests. Run `./gradlew publishToMavenCentral
-  -PreleaseVersion=1.0.0` (needs `mavenCentralUsername`/`mavenCentralPassword`). The Gradle Plugin
+  -PreleaseVersion=0.0.1` (needs `mavenCentralUsername`/`mavenCentralPassword`). The Gradle Plugin
   Portal is optional on top (`publishPlugins`, its own key, manual review).
 - Signing RPMs: the plugin doesn't sign the RPMs it builds (archives are signed with Sigstore).
   dnf can check them through the repository's GPG-signed metadata (`repo_gpgcheck=1`, documented
   in docs/packaging.md); signing each package (`gpgcheck=1`) needs `rpm --addsign` in CI for now.
-- Article: the "HUFs" anecdote is unsourced; "Try it" uses version 1.0.0, which is not published.
+- Article: the "HUFs" anecdote is unsourced.
 - Gradle deprecation warnings in this repository's own build: detekt 2.0.0-alpha.6 removed the
   only one due in Gradle 10 (`ReportingExtension.file`). `Configuration.setVisible`, due in Gradle 11,
   is still called by Dokka (2.2.0 and 2.3.0-Beta) and detekt 2's alpha; bump them when fixed

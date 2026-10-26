@@ -101,8 +101,9 @@ data class RuntimePolicy(
                 version = required("version"),
                 set = prefixed("set."),
                 append = prefixed("append.").mapValues { (k, _) -> list("append.$k") },
-                lockProperties = props.getProperty("lockProperties").toBoolean(),
-                lockedOptions = props.getProperty("runtimeOptions") == RuntimeOptions.LOCKED.id,
+                // A .properties value keeps trailing spaces: `true ` must still lock.
+                lockProperties = props.getProperty("lockProperties")?.trim().toBoolean(),
+                lockedOptions = props.getProperty("runtimeOptions")?.trim() == RuntimeOptions.LOCKED.id,
                 forbiddenModules = list("forbiddenModules"),
                 forbiddenJvmArgs = list("forbiddenJvmArgs"),
                 forbiddenLibraries = list("forbiddenLibraries"),

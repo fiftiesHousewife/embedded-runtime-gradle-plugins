@@ -53,7 +53,8 @@ internal object RuntimeSupport {
                 ),
                 emptyList(),
             )
-        val supported = releases.filterNot { it.isEndOfLife }.joinToString { it.name }
+        // Where to move to: never the line itself, which a warning before its end of life would otherwise name.
+        val supported = releases.filterNot { it.isEndOfLife || it.name == line.name }.joinToString { it.name }
         val until = line.endOfLife?.let { "supported until $it" } ?: "no end of life announced"
         return SupportAssessment(
             "$label (${runtime.version}): $until, latest ${line.latest ?: "unknown"}",
@@ -86,14 +87,22 @@ internal object RuntimeSupport {
 
     /**
      * Compares the numbers in two versions in order (`21.0.13+9` against `21.0.12.1+1`), which
-     * is how every vendor's scheme sorts, whatever separators it uses.
+     * is how every vendor's scheme sorts, whatever separators it uses. The version comes before the
+     * build number after `+`, so the point release `21.0.13.1+1` is newer than `21.0.13+9`; missing
+     * numbers count as zero, so `21.0.13.0` is no newer than `21.0.13`.
      */
     fun isNewer(candidate: String, current: String): Boolean {
-        val a = numbers(candidate)
-        val b = numbers(current)
-        val differing = a.zip(b).firstOrNull { (x, y) -> x != y }
-        return differing?.let { (x, y) -> x > y } ?: (a.size > b.size)
+        val byVersion = compare(numbers(candidate.substringBefore('+')), numbers(current.substringBefore('+')))
+        return if (byVersion != 0) {
+            byVersion > 0
+        } else {
+            compare(numbers(candidate.substringAfter('+', "")), numbers(current.substringAfter('+', ""))) > 0
+        }
     }
+
+    private fun compare(a: List<Long>, b: List<Long>): Int = (0 until maxOf(a.size, b.size))
+        .map { a.getOrElse(it) { 0L }.compareTo(b.getOrElse(it) { 0L }) }
+        .firstOrNull { it != 0 } ?: 0
 
     private fun numbers(version: String) = Regex("\\d+").findAll(version).map { it.value.toLong() }.toList()
 }

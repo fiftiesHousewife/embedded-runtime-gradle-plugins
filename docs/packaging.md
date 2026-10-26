@@ -134,19 +134,21 @@ archive, one per CPU under `app/amd64/` and `app/arm64/` (the names container pl
 for `docker build`. It needs at least one Linux target. It uses your project's own `Dockerfile` (or
 `src/deploy/docker/Dockerfile`, or whatever `dockerfile` is set to) if there is one; copy the app
 with `COPY app/${TARGETARCH}/ /app/` after `ARG TARGETARCH`, which BuildKit, Buildah and Podman set
-to the CPU being built.
+to the CPU being built (Docker's legacy builder, `DOCKER_BUILDKIT=0`, does not). A Dockerfile that
+still copies all of `app/` is refused by `appDockerfile`, since its image would have no `/app/bin`.
 
 Otherwise it generates one:
 
 - **Base image by digest.** `registry.access.redhat.com/ubi9/ubi-minimal`, which needs only glibc
   and a shell since the runtime is in the archive, pinned to the digest of its multi-arch index, so
   every build of a plugin release starts from the same bytes. A plugin release moves the pin. To use
-  a registry mirror, pass `--build-arg BASE_IMAGE=mirror.example.com/ubi9/ubi-minimal:9.8`; a mirror
-  keeps the digest, so `BASE_DIGEST` stays as it is.
+  a registry mirror or another base image, pass the whole reference, digest included:
+  `--build-arg BASE_IMAGE=mirror.example.com/ubi9/ubi-minimal:9.8@sha256:…` (a mirror keeps the
+  digest).
 - **OCI labels.** `title`, `version`, `revision` (the commit), `created` (the commit's time, so the
   same commit builds the same image), `source` (the `origin` remote with any credentials removed, or
-  `sourceUrl`), `licenses` (`license`, default `LicenseRef-Proprietary`), and `base.name` and
-  `base.digest` (the base image actually used).
+  `sourceUrl`), `licenses` (`license`, default `LicenseRef-Proprietary`), and `base.name` (the base
+  image actually used, digest included).
 - **Health checks.** `HEALTHCHECK` runs `bin/<app> healthcheck ready`. Docker uses it; OCI-format
   builds (Podman's and Buildah's default) drop it and Kubernetes ignores it, so give Kubernetes
   probes of its own (below).

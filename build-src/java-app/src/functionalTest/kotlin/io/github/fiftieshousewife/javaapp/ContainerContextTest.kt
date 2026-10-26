@@ -56,7 +56,7 @@ class ContainerContextTest {
         assertAll(
             { assertTrue(dockerfile.contains("""org.opencontainers.image.licenses="Apache-2.0""""), dockerfile) },
             { assertTrue(dockerfile.contains("""org.opencontainers.image.source="$source""""), dockerfile) },
-            { assertTrue(dockerfile.contains("ARG BASE_DIGEST=sha256:"), dockerfile) },
+            { assertTrue(Regex("ARG BASE_IMAGE=\\S+@sha256:").containsMatchIn(dockerfile), dockerfile) },
         )
     }
 }

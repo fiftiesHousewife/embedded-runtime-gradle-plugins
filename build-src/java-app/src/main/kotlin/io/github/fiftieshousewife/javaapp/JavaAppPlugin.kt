@@ -42,7 +42,7 @@ constructor(
         val wiring = AppWiring(project, ECOSYSTEM, extension, AppServices(archives, components))
         wiring.applyConventions()
         val detectedModules = project.objects.listProperty(String::class.java)
-        JavaConventions(project, extension).apply(detectedModules)
+        val conventions = JavaConventions(project, extension).also { it.apply(detectedModules) }
 
         // The archive replaces the application plugin's script-based distributions; keeping both
         // would publish two different ways to run the same app. installDist remains available.
@@ -56,7 +56,7 @@ constructor(
             detectedModules.set(runtimeTasks.jdeps().flatMap { it.outputFile }.map { JdepsModules.read(it.asFile) })
             runtimeTasks.findModules()
         }
-        val distribution = JdkSources.from(project.providers).distribution
+        val distribution = conventions.sources.distribution
         wiring.registerRuntimeSupportCheck(
             extension.javaVersion.zip(extension.jdkVersion) { feature, version ->
                 EmbeddedRuntime(distribution.supportProduct, feature.toString(), version)

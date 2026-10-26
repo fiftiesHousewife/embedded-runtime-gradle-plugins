@@ -32,7 +32,6 @@ class DockerfileTemplateTest {
                 "source" to "https://github.com/example/orders",
                 "licenses" to "Apache-2.0",
                 "base.name" to "\${BASE_IMAGE}",
-                "base.digest" to "\${BASE_DIGEST}",
             )
         assertAll(
             labels.map { (key, value) ->
@@ -59,10 +58,11 @@ class DockerfileTemplateTest {
 
     @Test
     fun `pins the base image by digest and copies the archive for the CPU being built`() {
+        val pinned =
+            Regex("""ARG BASE_IMAGE=registry\.access\.redhat\.com/ubi9/ubi-minimal:[\d.]+@sha256:[0-9a-f]{64}\n""")
         assertAll(
-            { assertTrue(rendered.contains("ARG BASE_IMAGE=registry.access.redhat.com/ubi9/ubi-minimal:"), rendered) },
-            { assertTrue(Regex("ARG BASE_DIGEST=sha256:[0-9a-f]{64}\n").containsMatchIn(rendered), rendered) },
-            { assertTrue(rendered.contains("FROM \${BASE_IMAGE}@\${BASE_DIGEST}"), rendered) },
+            { assertTrue(pinned.containsMatchIn(rendered), rendered) },
+            { assertTrue(rendered.contains("FROM \${BASE_IMAGE}\n"), rendered) },
             { assertTrue(rendered.contains("COPY --chown=1001:0 app/\${TARGETARCH}/ /app/"), rendered) },
         )
     }

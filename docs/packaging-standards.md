@@ -14,7 +14,7 @@ forgotten.
 | [Gradle Module Metadata](https://docs.gradle.org/current/userguide/publishing_gradle_module_metadata.html) | Variants described by attributes, not file names | One variant per target, with `org.gradle.native.operatingSystem` and `org.gradle.native.architecture` |
 | Checksums | A digest beside every published file | Gradle publishes `.sha256` and `.sha512` with each file; Gradle verifies them when it resolves an archive, e.g. for `app-smoke-test` |
 | [OpenPGP signatures](https://www.rfc-editor.org/rfc/rfc9580) | Detached `.asc` beside every file, for Maven Central | `-PsigningKey` and `-PsigningPassword` sign the whole publication |
-| [OCI image annotations](https://github.com/opencontainers/image-spec/blob/main/annotations.md) | `org.opencontainers.image.*` labels | The generated Dockerfile sets `title`, `version`, `revision`, `created`, `source`, `licenses`, `base.name` and `base.digest` |
+| [OCI image annotations](https://github.com/opencontainers/image-spec/blob/main/annotations.md) | `org.opencontainers.image.*` labels | The generated Dockerfile sets `title`, `version`, `revision`, `created`, `source`, `licenses` and `base.name` |
 
 ## Archives: tar.gz, tar and zip
 

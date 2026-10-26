@@ -6,10 +6,11 @@ import org.gradle.api.Project
 import org.gradle.api.file.ArchiveOperations
 import org.gradle.api.tasks.Sync
 import org.gradle.api.tasks.TaskProvider
+import java.io.File
 
 /**
  * `appDockerContext`: a container build context holding a Dockerfile (the project's own if it has
- * one, else a generated one) and a Linux archive extracted under `app/`.
+ * one, else a generated one) and every Linux archive extracted under `app/<cpu>/` (`amd64`, `arm64`).
  */
 internal class DockerContext(
     private val project: Project,
@@ -54,14 +55,14 @@ internal class DockerContext(
                 description = "Writes the container Dockerfile: the project's own if it has one, else a generated one"
                 text.set(
                     extension.dockerfile
-                        .map { it.asFile.readText() }
+                        .map { OwnDockerfile.read(it.asFile) }
                         .orElse(identity().map { DockerfileTemplate.render(template, it) }),
                 )
                 outputFile.set(wiring.workDir.map { it.file("docker/Dockerfile") })
             }
         return project.tasks.register("appDockerContext", Sync::class.java) {
             group = wiring.taskGroup
-            description = "Prepares a container build context from a Linux archive: Dockerfile + app/"
+            description = "Prepares a container build context: Dockerfile + every Linux archive under app/<cpu>/"
             from(dockerfile)
             into(project.layout.buildDirectory.dir("docker-context"))
         }
@@ -113,15 +114,32 @@ internal object DockerfileTemplate {
                 identity.source?.let { "source" to it },
                 "licenses" to identity.licenses,
             ).map { (key, value) -> "$PREFIX.$key=\"${escape(value)}\"" } +
-                // Expanded by the builder, so they name the base image actually used.
-                listOf("$PREFIX.base.name=\"${'$'}{BASE_IMAGE}\"", "$PREFIX.base.digest=\"${'$'}{BASE_DIGEST}\"")
+                // Expanded by the builder, so it names the base image actually used, digest included.
+                listOf("$PREFIX.base.name=\"${'$'}{BASE_IMAGE}\"")
         return template
             .replace("@LABELS@", labels.joinToString(" \\\n      "))
             .replace("@APP_NAME@", identity.name)
-            .replace("@BASE_IMAGE@", PluginVersion.dockerBaseImage)
-            .replace("@BASE_DIGEST@", PluginVersion.dockerBaseDigest)
+            .replace("@BASE_IMAGE@", "${PluginVersion.dockerBaseImage}@${PluginVersion.dockerBaseDigest}")
     }
 
     /** A Dockerfile double-quoted value: `\`, `"` and `$` are taken literally only when escaped. */
     private fun escape(value: String) = value.replace("\\", "\\\\").replace("\"", "\\\"").replace("$", "\\$")
+}
+
+/**
+ * A project's own Dockerfile. The context holds one archive per CPU, under `app/amd64/` and
+ * `app/arm64/`, so a Dockerfile that copies all of `app/` (as one written for 0.0.2 and earlier
+ * does) builds an image with no `/app/bin` that fails only when it starts; it is refused here.
+ */
+internal object OwnDockerfile {
+    private val copiesWholeApp = Regex("""(?m)^\s*(COPY|ADD)\b.*\sapp/?\s""")
+
+    fun read(file: File): String = file.readText().also { text ->
+        if (copiesWholeApp.containsMatchIn(text)) {
+            throw GradleException(
+                "$file copies app/, which now holds one archive per CPU (app/amd64/, app/arm64/). Copy the one " +
+                    "being built:\n  ARG TARGETARCH\n  COPY app/${'$'}{TARGETARCH}/ /app/",
+            )
+        }
+    }
 }

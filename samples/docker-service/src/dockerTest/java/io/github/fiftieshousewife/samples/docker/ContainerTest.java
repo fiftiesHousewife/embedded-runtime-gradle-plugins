@@ -49,7 +49,7 @@ class ContainerTest {
     void isLabelledWithTheAppItsCommitAndItsBaseImage() {
         Map<String, String> labels = container.getContainerInfo().getConfig().getLabels();
         assertAll(
-            java.util.stream.Stream.of("title", "version", "revision", "created", "licenses", "base.name", "base.digest")
+            java.util.stream.Stream.of("title", "version", "revision", "created", "licenses", "base.name")
                 .map(key -> "org.opencontainers.image." + key)
                 .map(label -> () -> assertFalse(labels.getOrDefault(label, "").isBlank(), label + " in " + labels)));
     }

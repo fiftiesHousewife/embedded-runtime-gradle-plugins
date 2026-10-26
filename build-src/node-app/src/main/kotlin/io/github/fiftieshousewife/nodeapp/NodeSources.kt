@@ -43,8 +43,6 @@ class NodeSources(private val binaryRepo: BinaryRepository?, private val overrid
     val npmRegistry: URI
         get() = binaryRepo?.repo(overrides.binaryRepoNpm) ?: RuntimeRepository.slash(overrides.publicNpmRegistry)
 
-    val usesBinaryRepo: Boolean get() = binaryRepo != null
-
     companion object {
         /** Ivy organisation of the Node.js archives. */
         const val GROUP = "nodejs"

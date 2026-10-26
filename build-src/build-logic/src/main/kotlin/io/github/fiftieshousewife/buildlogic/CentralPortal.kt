@@ -1,6 +1,7 @@
 package io.github.fiftieshousewife.buildlogic
 
 import groovy.json.JsonSlurper
+import java.io.IOException
 import java.net.Authenticator
 import java.net.PasswordAuthentication
 import java.net.ProxySelector
@@ -48,7 +49,10 @@ class CentralPortal(
         return response.body().trim()
     }
 
-    /** The deployment's state (`PENDING`, `VALIDATING`, `VALIDATED`, `PUBLISHING`, `PUBLISHED`, `FAILED`) and errors. */
+    /**
+     * The deployment's state (`PENDING`, `VALIDATING`, `VALIDATED`, `PUBLISHING`, `PUBLISHED`, `FAILED`) and errors.
+     * Throws [IOException] for what may pass (a network error, or Central answering 5xx), so the caller can ask again.
+     */
     @Suppress("UNCHECKED_CAST")
     fun status(deploymentId: String): Pair<String, String> {
         val request = HttpRequest.newBuilder(URI.create("$baseUrl/api/v1/publisher/status?id=$deploymentId"))
@@ -57,6 +61,9 @@ class CentralPortal(
             .POST(HttpRequest.BodyPublishers.noBody())
             .build()
         val response = client.send(request, HttpResponse.BodyHandlers.ofString())
+        if (response.statusCode() >= SERVER_ERROR) {
+            throw IOException("Status unavailable: HTTP ${response.statusCode()} ${response.body()}")
+        }
         check(response.statusCode() in SUCCESS) { "Status refused: HTTP ${response.statusCode()} ${response.body()}" }
         val json = JsonSlurper().parseText(response.body()) as Map<String, Any?>
         return json["deploymentState"].toString() to (json["errors"]?.toString() ?: "")
@@ -85,6 +92,7 @@ class CentralPortal(
         const val BOUNDARY = "embedded-runtime-bundle"
         private const val TIMEOUT_SECONDS = 60L
         private const val UPLOAD_MINUTES = 10L
+        private const val SERVER_ERROR = 500
         private val SUCCESS = 200..299
     }
 }

@@ -4,17 +4,16 @@
 #
 # The base image needs only glibc and /bin/sh — the Java or Node runtime is inside the archive,
 # so there is exactly one runtime version to track. It is pinned by digest, so every build of this
-# release starts from the same bytes. Point BASE_IMAGE at your registry mirror: a mirror keeps the
-# digest, so BASE_DIGEST stays as it is. Nothing is run while building, so one context builds every
-# CPU without emulation: docker buildx build --platform linux/amd64,linux/arm64 .
+# release starts from the same bytes. To use a registry mirror or another base image, pass the whole
+# reference: --build-arg BASE_IMAGE=mirror.example.com/ubi9/ubi-minimal:9.8@sha256:… (a mirror keeps
+# the digest). Nothing is run while building, so one context builds every CPU without emulation:
+# docker buildx build --platform linux/amd64,linux/arm64 .
 ARG BASE_IMAGE=@BASE_IMAGE@
-ARG BASE_DIGEST=@BASE_DIGEST@
-FROM ${BASE_IMAGE}@${BASE_DIGEST}
+FROM ${BASE_IMAGE}
 
 # Set by BuildKit, Buildah and Podman to the CPU being built: amd64 or arm64.
 ARG TARGETARCH
 ARG BASE_IMAGE
-ARG BASE_DIGEST
 
 # OCI image annotations: which app, release and commit this image holds, and what it was built on.
 LABEL @LABELS@

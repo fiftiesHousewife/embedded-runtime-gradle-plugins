@@ -48,10 +48,8 @@ command=${1:-}
 [ $# -gt 0 ] && shift
 case "$command" in
   run) ;;
-  healthcheck)
-    # live: the process is working (restart it if not); ready: it can take requests. None: ready.
-    case "${1:-}" in ''|live|ready) ;; *) usage; exit 64 ;; esac
-    set -- --healthcheck "$@" ;;
+  # Any arguments are the app's: live (the process works) or ready (it can take requests), by convention.
+  healthcheck) set -- --healthcheck "$@" ;;
   version) cat "$APP_HOME/META-INF/app.json"; exit 0 ;;
   -h|--help|help) usage; exit 0 ;;
   *) usage; exit 64 ;;

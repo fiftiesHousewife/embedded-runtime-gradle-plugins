@@ -8,6 +8,7 @@ import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.Internal
 import org.gradle.api.tasks.TaskAction
 import org.gradle.api.tasks.UntrackedTask
+import java.io.IOException
 import java.time.Duration
 import java.time.Instant
 
@@ -63,7 +64,16 @@ abstract class PublishCentralBundle : DefaultTask() {
         val done = if (automatic.get()) setOf("PUBLISHING", "PUBLISHED") else setOf("VALIDATED")
         val deadline = Instant.now() + Duration.ofMinutes(WAIT_MINUTES)
         while (Instant.now() < deadline) {
-            val (state, errors) = portal.status(id)
+            // The bundle is already uploaded: a passing failure to read its state must not fail the
+            // release, or running it again would upload the same version a second time.
+            val (state, errors) =
+                try {
+                    portal.status(id)
+                } catch (e: IOException) {
+                    logger.warn("Could not read the state of ${deploymentName.get()} ($id): ${e.message}; asking again")
+                    Thread.sleep(POLL_MILLIS)
+                    continue
+                }
             when (state) {
                 in done -> return logger.lifecycle("Deployment ${deploymentName.get()} is $state")
                 "FAILED" -> throw GradleException("Central rejected ${deploymentName.get()} ($id): $errors")

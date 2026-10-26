@@ -62,7 +62,10 @@ class RuntimeSupportTest {
     @Test
     fun `an end of life within the warning period is a warning`() {
         val warning = assess("17", "17.0.21+7").warnings.single()
-        assertTrue(warning.contains("reaches end of life on 2027-01-15, in 81 days"), warning)
+        assertAll(
+            { assertTrue(warning.contains("reaches end of life on 2027-01-15, in 81 days"), warning) },
+            { assertTrue(warning.endsWith("plan the move to 25, 21, 11"), warning) },
+        )
     }
 
     @Test
@@ -86,6 +89,10 @@ class RuntimeSupportTest {
             { assertTrue(RuntimeSupport.isNewer("24.22.1", "24.18.1")) },
             { assertTrue(RuntimeSupport.isNewer("21.0.13.0.2", "21.0.13")) },
             { assertFalse(RuntimeSupport.isNewer("21.0.13", "21.0.13")) },
+            // A point release beats any build of the release before it: the build number comes last.
+            { assertTrue(RuntimeSupport.isNewer("21.0.13.1+1", "21.0.13+9")) },
+            { assertFalse(RuntimeSupport.isNewer("21.0.12+8", "21.0.12.1+1")) },
+            { assertTrue(RuntimeSupport.isNewer("21.0.13+10", "21.0.13+9")) },
             { assertFalse(RuntimeSupport.isNewer("21.52.203", "21.54.107-ca-jdk21.0.13")) },
         )
     }

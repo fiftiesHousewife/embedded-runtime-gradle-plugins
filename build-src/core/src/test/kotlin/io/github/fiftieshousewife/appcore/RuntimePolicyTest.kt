@@ -20,4 +20,13 @@ class RuntimePolicyTest {
         val failure = assertThrows(GradleException::class.java) { RuntimePolicy.load(dir) }
         assertTrue(failure.message!!.contains("lockProperties has a comment after the value"), failure.message)
     }
+
+    @Test
+    fun `trailing spaces after a value still lock, rather than quietly reading as false`() {
+        dir.resolve(
+            RuntimePolicy.FILE,
+        ).writeText("id=acme\nversion=1\nlockProperties=true   \nruntimeOptions=locked \n")
+        val policy = RuntimePolicy.load(dir)
+        assertTrue(policy.lockProperties && policy.lockedOptions, policy.toString())
+    }
 }

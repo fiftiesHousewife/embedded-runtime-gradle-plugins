@@ -47,11 +47,13 @@ object AppSettings {
         val extra = settings.gradle.extensions.extraProperties
         if (extra.has(REPOSITORIES_CONFIGURED)) return
         extra.set(REPOSITORIES_CONFIGURED, true)
+        // Only a convention, so a mode the build sets itself wins; without it Gradle's default lets a
+        // project that declares any repository lose the runtime repositories added here.
+        val drm = settings.dependencyResolutionManagement
+        drm.repositoriesMode.convention(RepositoriesMode.PREFER_SETTINGS)
         if (binaryRepo?.borrowedFrom != null) return
 
         configurePluginRepositories(settings.pluginManagement.repositories, binaryRepo)
-        val drm = settings.dependencyResolutionManagement
-        drm.repositoriesMode.convention(RepositoriesMode.PREFER_SETTINGS)
         drm.repositories {
             if (binaryRepo == null) {
                 mavenCentral()

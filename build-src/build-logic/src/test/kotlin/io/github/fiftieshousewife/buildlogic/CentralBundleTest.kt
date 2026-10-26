@@ -76,9 +76,9 @@ class CentralBundleTest {
     }
 
     @Test
-    fun `the bundle holds the repository layout without Maven metadata`() {
+    fun `the bundle holds the repository layout without Maven metadata`(@TempDir out: File) {
         stage()
-        val entries = ZipFile(CentralBundle.zip(staging, File(staging.parentFile, "bundle.zip"))).use { zip ->
+        val entries = ZipFile(CentralBundle.zip(staging, out.resolve("bundle.zip"))).use { zip ->
             zip.entries().toList().map { it.name }
         }
         assertTrue("io/github/fiftieshousewife/java-app/0.0.3/java-app-0.0.3.jar.asc" in entries, entries.toString())

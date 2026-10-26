@@ -8,7 +8,7 @@ import java.io.File
 
 /** The defaults behind `javaApp {}`, and the compile toolchain they imply. */
 internal class JavaConventions(private val project: Project, private val extension: JavaAppExtension) {
-    private val sources = JdkSources.from(project.providers)
+    val sources = JdkSources.from(project.providers)
 
     /**
      * Every use goes through this, so an unsupported release is reported once, by name, rather than

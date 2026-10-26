@@ -169,7 +169,8 @@ and record its server and login (`BinaryRepository.borrow`), read with the publi
 `getCredentials(org.gradle.api.artifacts.repositories.PasswordCredentials)`. That call gives a
 repository without credentials empty ones, which breaks it, so borrowing one without a user name
 stops the build: there is no login to lend, and `binaryRepo.url` serves anonymous servers. The record is kept by name in `BinaryRepository` because the JDK toolchain resolver
-can't see the settings. With `binaryRepo.url`, Gradle reads `binaryRepoUsername`/`binaryRepoPassword`
+can't see the settings; that is per daemon, not per build, so two builds of one composite that
+borrow the same name with different servers or logins would see whichever was recorded last. With `binaryRepo.url`, Gradle reads `binaryRepoUsername`/`binaryRepoPassword`
 by repository *name* (`binaryRepo`, unique per container). Every other consumer (runtime Ivy
 repositories, npm, publishing, RPM upload, certificate downloads) takes `BinaryRepository.login`.
 

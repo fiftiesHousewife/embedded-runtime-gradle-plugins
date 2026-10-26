@@ -16,7 +16,7 @@ import java.io.File
 
 /**
  * Checks one archive against its Sigstore bundle. Runs in a worker whose classpath holds
- * sigstore-java, which the plugins otherwise never load; see [AppSmokeTest.signerIdentity].
+ * sigstore-java, which the plugins otherwise never load; see [AppSmokeTest.signer].
  */
 abstract class VerifySigstoreBundle : WorkAction<VerifySigstoreBundle.Parameters> {
     interface Parameters : WorkParameters {

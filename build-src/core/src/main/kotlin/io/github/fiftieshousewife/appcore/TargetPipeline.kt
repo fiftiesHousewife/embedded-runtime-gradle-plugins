@@ -99,12 +99,12 @@ internal class TargetPipeline(private val project: Project, private val wiring: 
     }
 
     /**
-     * The archive of [archiveFormat][AppExtension.archiveFormat], named `<app>-<version>-<target>.<ext>`
-     * in `build/distributions`, the classifier the Maven publication uses; the other format's task is
-     * disabled.
+     * The archive of [archiveFormat][AppExtension.archiveFormat], else the one native to [target],
+     * named `<app>-<version>-<target>.<ext>` in `build/distributions`, the classifier the Maven
+     * publication uses; the other format's task is disabled.
      */
     private fun archiveTask(name: String, target: Target): TaskProvider<out AbstractArchiveTask> {
-        val format = extension.archiveFormat.get()
+        val format = extension.archiveFormat.orNull ?: ArchiveFormat.nativeTo(target)
         val tar = tasks.named("${name}DistTar", Tar::class.java) {
             enabled = format != ArchiveFormat.ZIP
             compression = if (format == ArchiveFormat.TAR_GZ) Compression.GZIP else Compression.NONE

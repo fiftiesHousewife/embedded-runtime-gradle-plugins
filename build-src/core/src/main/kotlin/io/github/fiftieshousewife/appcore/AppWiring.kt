@@ -153,18 +153,20 @@ class AppWiring(
             providers.gradleProperty(ecosystem.property("targets")).map(Target::parseList).orElse(listOf(host)),
         )
         val projectDir = layout.projectDirectory
+        // The project's root Dockerfile; one an older project keeps in src/deploy/docker/ is still used.
+        val legacy = projectDir.file("src/deploy/docker/Dockerfile")
         extension.dockerfile.convention(
             layout.file(
                 providers.provider {
-                    listOf(projectDir.file("Dockerfile"), projectDir.file("src/deploy/docker/Dockerfile"))
-                        .map { it.asFile }
-                        .firstOrNull(File::isFile)
+                    legacy.asFile.takeIf { it.isFile && !projectDir.file("Dockerfile").asFile.isFile }
+                        ?: projectDir.file("Dockerfile").asFile
                 },
             ),
         )
         extension.configDefaults.convention(projectDir.dir("src/deploy/conf"))
         ExtensionConventions(project, ecosystem).apply(extension)
-        extension.archiveFormat.convention(setting("archiveFormat", ArchiveFormat::parse).orElse(ArchiveFormat.TAR_GZ))
+        // Unset, each target gets the format native to it: ArchiveFormat.nativeTo.
+        extension.archiveFormat.convention(setting("archiveFormat", ArchiveFormat::parse))
         extension.runtimeOptions.convention(
             setting("runtimeOptions", RuntimeOptions::parse).orElse(RuntimeOptions.OPEN),
         )

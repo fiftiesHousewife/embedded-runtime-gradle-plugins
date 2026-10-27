@@ -49,8 +49,10 @@ smoke test fails on a missing JDK class, use the `embedded-runtime-jlink-modules
   `gradle.properties`; its URL and credentials are reused, whatever the credential properties are
   called, so don't copy them anywhere. Otherwise set `binaryRepo.url` (and `binaryRepoUsername` /
   `binaryRepoPassword`) once per machine in `~/.gradle/gradle.properties`, never in the project.
-- An existing Dockerfile at the project root is used as-is by `appDockerContext`; otherwise one is
-  generated. Its `COPY` should take the archive for the CPU being built: `app/${TARGETARCH}/`.
+- `appDockerfile` creates the project's root `Dockerfile` and keeps the block between
+  `# >>> embedded-runtime` and `# <<< embedded-runtime` up to date; commit it, and add instructions
+  after the block, never inside it. A Dockerfile without the block is the project's own; its `COPY`
+  should take the archive for the CPU being built: `app/${TARGETARCH}/`.
 
 ## 5. Done when
 

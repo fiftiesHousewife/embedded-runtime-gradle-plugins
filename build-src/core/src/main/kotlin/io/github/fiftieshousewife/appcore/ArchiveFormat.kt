@@ -11,13 +11,13 @@ import java.io.File
  * executable however it is unpacked.
  */
 enum class ArchiveFormat(val id: String) {
-    /** The default: smallest for a runtime, and what `tar`, Windows 10+ `tar.exe` and macOS all read. */
+    /** Linux's and macOS's: smallest for a runtime, opened by `tar` and the Finder. */
     TAR_GZ("tar.gz"),
 
     /** Uncompressed, for a pipeline that compresses (or signs, or layers) the archive itself. */
     TAR("tar"),
 
-    /** What Windows Explorer and most artefact viewers open without a separate tool. */
+    /** Windows's: what Explorer opens without a separate tool. */
     ZIP("zip"),
     ;
 
@@ -27,6 +27,9 @@ enum class ArchiveFormat(val id: String) {
     override fun toString(): String = id
 
     companion object {
+        /** The format [target]'s own OS opens without a separate tool: `zip` on Windows, else `tar.gz`. */
+        fun nativeTo(target: Target): ArchiveFormat = if (target.isWindows) ZIP else TAR_GZ
+
         fun parse(id: String): ArchiveFormat = entries.firstOrNull { it.id == id.trim().lowercase() }
             ?: throw GradleException("Unsupported archive format '$id'. Supported: ${entries.joinToString()}")
 

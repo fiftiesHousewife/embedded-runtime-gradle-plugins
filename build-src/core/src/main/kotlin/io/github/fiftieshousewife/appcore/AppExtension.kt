@@ -39,14 +39,16 @@ abstract class AppExtension {
     abstract val sourceUrl: Property<String>
 
     /**
-     * The Dockerfile `appDockerContext` copies. Defaults to the project's own `Dockerfile`, else
-     * `src/deploy/docker/Dockerfile`; with neither, a generated one is used.
+     * The project's Dockerfile, which `appDockerfile` creates if missing and whose embedded-runtime
+     * block it keeps up to date; one without that block is used as written. Defaults to the
+     * project's root `Dockerfile` (or an existing `src/deploy/docker/Dockerfile`).
      */
     abstract val dockerfile: RegularFileProperty
 
     /**
-     * The archive each target is packed into: `tar.gz` (default), `tar` or `zip`. Defaults to
-     * `-PjavaApp.archiveFormat` / `-PnodeApp.archiveFormat`. The extension is part of the published
+     * The archive every target is packed into: `tar.gz`, `tar` or `zip`. Unset (and without
+     * `-PjavaApp.archiveFormat` / `-PnodeApp.archiveFormat`), each target gets the one native to it:
+     * `zip` for Windows, `tar.gz` for Linux and macOS. The extension is part of the published
      * artifact, so consumers resolving by Gradle Module Metadata are unaffected by a change.
      */
     abstract val archiveFormat: Property<ArchiveFormat>

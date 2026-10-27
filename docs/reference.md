@@ -6,7 +6,7 @@
 javaApp {                                       // nodeApp {} has the same first nine settings
     appName = "orders-service"                  // launcher and archive name; default: project name
     targets("linux-x64", "windows-x64")         // default: -PjavaApp.targets, else this machine
-    archiveFormat("tar.gz")                     // or "tar", "zip"; default: -PjavaApp.archiveFormat
+    archiveFormat("tar.gz")                     // or "tar", "zip", for every target; default: -PjavaApp.archiveFormat, else zip for Windows and tar.gz for the rest
     rpm {                                       // see Packaging and deploying
         enabled = false                         // default: -PjavaApp.rpm
         packageName = "orders-service"          // default: appName
@@ -21,7 +21,7 @@ javaApp {                                       // nodeApp {} has the same first
     }
     license = "Apache-2.0"                      // SPDX; default LicenseRef-Proprietary (image label, RPM)
     sourceUrl = "https://github.com/example/orders" // image label; default: the origin remote
-    dockerfile = file("docker/Dockerfile")      // default: Dockerfile, else src/deploy/docker/Dockerfile
+    dockerfile = file("docker/Dockerfile")      // default: the root Dockerfile, which appDockerfile keeps up to date
     configDefaults = file("src/deploy/conf")    // shipped as conf.defaults/
     sbom = file("build/reports/bom.json")       // your own CycloneDX SBOM instead of the built-in one
     securityPolicy = "/etc/acme/java-policy"    // a directory or zip; -PjavaApp.securityPolicy wins over this
@@ -129,7 +129,7 @@ Each defaults to the `-PappSmokeTest.<name>` property of the same name.
 | `appSmokeTest` | Starts this machine's archive and waits for its health check; part of `check` |
 | `runApp` | Runs this machine's packaged app; pass arguments with `-Pargs="…"` |
 | `appVerifyPolicyLinuxX64`, … | Checks an assembled app against the runtime policy; every archive depends on it |
-| `appDockerfile` | Writes the Dockerfile: the project's own (`Dockerfile`, `src/deploy/docker/Dockerfile` or `dockerfile`) if there is one, else a generated one |
+| `appDockerfile` | Creates the project's `Dockerfile` if missing and keeps its embedded-runtime block up to date; one without the block is left as written |
 | `appDockerContext` | Writes a container build context: that Dockerfile plus each Linux archive under `app/amd64/` or `app/arm64/` |
 | `checkRuntimeSupport` | Fails if the embedded runtime's release line has reached end of life; warns if it will within 90 days or a newer patch is out. Not part of `check`; see [Keeping the runtime patched](runtime-updates.md) |
 | `downloadJdk<Target>` | Java, with `javaApp.jdk.yumRepo`: the JDK package from the YUM repository, found in its metadata and checked against its SHA-256 |
@@ -163,7 +163,7 @@ also be set in code: the repository and runtime ones in `embeddedRuntime {}`, th
 | `appSmokeTest.signerIssuer` | `https://token.actions.githubusercontent.com` | The OIDC issuer that identity must come from |
 | `appSmokeTest.sigstoreTrustedRoot` | fetched from Sigstore | A copy of Sigstore's `trusted_root.json`, for machines that can't fetch it |
 | `appSmokeTest.securityPolicy`, `appSmokeTest.securityPolicyArtifact` | | In a build applying `app-smoke-test`: the policy every archive must comply with before it is started |
-| `javaApp.archiveFormat`, `nodeApp.archiveFormat` | `tar.gz` | `tar.gz`, `tar` or `zip` |
+| `javaApp.archiveFormat`, `nodeApp.archiveFormat` | `zip` for Windows, `tar.gz` for the rest | `tar.gz`, `tar` or `zip`, for every target |
 | `javaApp.rpm`, `nodeApp.rpm` | `false` | Also build an RPM per Linux target |
 | `javaApp.runtimeOptions`, `nodeApp.runtimeOptions` | `open` | `locked` refuses to start while anything would add runtime options |
 | `javaApp.allowUntestedPublish`, `nodeApp.allowUntestedPublish` | `false` | Allow publishing an archive that was never started |

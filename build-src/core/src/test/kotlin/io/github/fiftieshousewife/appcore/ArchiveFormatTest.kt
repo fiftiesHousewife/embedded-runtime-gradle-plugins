@@ -32,4 +32,18 @@ class ArchiveFormatTest {
             { assertEquals(ArchiveFormat.ZIP, ArchiveFormat.of(File("svc-2.0.0-windows-x64.zip"))) },
         )
     }
+
+    @Test
+    fun `each target defaults to what its own OS opens without a separate tool`() {
+        assertEquals(
+            mapOf(
+                "linux-x64" to "tar.gz",
+                "linux-aarch64" to "tar.gz",
+                "windows-x64" to "zip",
+                "mac-x64" to "tar.gz",
+                "mac-aarch64" to "tar.gz",
+            ),
+            Target.SUPPORTED.associate { it.id to ArchiveFormat.nativeTo(it).id },
+        )
+    }
 }

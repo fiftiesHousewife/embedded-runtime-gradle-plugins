@@ -6,9 +6,9 @@ archive can become a container image. Which conventions each format follows, and
 
 | Format | For | How |
 |---|---|---|
-| `.tar.gz` (default) | Any server, any OS | Always built |
+| `.tar.gz` | Linux and macOS targets, by default | Always built |
+| `.zip` | Windows targets, by default: Explorer opens it | Always built |
 | `.tar` | Pipelines that compress or layer the archive themselves | `archiveFormat("tar")` |
-| `.zip` | People unpacking a Windows build in Explorer | `archiveFormat("zip")` |
 | `.rpm` | Red Hat family servers managed with dnf | `rpm { enabled = true }` |
 | Container image | Kubernetes, ECS, any OCI runtime | `appDockerContext`, then `docker build` |
 
@@ -20,7 +20,9 @@ javaApp {                       // or nodeApp
 }
 ```
 
-One format applies to every target. Whatever the format, an archive holds one directory
+By default each target gets the format its own OS opens without a separate tool: `zip` for
+Windows, `tar.gz` for Linux and macOS. Setting `archiveFormat` uses that one format for every
+target. Whatever the format, an archive holds one directory
 `<app>-<version>-<target>/`, keeps Unix permissions, is smoke-tested and published the same way, and a
 consuming build that resolves by Gradle Module Metadata needs no change.
 
@@ -103,7 +105,7 @@ named after it, so it has the distribution plugin's usual tasks:
 | Task | Does |
 |---|---|
 | `install<Target>Dist`, e.g. `installLinuxX64Dist` | Lays the app out in `build/app/<target>/<app>-<version>/` |
-| `<target>DistTar` / `<target>DistZip` | The archive, `build/distributions/<app>-<version>-<target>.tar.gz` (or `.zip`); only the `archiveFormat` one is enabled |
+| `<target>DistTar` / `<target>DistZip` | The archive, `build/distributions/<app>-<version>-<target>.tar.gz` (`.zip` for Windows); only the `archiveFormat` one is enabled |
 | `appArchive` | Every target's archive |
 | `installDist` | Gradle's usual task: this machine's app with its runtime, in `build/install/<app>` |
 
@@ -129,15 +131,35 @@ take the archive as it is.
 
 ## As a container image
 
-`./gradlew appDockerContext` writes `build/docker-context/` with a Dockerfile and every Linux
-archive, one per CPU under `app/amd64/` and `app/arm64/` (the names container platforms use), ready
-for `docker build`. It needs at least one Linux target. It uses your project's own `Dockerfile` (or
-`src/deploy/docker/Dockerfile`, or whatever `dockerfile` is set to) if there is one; copy the app
-with `COPY app/${TARGETARCH}/ /app/` after `ARG TARGETARCH`, which BuildKit, Buildah and Podman set
-to the CPU being built (Docker's legacy builder, `DOCKER_BUILDKIT=0`, does not). A Dockerfile that
-still copies all of `app/` is refused by `appDockerfile`, since its image would have no `/app/bin`.
+The project's `Dockerfile`, at its root, is part of the project: `appDockerfile` creates it if it is
+missing, and keeps it up to date. The plugin owns one block of it, between
+`# >>> embedded-runtime` and `# <<< embedded-runtime`, and rewrites only that block, only when it
+changes (a plugin upgrade moving the base image, say). Anything you add after the block stays as
+you wrote it:
 
-Otherwise it generates one:
+```dockerfile
+# >>> embedded-runtime: written by the io.github.fiftieshousewife java-app / node-app plugin, …
+ARG BASE_IMAGE=registry.access.redhat.com/ubi9/ubi-minimal:9.8@sha256:…
+FROM ${BASE_IMAGE}
+…
+ENTRYPOINT ["/app/bin/orders", "run"]
+# <<< embedded-runtime
+USER root
+RUN microdnf install -y fontconfig && microdnf clean all
+USER 1001
+```
+
+Commit it. Nothing in it changes from one build to the next: the release, its commit and that
+commit's time are `ARG`s (`APP_VERSION`, `GIT_COMMIT`, `CREATED`), which `appDockerContext` fills in
+for each build in the copy it writes to `build/docker-context/`, beside every Linux archive, one per
+CPU under `app/amd64/` and `app/arm64/` (the names container platforms use). A Dockerfile without
+the markers is entirely yours and is used as written; copy the app in it with
+`COPY app/${TARGETARCH}/ /app/` after `ARG TARGETARCH`, which BuildKit, Buildah and Podman set to the
+CPU being built (Docker's legacy builder, `DOCKER_BUILDKIT=0`, does not). A Dockerfile that still
+copies all of `app/` is refused, since its image would have no `/app/bin`. `dockerfile = file(…)`
+puts it elsewhere.
+
+What the plugin's block holds:
 
 - **Base image by digest.** `registry.access.redhat.com/ubi9/ubi-minimal`, which needs only glibc
   and a shell since the runtime is in the archive, pinned to the digest of its multi-arch index, so

@@ -91,7 +91,7 @@ javaApp {
     // Target platforms: one archive each. A Mac or Windows machine builds the Linux ones directly,
     // with no containers. Only this machine's archive can be started, so only it is smoke-tested.
     targets("linux-x64", "linux-aarch64", "windows-x64")
-    archiveFormat("tar.gz")                    // or "tar", "zip"
+    // Archives: zip for Windows, tar.gz for Linux and macOS, unless archiveFormat("…") picks one for all
     allowUntestedPublish = true                // publish the targets this machine couldn't start
 
     // The runtime: an exact JDK, compiled with and embedded. The vendor is a Gradle property
@@ -283,7 +283,7 @@ setting and its default is in the [reference](docs/reference.md).
 |---|---|---|
 | `appRpm`, `appRpm<Target>` | Builds an RPM for each Linux target; part of `assemble` when enabled | `rpm { enabled, packageName, release, summary, license, vendor, url, user, systemd }`; `-PjavaApp.rpm` |
 | `appPublishRpm` | Uploads the RPMs to a YUM repository; part of `publish` when one is set | `rpm { repositoryUrl }`; `-PbinaryRepo.repo.rpm`; the binary repository's login |
-| `appDockerfile` | Writes the Dockerfile: your own if there is one, else a generated one | `dockerfile` |
+| `appDockerfile` | Creates the project's `Dockerfile` if missing and keeps the plugin's block of it up to date | `dockerfile` |
 | `appDockerContext` | Writes a container build context: the Dockerfile plus each Linux archive, by CPU | `dockerfile`, `targets(…)`, `license`, `sourceUrl` |
 | `publish` | Gradle's own: publishes every target's archive under one version, with the target as the classifier | `-PbinaryRepo.repository` or `-PbinaryRepo.url`, `-PbinaryRepo.repo.releases`, `-PbinaryRepo.repo.snapshots` |
 | `aiSkills` | Writes the AI assistant skills and the build-check hook into the project | |

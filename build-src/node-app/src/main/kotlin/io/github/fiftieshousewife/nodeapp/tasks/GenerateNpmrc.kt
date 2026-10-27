@@ -16,12 +16,7 @@ import java.nio.file.Files
 import java.nio.file.attribute.PosixFilePermissions
 import java.util.Base64
 
-/**
- * Writes the npm user config pointing at the configured registry, with the binary repository's
- * credentials and the JVM's proxy settings when present. It is never up to date or cached because it
- * carries a secret; the file is written
- * owner-readable only and lives under `build/`.
- */
+/** Owner-readable only and never cached, because it carries the binary repository's credentials. */
 @UntrackedTask(because = "Contains credentials that must not be cached or fingerprinted")
 abstract class GenerateNpmrc : DefaultTask() {
     @get:Input abstract val registry: Property<String>
@@ -46,12 +41,8 @@ abstract class GenerateNpmrc : DefaultTask() {
 
 internal data class NpmUser(val name: String, val password: String)
 
-/** The lines of the generated `.npmrc`. */
 internal object Npmrc {
-    /**
-     * `replace-registry-host=always`: lockfiles record registry.npmjs.org tarball URLs; fetch them
-     * from the configured registry instead, whichever host the lockfile was generated against.
-     */
+    /** `replace-registry-host=always` fetches a lockfile's registry.npmjs.org tarballs from [registry] instead. */
     fun lines(registry: String, caFile: String?, user: NpmUser?): List<String> {
         val normalised = registry.trimEnd('/') + "/"
         return listOfNotNull("registry=$normalised", "replace-registry-host=always", caFile?.let { "cafile=$it" }) +

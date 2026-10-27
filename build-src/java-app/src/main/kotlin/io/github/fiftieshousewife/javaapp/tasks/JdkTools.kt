@@ -12,17 +12,14 @@ object JdkTools {
     fun home(dir: File): File = listOf(dir, dir.resolve("Contents/Home")).firstOrNull { it.resolve("release").isFile }
         ?: throw GradleException("No JDK found in $dir (expected a 'release' file)")
 
-    /** `JAVA_VERSION` from the home's `release` file, e.g. `21.0.13`. */
     fun javaVersion(home: File): String? = release(home, "JAVA_VERSION")
 
-    /** Who built the JDK at [home], as its `release` file says: `Eclipse Adoptium`, `Oracle Corporation`. */
     fun implementor(home: File): String? = release(home, "IMPLEMENTOR")
 
     private fun release(home: File, key: String): String? = home.resolve("release").takeIf(File::isFile)?.let { file ->
         Properties().apply { Files.newInputStream(file.toPath()).use(::load) }.getProperty(key)?.trim('"')
     }
 
-    /** Whether the JDK at [home] is the release [pin] names; see [requirePinned]. */
     fun isPinned(pin: String, home: File): Boolean {
         val actual = javaVersion(home) ?: return false
         // Whole version components only: 21.0.1 must not pass for 21.0.10.
@@ -30,10 +27,8 @@ object JdkTools {
     }
 
     /**
-     * Refuses a JDK that isn't the pinned release, such as an installed one a patch behind: the
-     * archive's manifest and SBOM name the pin. Vendors spell versions differently, so the `release`
-     * file's `JAVA_VERSION` (`21.0.5`) must start the pin (`21.0.5`, `21.0.5+11`, `21.0.5.0.11`) or follow
-     * `jdk` in it (Zulu's `21.38.21-ca-jdk21.0.5`).
+     * The archive's manifest and SBOM name the pin. `JAVA_VERSION` must start the pin or follow `jdk` in it, as in
+     * Zulu's `21.38.21-ca-jdk21.0.5`.
      */
     fun requirePinned(pin: String, home: File) {
         val actual = javaVersion(home) ?: return
@@ -47,7 +42,6 @@ object JdkTools {
     fun tool(home: File, name: String): File =
         home.resolve("bin/$name").let { if (it.isFile) it else home.resolve("bin/$name.exe") }
 
-    /** Links [request]'s modules with its tool JDK's jlink. The two JDKs must be the same exact release. */
     fun link(exec: ExecOperations, request: JlinkRequest) {
         val toolVersion = javaVersion(request.toolHome)
         val targetVersion = javaVersion(request.targetHome)
@@ -68,11 +62,7 @@ object JdkTools {
     }
 }
 
-/**
- * One jlink run: [toolHome]'s jlink links [modules] from [targetHome]'s jmods (or [jmods], when the
- * vendor ships them separately) into [output]. With no jmods at all, a JEP 493 JDK links from its
- * own runtime image, which works only for the machine it runs on.
- */
+/** With no jmods at all, a JEP 493 JDK links from its own runtime image, which works only on the machine it runs on. */
 data class JlinkRequest(
     val toolHome: File,
     val targetHome: File,

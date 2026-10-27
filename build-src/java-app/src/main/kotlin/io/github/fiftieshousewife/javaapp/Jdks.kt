@@ -19,10 +19,7 @@ import org.gradle.api.tasks.TaskProvider
 import org.gradle.jvm.toolchain.JavaToolchainService
 import java.io.File
 
-/**
- * A JDK on disk: its directory, a separate `jmods/` directory when the vendor publishes one
- * ([JdkDistribution.separateJmods]), and the tasks that put them there, if any.
- */
+/** [jmods] is set when the vendor publishes them separately ([JdkDistribution.separateJmods]). */
 internal class JdkHome(
     val dir: Provider<Directory>,
     val builtBy: TaskProvider<out Task>?,
@@ -33,9 +30,7 @@ internal class JdkHome(
 }
 
 /**
- * The JDK for each target, set up once: a directory configured by path is used as it is, an archive
- * configured by path is extracted, and otherwise the pinned JDK is resolved from [JdkSources]. An
- * RPM (by its `.rpm` name or the repository's pattern) is unpacked and its JDK home found inside.
+ * A directory configured by path is used as it is, an archive extracted, else the pin is resolved from [JdkSources].
  * Called once the build script has run, when the Java release is final.
  */
 internal class Jdks(
@@ -64,11 +59,7 @@ internal class Jdks(
         }
     }
 
-    /**
-     * The compile toolchain's JDK, for this machine's target, when it is exactly the pinned
-     * distribution and version and jlink can link from it: nothing to download or unpack. Only a
-     * vendor's separate jmods ([JdkDistribution.separateJmods]) are still fetched.
-     */
+    /** Nothing to download or unpack; only a vendor's separate jmods are still fetched. */
     private fun toolchainJdk(target: Target, feature: Int): JdkHome? {
         val sources = JdkSources.from(project.providers)
         if (whyNotToolchainJdk(target, sources.distribution, feature) != null) return null
@@ -81,11 +72,7 @@ internal class Jdks(
         return JdkHome(dir, builtBy = null, project.layout.dir(jmods.map { it.destinationDir }), jmods)
     }
 
-    /**
-     * The JDK Gradle compiles with: `java.toolchain`, which the plugin sets to the pinned release and
-     * vendor, as Gradle resolves it (an installed JDK, or one it provisions). Not the JDK running the
-     * Gradle daemon, which is often another one.
-     */
+    /** The JDK Gradle compiles with, not the one running the daemon, which is often another. */
     private val toolchainHome: Result<File> by lazy {
         runCatching {
             val toolchain = project.extensions.getByType(JavaPluginExtension::class.java).toolchain
@@ -94,11 +81,7 @@ internal class Jdks(
         }
     }
 
-    /**
-     * Why the compile toolchain's JDK can't be [target]'s, or null when it can: it must be this
-     * machine's, be the pinned [distribution] and version, and have `jmods/` (or the vendor ships
-     * those separately), and reuse must not be turned off.
-     */
+    /** Null when the compile toolchain's JDK can be [target]'s. */
     private fun whyNotToolchainJdk(target: Target, distribution: JdkDistribution, feature: Int): String? {
         if (project.providers.setting(JdkSources.REUSE_TOOLCHAIN)?.toBoolean() == false) {
             return "reusing it is turned off (${JdkSources.REUSE_TOOLCHAIN}=false)"
@@ -121,7 +104,6 @@ internal class Jdks(
     private fun jmodsArchive(sources: JdkSources, target: Target) =
         resolved(JMODS, target) { sources.jmodsArtifact(it, target) }
 
-    /** The pinned JDK for [target], resolved like any other dependency, with its jmods if separate. */
     private fun downloadedJdk(target: Target, feature: Int): JdkHome {
         val sources = JdkSources.from(project.providers)
         if (sources.archivesAreRpms && target.os != Os.LINUX) throw linuxOnly(target, feature, sources)
@@ -138,10 +120,7 @@ internal class Jdks(
         return JdkHome(jdk.dir, jdk.builtBy, project.layout.dir(jmods.map { it.destinationDir }), jmods)
     }
 
-    /**
-     * A YUM repository or `.rpm` pattern holds Linux JDKs, so another target needs its JDK by path, or
-     * the compile toolchain's; this says why the latter wasn't used.
-     */
+    /** A YUM repository or `.rpm` pattern holds Linux JDKs only; this says why the toolchain's wasn't used. */
     private fun linuxOnly(target: Target, feature: Int, sources: JdkSources): GradleException {
         val source = if (sources.yum != null) JdkSources.YUM_REPO else "the .rpm pattern"
         return GradleException(
@@ -151,7 +130,6 @@ internal class Jdks(
         )
     }
 
-    /** The JDK's RPM from a YUM repository, found by package name, pinned version and [target]'s CPU. */
     private fun yumPackage(target: Target, feature: Int, yum: JdkYumSource): Provider<File> {
         val task = project.tasks.register("downloadJdk${target.taskSuffix}", DownloadYumPackage::class.java) {
             group = wiring.taskGroup

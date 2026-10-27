@@ -7,22 +7,9 @@ import org.gradle.api.Project
 import java.time.Duration
 
 /**
- * `io.github.fiftieshousewife.app-smoke-test` — smoke-tests published app archives from any build,
- * for example a deployment pipeline checking a release before rolling it out:
- *
- * ```
- * dependencies { smokeTest("com.example:orders-service:1.4.2") }
- * ```
- *
- * `appSmokeTest` resolves the archive built for this machine's OS and CPU, using the attributes the
- * java-app and node-app publications carry in their Gradle Module Metadata, then starts it exactly
- * as the producing build's own smoke test does. With `-PappSmokeTest.securityPolicy` (or
- * `…securityPolicyArtifact`) it first checks the archive against the organisation's runtime policy.
- *
- * With `appSmokeTest { signerIdentity = … }` ([AppSmokeTestExtension]) or `-PappSmokeTest.signerIdentity`
- * it first verifies each archive's Sigstore bundle, published
- * beside it as `<archive>.sigstore.json`: only an archive signed by that identity (a regex, such as
- * one release workflow of one repository) is started. See [SigstoreBundles].
+ * Smoke-tests published app archives from any build, such as a pipeline checking a release before rolling it
+ * out, exactly as the producing build does. With a runtime policy it first checks each archive against it; with
+ * a signer identity ([AppSmokeTestExtension]) it first verifies each archive's Sigstore bundle ([SigstoreBundles]).
  */
 abstract class AppSmokeTestPlugin : Plugin<Project> {
     override fun apply(project: Project) {

@@ -7,10 +7,8 @@ import org.gradle.nativeplatform.MachineArchitecture
 import org.gradle.nativeplatform.OperatingSystemFamily
 
 /**
- * Resolves published app archives for this machine's OS and CPU, using the attributes the java-app
- * and node-app publications carry in their Gradle Module Metadata. Only the target is requested, so
- * a module published without Gradle Module Metadata still resolves when its dependency names the
- * classifier and extension instead.
+ * Only the OS and CPU attributes are requested, so a module published without Gradle Module Metadata still
+ * resolves when its dependency names the classifier and extension instead.
  */
 internal object MachineArchives {
     fun resolvable(project: Project, name: String, declared: NamedDomainObjectProvider<DependencyScopeConfiguration>) =

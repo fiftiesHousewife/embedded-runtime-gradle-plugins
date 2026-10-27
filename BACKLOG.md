@@ -27,32 +27,17 @@ under the configuration cache.
 
 ## Shared module sets
 
-Done 2026-10-27: jlink links the smallest of the sets in `module-sets.properties` holding the app's
-modules (on by default, `javaApp.sharedModuleSets=false` to turn off).
-
 | Item | Notes |
 |---|---|
 | **Sets from real data** | The four default sets are estimates from the samples and common stacks. Count the distinct `MODULES=` lines of published archives' `runtime/release` in the binary repository and retune |
 | **Sets on other releases** | The sets use modules believed present in Java 11 to 27, but were only linked on Java 21. Link each set on every supported feature release in a test or CI job |
 
-## Next: Gradle-native launchers and distributions
-
-Done on 2026-10-25 (the plan is in git history, removed in the commit after it was done): Java launchers
-come from Gradle's own `startScripts`, every target is a Gradle distribution, plain `installDist`
-installs this machine's app with its runtime, and the custom installer is gone.
-
 ## AI tooling
-
-Done 2026-10-25: everything in `ai/` (see `ai/README.md`): skills in the open Agent Skills format
-shared by Copilot and Devin (and slash commands in both), one post-edit build-check hook wired for
-Claude Code, Copilot and the Devin CLI and tested in CI both ways, Copilot repository instructions,
-and `./gradlew aiSkills` to install them in a project. Prompt files were dropped: skills replace them.
 
 | Item | Notes |
 |---|---|
 | **`.claude/settings.json`** | Sandbox blocks writing it; the snippet that auto-suggests the marketplace to collaborators is in the conversation of 2026-10-25. Owner to add |
 | **Unverified hook details** | Researched 2026-10-25 from GitHub's and Devin's hook docs: Copilot runs hooks in its CLI and cloud agent only (none documented for VS Code, Visual Studio or JetBrains); Devin's edit tools are `write`, `edit`, `apply_patch` and its PostToolUse feedback is `hookSpecificOutput.additionalContext`, both now used. Still undocumented anywhere: the file-path argument names of Copilot's `edit`/`create` and Devin's `write`/`edit`, and the shape of Devin's `apply_patch` input (the script tries `file_path`, `path` and `*** Update File:` lines), and whether Devin's cloud sessions run hooks. Settle by logging one real payload from each agent |
-
 
 ## Code quality
 
@@ -66,7 +51,6 @@ and `./gradlew aiSkills` to install them in a project. Prompt files were dropped
 |---|---|
 | Windows functional tests | One functional test now runs on Windows: an installed JDK given by `javaApp.jdk.<feature>.windows-x64.path`, built, zipped and smoke-tested through the `.bat` launcher. The rest still skip there, because the fixtures build fake download sites with the system `tar` and `sh`; porting them means Windows-layout JDK and Node zips (commons-compress is already a dependency) |
 | GitHub API access for the agent | Unauthenticated API calls hit the rate limit; `gh` config is unreadable in the sandbox |
-
 
 ## Older open items
 

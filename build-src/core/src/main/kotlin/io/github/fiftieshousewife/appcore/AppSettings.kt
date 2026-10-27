@@ -12,27 +12,15 @@ import org.gradle.api.initialization.resolve.RepositoriesMode
 import org.gradle.authentication.http.BasicAuthentication
 
 /**
- * The `settings.gradle.kts` wiring the Java and Node settings plugins share:
- *
- * | Input            | public                | binaryRepo                       |
- * |------------------|-----------------------|-----------------------------------|
- * | Maven libraries  | Maven Central         | `<url>/<repo.maven>`              |
- * | Project plugins  | Gradle Plugin Portal  | `<url>/<repo.gradlePlugins>`      |
- * | Runtime archives | the vendor's own site | `<url>/<repo.runtimes>/...`       |
- *
- * Projects declare no repositories of their own. A build holding both Java and Node apps applies
- * both settings plugins, so everything here is safe to run twice. A build that borrows a repository
- * it declares itself (`binaryRepo.repository`) keeps its own Maven and plugin repositories; only the
- * runtime repositories are added.
+ * A build with Java and Node apps applies both settings plugins, so all of this is safe to run twice. A build
+ * that borrows its own repository (`binaryRepo.repository`) keeps its Maven and plugin repositories.
  */
 object AppSettings {
     private const val REPOSITORIES_CONFIGURED = "io.github.fiftieshousewife.appcore.repositories"
 
     /**
-     * Runs [configure] with the binary repository, or null for the public internet, once the
-     * settings script has finished: the `embeddedRuntime {}` block ([EmbeddedRuntimeSettings]) and
-     * a borrowed repository are both written further down `settings.gradle.kts` than the plugins
-     * block that applies this.
+     * Waits for the settings script: the `embeddedRuntime {}` block ([EmbeddedRuntimeSettings]) and a borrowed
+     * repository are written further down `settings.gradle.kts` than the plugins block that applies this.
      */
     fun withBinaryRepository(settings: Settings, configure: (BinaryRepository?) -> Unit) {
         val inCode = EmbeddedRuntimeSettings.on(settings)
@@ -52,12 +40,7 @@ object AppSettings {
         }
     }
 
-    /**
-     * The repository to borrow: the one named, else one found among those the build declares
-     * ([BinaryRepository.discover]). Decided once per build, by whichever settings plugin gets there
-     * first, before either adds repositories of its own; recorded as if named, so projects and the
-     * toolchain resolver see it too.
-     */
+    /** Decided once per build and recorded as if named, so projects and the toolchain resolver see it too. */
     private fun borrowedRepository(settings: Settings): String? {
         val extra = settings.gradle.extensions.extraProperties
         if (extra.has(BORROWED)) return extra.get(BORROWED) as String?
@@ -80,7 +63,6 @@ object AppSettings {
 
     private const val BORROWED = "io.github.fiftieshousewife.appcore.borrowedRepository"
 
-    /** Maven and plugin repositories: configured by whichever settings plugin is applied first. */
     fun configureRepositories(settings: Settings, binaryRepo: BinaryRepository?) {
         val extra = settings.gradle.extensions.extraProperties
         if (extra.has(REPOSITORIES_CONFIGURED)) return
@@ -106,7 +88,6 @@ object AppSettings {
         }
     }
 
-    /** An Ivy repository serving exactly one runtime's archives, and nothing else. */
     fun addRuntimeRepository(settings: Settings, runtime: RuntimeRepository, binaryRepo: BinaryRepository?) {
         settings.dependencyResolutionManagement.repositories {
             exclusiveContent {
@@ -136,10 +117,7 @@ object AppSettings {
         if (runtime.baseUrl.scheme != "file") authenticateExplicitly(repo, binaryRepo.login(settings.providers).orNull)
     }
 
-    /**
-     * Project plugins are resolved at the settings plugin's own version, so build scripts write
-     * `id("io.github.fiftieshousewife.java-app")` with no version and can never drift from it.
-     */
+    /** So build scripts give no version and can never drift from the settings plugin's. */
     fun alignPluginVersions(settings: Settings, vararg pluginIds: String) {
         val version = PluginVersion.current
         settings.pluginManagement.plugins {
@@ -147,11 +125,9 @@ object AppSettings {
         }
     }
 
-    /** Records that [settingsPluginId] ran, for [requireApplied]. */
     fun markApplied(settings: Settings, settingsPluginId: String) = settings.gradle.extensions.extraProperties
         .set(settingsPluginId, true)
 
-    /** Fails a project plugin early, with the line to add, when its settings plugin is missing. */
     fun requireApplied(project: Project, settingsPluginId: String) {
         if (!project.gradle.extensions.extraProperties
                 .has(settingsPluginId)
@@ -165,10 +141,8 @@ object AppSettings {
     }
 
     /**
-     * Gradle resolves `binaryRepoUsername` / `binaryRepoPassword` lazily from the repository
-     * name, keeping them out of the configuration cache. The name must be `binaryRepo`, and Gradle
-     * makes names unique within one repository container, so this is used for at most one
-     * repository per container.
+     * Gradle reads `binaryRepoUsername`/`binaryRepoPassword` lazily by the name `binaryRepo`, keeping them out
+     * of the configuration cache; names are unique per container, so this serves one repository in each.
      */
     fun authenticate(repo: AuthenticationSupported) {
         repo.credentials(PasswordCredentials::class.java)
@@ -176,9 +150,8 @@ object AppSettings {
     }
 
     /**
-     * The binary repository's login, for repositories that can't take it by identity: the runtime
-     * archives, and every repository of a borrowing build. The values are read at configuration
-     * time, so they are stored, encrypted, in the configuration cache entry.
+     * For repositories that can't take the login by name (runtime archives, a borrowing build's): read at
+     * configuration time, so it is stored, encrypted, in the configuration cache entry.
      */
     fun authenticateExplicitly(repo: AuthenticationSupported, login: RepositoryLogin?) {
         login ?: return

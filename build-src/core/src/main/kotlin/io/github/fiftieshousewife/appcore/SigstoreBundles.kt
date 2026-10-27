@@ -12,15 +12,13 @@ import org.gradle.api.attributes.Usage
 import org.gradle.api.attributes.java.TargetJvmEnvironment
 
 /**
- * The Sigstore bundles of published archives, and the library that verifies them. A bundle is not
- * part of the Gradle Module Metadata (`dev.sigstore.sign` uploads it beside each file, as the
+ * A bundle is not part of the Gradle Module Metadata (`dev.sigstore.sign` uploads it beside each file, as the
  * signing plugin does `.asc` files), so it is asked for by its Maven coordinates.
  */
 internal object SigstoreBundles {
     /** The OIDC issuer of GitHub Actions' identity tokens, the default `signerIssuer`. */
     const val GITHUB_ACTIONS = "https://token.actions.githubusercontent.com"
 
-    /** Gives [task] each archive's bundle and the verifier, for a build that requires a signer. */
     fun verify(project: Project, archives: NamedDomainObjectProvider<ResolvableConfiguration>, task: AppSmokeTest) {
         task.signatures.from(of(project, archives).get().incoming.artifactView { lenient(true) }.files)
         task.verifierClasspath.from(verifierClasspath(project))
@@ -40,7 +38,6 @@ internal object SigstoreBundles {
         )}@$extension${AppSmokeTest.BUNDLE_SUFFIX}"
     }
 
-    /** The bundle of every archive [archives] resolves to, resolved only if a task asks for it. */
     fun of(
         project: Project,
         archives: NamedDomainObjectProvider<ResolvableConfiguration>,
@@ -62,10 +59,7 @@ internal object SigstoreBundles {
         }
     }
 
-    /**
-     * sigstore-java, for the verifying worker alone. Its Bouncy Castle is aligned with the one on
-     * the plugins' classpath, since the worker sees both.
-     */
+    /** Its Bouncy Castle is aligned with the plugins' own, since the verifying worker sees both. */
     private fun verifierClasspath(project: Project): NamedDomainObjectProvider<ResolvableConfiguration> {
         val declared = project.configurations.dependencyScope("sigstoreVerifierDependencies") {
             dependencies.add(project.dependencies.create("dev.sigstore:sigstore-java:${PluginVersion.sigstoreJava}"))

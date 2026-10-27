@@ -9,11 +9,7 @@ enum class Os(val id: String) {
     MAC("mac"),
 }
 
-/**
- * A CPU, with the name each ecosystem gives it: [id] in target ids and Maven classifiers (`x64`),
- * [rpm] in RPM and YUM metadata and `uname -m` (`x86_64`), and [container] in container platforms
- * and Docker's `TARGETARCH` (`amd64`).
- */
+/** [id] in target ids (`x64`), [rpm] in RPM and `uname -m` (`x86_64`), [container] in Docker (`amd64`). */
 enum class Arch(val id: String, val rpm: String, val container: String) {
     X64("x64", "x86_64", "amd64"),
     AARCH64(ARM_64, ARM_64, "arm64"),
@@ -22,11 +18,7 @@ enum class Arch(val id: String, val rpm: String, val container: String) {
 /** What Linux, RPM and the JDK call 64-bit ARM. */
 private const val ARM_64 = "aarch64"
 
-/**
- * The operating system and CPU an app archive is built for, such as `linux-x64`. The id is the Maven
- * classifier of the published archive, so it is part of the artefact contract and must never change
- * meaning.
- */
+/** The id is the published archive's Maven classifier, so it must never change meaning. */
 data class Target(val os: Os, val arch: Arch) : Serializable {
     val id: String get() = "${os.id}-${arch.id}"
     val isWindows: Boolean get() = os == Os.WINDOWS
@@ -35,7 +27,6 @@ data class Target(val os: Os, val arch: Arch) : Serializable {
     /** `LinuxX64`, `MacAarch64`: appended to the names of tasks built once per target. */
     val taskSuffix: String get() = os.id.replaceFirstChar(Char::uppercase) + arch.id.replaceFirstChar(Char::uppercase)
 
-    /** The distribution plugin's install task for this target's distribution, `installLinuxX64Dist`. */
     val installTaskName: String get() = "install${taskSuffix}Dist"
 
     override fun toString(): String = id
@@ -57,7 +48,6 @@ data class Target(val os: Os, val arch: Arch) : Serializable {
         fun parse(id: String): Target = SUPPORTED.firstOrNull { it.id == id.trim().lowercase() }
             ?: throw GradleException("Unsupported target '$id'. Supported: ${SUPPORTED.joinToString()}")
 
-        /** The machine Gradle is running on. */
         fun host(): Target {
             val osName = System.getProperty("os.name").lowercase()
             val os =

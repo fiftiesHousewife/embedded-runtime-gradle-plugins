@@ -9,11 +9,8 @@ import org.gradle.api.provider.Provider
 import java.io.File
 
 /**
- * Where a build gets the [RuntimePolicy] from: `securityPolicy`, a directory or zip on disk, or
- * `securityPolicyArtifact`, the `group:name:version` of a zip in the build's Maven repositories
- * (normally a binary repository, so the policy is versioned and reviewed like any release). Each
- * can be set in the build, or per machine or CI agent as the `-P<block>.…` property of that name,
- * in `~/.gradle/gradle.properties` or an `ORG_GRADLE_PROJECT_…` variable, which wins over the build.
+ * `securityPolicyArtifact` normally comes from a binary repository, so the [RuntimePolicy] is versioned and
+ * reviewed like any release; a machine's or CI agent's `-P<block>.…` property wins over the build.
  */
 object RuntimePolicySource {
     fun files(project: Project, path: Provider<String>, artifact: Provider<String>): FileCollection {
@@ -33,7 +30,6 @@ object RuntimePolicySource {
         return project.files(fromPath, fromArtifact)
     }
 
-    /** The policy in [files] (a directory or a zip), or null when none is configured. */
     fun load(files: Set<File>, fs: FileSystemOperations, archives: ArchiveOperations, scratch: File): RuntimePolicy? {
         if (files.size > 1) {
             throw GradleException("Set one of securityPolicy and securityPolicyArtifact, not both: $files")

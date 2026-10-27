@@ -16,9 +16,8 @@ internal data class SupportedRelease(
 internal data class SupportAssessment(val summary: String, val problems: List<String>, val warnings: List<String>)
 
 /**
- * Whether an embedded runtime is still supported, from the endoflife.date API
- * (`/api/v1/products/<product>`): its release line must not have reached end of life, and should
- * not be about to, and the pinned version should be the line's latest patch.
+ * From endoflife.date: the release line must not have reached end of life, and should not be about to, and
+ * the pinned version should be the line's latest patch.
  */
 internal object RuntimeSupport {
     const val DEFAULT_URL = "https://endoflife.date/api/v1/products/"
@@ -86,10 +85,8 @@ internal object RuntimeSupport {
         }
 
     /**
-     * Compares the numbers in two versions in order (`21.0.13+9` against `21.0.12.1+1`), which
-     * is how every vendor's scheme sorts, whatever separators it uses. The version comes before the
-     * build number after `+`, so the point release `21.0.13.1+1` is newer than `21.0.13+9`; missing
-     * numbers count as zero, so `21.0.13.0` is no newer than `21.0.13`.
+     * By the numbers in order, as every vendor's scheme sorts whatever its separators; the build after `+` comes
+     * last, so `21.0.13.1+1` is newer than `21.0.13+9`, and missing numbers count as zero.
      */
     fun isNewer(candidate: String, current: String): Boolean {
         val byVersion = compare(numbers(candidate.substringBefore('+')), numbers(current.substringBefore('+')))
@@ -107,8 +104,5 @@ internal object RuntimeSupport {
     private fun numbers(version: String) = Regex("\\d+").findAll(version).map { it.value.toLong() }.toList()
 }
 
-/**
- * The runtime an archive embeds, named as endoflife.date names it: [product] `eclipse-temurin` or
- * `nodejs`, release line [release] `21` or `24`, and the exact [version] pinned.
- */
+/** Named as endoflife.date names it: [product] `eclipse-temurin` or `nodejs`, release line [release] `21` or `24`. */
 data class EmbeddedRuntime(val product: String, val release: String, val version: String) : java.io.Serializable

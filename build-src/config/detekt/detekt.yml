@@ -107,3 +107,25 @@ performance:
   SpreadOperator:
     active: true
     excludes: ['**/test/**', '**/testFixtures/**', '**/functionalTest/**']
+
+# The repository's own rules (detekt-rules). detekt's LargeClass counts one class's code only, and
+# nothing limits comments: files stay small, and comments say why, not what.
+source-file:
+  FileLength:
+    active: true
+    allowedLines: 200
+  CommentDensity:
+    active: true
+    allowedPercent: 15
+    minLines: 30
+    # Tests carry no comments at all. The DSL types users configure are exempt: their KDoc is the
+    # published reference for each setting (Dokka, and the IDE while writing javaApp { … }).
+    excludes:
+      - '**/test/**'
+      - '**/testFixtures/**'
+      - '**/functionalTest/**'
+      - '**/*Extension.kt'
+      - '**/*RuntimeSecurity.kt'
+      - '**/JavaRuntimeDefaults.kt'
+      - '**/RpmPackaging.kt'
+      - '**/EmbeddedRuntimeSettings.kt'

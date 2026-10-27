@@ -11,14 +11,8 @@ import org.gradle.api.file.ArchiveOperations
 import javax.inject.Inject
 
 /**
- * `io.github.fiftieshousewife.node-app` — a Node.js application packaged with the official Node
- * binary into a self-contained `.tar.gz`. Gradle drives npm with the same pinned Node distribution
- * that is bundled, so nothing needs to be installed on the build machine except a JDK for Gradle.
- *
- * Archive layout: `bin/<app>`, `runtime/bin/node` (`runtime/node.exe` on Windows),
- * `app/` (sources, `package.json`, production `node_modules`), `conf.defaults/`, `META-INF/`.
- * Dependencies live in `app/node_modules` rather than `lib/` because ES modules resolve packages
- * by walking up from the importing file and ignore `NODE_PATH`.
+ * npm runs on the same pinned Node that is bundled, so the build machine needs only a JDK. Dependencies live in
+ * `app/node_modules`, not `lib/`, because ES modules resolve packages upwards and ignore `NODE_PATH`.
  */
 abstract class NodeAppPlugin
 @Inject

@@ -1,67 +1,20 @@
 package io.github.fiftieshousewife.appcore
 
 import io.github.fiftieshousewife.appcore.tasks.CheckRuntimeSupport
-import io.github.fiftieshousewife.appcore.tasks.GenerateAppManifest
-import io.github.fiftieshousewife.appcore.tasks.GenerateLaunchers
-import io.github.fiftieshousewife.appcore.tasks.GenerateSbom
 import io.github.fiftieshousewife.appcore.tasks.InstallAiSkills
-import io.github.fiftieshousewife.appcore.tasks.WriteTextFile
 import org.gradle.api.GradleException
 import org.gradle.api.NamedDomainObjectProvider
 import org.gradle.api.Project
 import org.gradle.api.Task
 import org.gradle.api.artifacts.ExternalModuleDependency
 import org.gradle.api.artifacts.ResolvableConfiguration
-import org.gradle.api.component.SoftwareComponentFactory
-import org.gradle.api.file.ArchiveOperations
-import org.gradle.api.file.CopySpec
 import org.gradle.api.file.Directory
-import org.gradle.api.file.DuplicatesStrategy
 import org.gradle.api.file.FileCollection
-import org.gradle.api.file.RegularFile
 import org.gradle.api.provider.Provider
 import org.gradle.api.tasks.Sync
 import org.gradle.api.tasks.TaskProvider
 import org.gradle.api.tasks.bundling.AbstractArchiveTask
 import java.io.File
-
-/** The names that tell the Java and Node plugins apart wherever they share code. */
-data class Ecosystem(
-    /** `java` or `node`, recorded in `META-INF/app.json`. */
-    val id: String,
-    /** The DSL block, `javaApp` or `nodeApp`, which also prefixes this plugin's Gradle properties. */
-    val extensionName: String,
-    val settingsPluginId: String,
-) {
-    /** The task group every task this plugin registers belongs to, e.g. `java app`. */
-    val taskGroup: String get() = "$id app"
-
-    fun property(name: String) = "$extensionName.$name"
-}
-
-/** The Gradle services a plugin is injected with and the shared pipeline needs. */
-data class AppServices(val archives: ArchiveOperations, val components: SoftwareComponentFactory)
-
-/** Where an ecosystem's launchers come from. */
-sealed interface Launchers {
-    /** Rendered by [GenerateLaunchers] from these start lines (Node). */
-    data class Generated(val posixExec: Provider<String>, val windowsExec: Provider<String>) : Launchers
-
-    /** Gradle's own `startScripts` task, which writes both scripts; each target takes its own (Java). */
-    data class StartScripts(val task: TaskProvider<out Task>) : Launchers
-}
-
-/** What an ecosystem plugin contributes to the shared archive pipeline for one target. */
-data class EcosystemSpec(
-    val runtimeName: String,
-    val runtimeVersion: Provider<String>,
-    /** Where `bin/` comes from for a target. */
-    val launchers: Launchers,
-    /** Adds the ecosystem's own content (`runtime/`, plus `lib/` or `app/`) to the assembled directory. */
-    val contents: CopySpec.() -> Unit,
-    /** Feeds library components into the SBOM task. */
-    val sbom: GenerateSbom.() -> Unit,
-)
 
 /** The tasks registered before the targets are known, wired to them afterwards. */
 private data class Lifecycle(
@@ -72,40 +25,9 @@ private data class Lifecycle(
 )
 
 /**
- * The targets whose archives are never started here: every target but this machine's, and this
- * machine's too when the smoke test is turned off.
- */
-internal fun untestedTargets(targets: Collection<Target>, host: Target, smokeTestEnabled: Boolean): List<Target> =
-    targets.filter { it != host || !smokeTestEnabled }
-
-/** The tasks built for one target. */
-class TargetTasks(
-    val target: Target,
-    val assemble: TaskProvider<Sync>,
-    /** `appArchive<T>`: a Tar or Zip task, as [AppExtension.archiveFormat] says. */
-    val archive: TaskProvider<out AbstractArchiveTask>,
-    /** This target's SBOM: the built-in one, or the project's own ([AppExtension.sbom]). */
-    val sbom: Provider<RegularFile>,
-)
-
-/**
- * The pipeline the Java and Node plugins share; not a public API. Once per target:
- *
- * ```
- * startScripts / appLaunchers<T> ─┐
- * appManifest<T>                  ─┼─► distribution <target> ─► <target>DistTar/Zip ──► publish
- * appSbom<T>                      ─┘                          ─► install<Target>Dist
- * ```
- *
- * plus, for this machine's archive only, `appSmokeTest` and `runApp`, and for a Linux archive
- * `appDockerContext`, and for a Linux target with `rpm { enabled = true }` `appRpm<T>`. `appArchive`
- * builds every target's archive.
- *
- * Targets are set in the build script, so per-target tasks are registered once it has run. The
- * tasks a build script may refer to by name are registered up front and wired to their target then.
- *
- * Every archive, whatever the target, is a `.tar.gz` (or the [ArchiveFormat] chosen) with one
- * top-level directory `<app>-<version>/`. Windows 10+ extracts a `.tar.gz` with the built-in `tar.exe`.
+ * The pipeline the Java and Node plugins share; not a public API (AGENTS.md draws it). Targets are
+ * set in the build script, so per-target tasks are registered once it has run; the tasks a build
+ * script may name are registered up front and wired to their target then.
  */
 class AppWiring(
     private val project: Project,
@@ -125,18 +47,13 @@ class AppWiring(
     val taskGroup: String get() = ecosystem.taskGroup
     val version: Provider<String> = providers.provider { project.version.toString() }
 
-    /** [AppExtension.gitCommit]. */
     val gitCommit: Provider<String> = extension.gitCommit
 
-    /**
-     * When the commit was made (ISO 8601), the image's `created` label: rebuilding the same commit
-     * then produces the same image. Absent outside a checkout.
-     */
+    /** The commit's time, the image's `created` label, so rebuilding a commit gives the same image. */
     val gitCommitTime: Provider<String> = Git(project).output("log", "-1", "--format=%cI")
 
     private val rpmPackages by lazy { RpmPackages(project, this) }
 
-    /** The organisation's runtime policy, if one is configured; see [RuntimePolicySource]. */
     val runtimePolicy: FileCollection =
         RuntimePolicySource.files(
             project,
@@ -178,7 +95,6 @@ class AppWiring(
         )
     }
 
-    /** `-P<ecosystem>.<name>`, parsed. */
     private fun <T : Any> setting(name: String, parse: (String) -> T): Provider<T> =
         providers.gradleProperty(ecosystem.property(name)).map(parse)
 
@@ -186,28 +102,24 @@ class AppWiring(
     fun runtimeArchive(
         name: String,
         artifact: Provider<RuntimeArtifact>,
-    ): NamedDomainObjectProvider<ResolvableConfiguration> =
-        // `resolvable` states the role up front, rather than flipping the canBeConsumed /
-        // canBeResolved flags on a general-purpose configuration after the fact.
-        project.configurations.resolvable(name) {
-            isTransitive = false
-            description = "Runtime archive resolved from the runtime repository"
-            dependencies.addLater(
-                artifact.map { a ->
-                    (project.dependencies.create(a.notation) as ExternalModuleDependency).apply {
-                        isTransitive = false
-                        artifact {
-                            this.name = a.artifact
-                            this.type = a.extension
-                            this.extension = a.extension
-                            this.classifier = a.classifier
-                        }
+    ): NamedDomainObjectProvider<ResolvableConfiguration> = project.configurations.resolvable(name) {
+        isTransitive = false
+        description = "Runtime archive resolved from the runtime repository"
+        dependencies.addLater(
+            artifact.map { a ->
+                (project.dependencies.create(a.notation) as ExternalModuleDependency).apply {
+                    isTransitive = false
+                    artifact {
+                        this.name = a.artifact
+                        this.type = a.extension
+                        this.extension = a.extension
+                        this.classifier = a.classifier
                     }
-                },
-            )
-        }
+                }
+            },
+        )
+    }
 
-    /** Extracts the single runtime archive in [archive], dropping its top-level directory. */
     fun extractRuntime(name: String, archive: Provider<File>, destination: Provider<Directory>): TaskProvider<Sync> =
         tasks.register(name, Sync::class.java) {
             group = taskGroup
@@ -224,26 +136,19 @@ class AppWiring(
             AppCopySpecs.ownerWritable(this)
         }
 
-    /** The single file a [runtimeArchive] configuration resolves to. */
     fun singleFile(configuration: NamedDomainObjectProvider<ResolvableConfiguration>): Provider<File> =
         configuration.flatMap { it.elements }.map { it.single().asFile }
 
-    /** `checkRuntimeSupport`, for the runtime this ecosystem embeds; see [CheckRuntimeSupport]. */
     fun registerRuntimeSupportCheck(runtime: Provider<EmbeddedRuntime>) =
         CheckRuntimeSupport.register(project, runtime, extension.runtimeSupport)
 
-    /**
-     * Registers the whole pipeline. [contribute] is called once per target, after the build script
-     * has run, to register that target's ecosystem-specific tasks.
-     */
+    /** Registers the pipeline; [contribute] registers each target's ecosystem tasks once targets are known. */
     fun register(contribute: (Target) -> EcosystemSpec) {
-        // Each target becomes a distribution of its own (TargetPipeline).
         project.pluginManager.apply("distribution")
         val lifecycle = registerLifecycle()
         project.afterEvaluate { registerTargets(lifecycle, contribute) }
     }
 
-    /** The tasks a build script may name, registered before the targets are known. */
     private fun registerLifecycle(): Lifecycle {
         val allArchives =
             tasks.register("appArchive") {
@@ -261,8 +166,7 @@ class AppWiring(
         val publishing = AppPublishing(project, this, services.components).apply { register(smoke) }
         tasks.named("assemble") { dependsOn(allArchives) }
         tasks.named("check") { dependsOn(smoke) }
-        // Every archive feeding the app (the application jar included) must be byte-reproducible,
-        // so rebuilding a commit yields an identical archive checksum. Gradle 9 does this by default.
+        // Every archive feeding the app, its jar included, must be byte-reproducible.
         tasks.withType(AbstractArchiveTask::class.java).configureEach {
             isPreserveFileTimestamps = false
             isReproducibleFileOrder = true

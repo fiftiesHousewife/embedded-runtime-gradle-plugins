@@ -17,12 +17,8 @@ import java.util.Optional
 import javax.inject.Inject
 
 /**
- * Provisions compile JDKs from the same source, and at the same exact version, as the runtime that
- * gets linked into the archive. Gradle toolchain requests carry only a feature version ("21"); the
- * exact patch level comes from the java-app catalogue or a `javaApp.jdk.<feature>` override.
- *
- * Only HotSpot builds of the configured `javaApp.jdk.distribution` are served. Requests for another
- * vendor or implementation fall through to any other configured resolver.
+ * Compile JDKs from the same source and exact pin as the embedded runtime; a request carries only the feature
+ * release. Other vendors fall through to other resolvers rather than being silently redirected.
  */
 abstract class JdkToolchainResolver : JavaToolchainResolver {
     @get:Inject
@@ -38,8 +34,6 @@ abstract class JdkToolchainResolver : JavaToolchainResolver {
             request.buildPlatform.operatingSystem,
             request.buildPlatform.architecture,
         )
-        // Serve only the distribution this machine is configured for; any other vendor request
-        // falls through to Gradle's other resolvers rather than being silently redirected.
         val servable = ToolchainRequests.serves(sources.distribution, spec.vendor.get(), spec.implementation.get())
         val feature = spec.languageVersion.get().asInt()
         val version = JdkCatalog.pinnedJdk(providers, sources.distribution, feature).takeIf { servable }
@@ -50,7 +44,6 @@ abstract class JdkToolchainResolver : JavaToolchainResolver {
     }
 }
 
-/** The decisions [JdkToolchainResolver] makes, apart from Gradle's request objects. */
 internal object ToolchainRequests {
     fun serves(distribution: JdkDistribution, vendor: JvmVendorSpec, implementation: JvmImplementation) =
         implementation != JvmImplementation.J9 && distribution.vendorSpec.matches(vendor.toString())
@@ -62,10 +55,8 @@ internal object ToolchainRequests {
     }
 
     /**
-     * A JDK configured by path wins. Gradle provisions toolchains from zip and tar.gz archives only, so
-     * an installed directory or an RPM is left to the JDKs Gradle finds on the machine (installed ones,
-     * and `org.gradle.java.installations.paths`), as is a download that is an RPM ([download] null).
-     * Nothing is ever fetched from anywhere else.
+     * Gradle provisions toolchains from zip and tar.gz only, so a directory or an RPM is left to the JDKs Gradle
+     * finds on the machine (installed ones and `org.gradle.java.installations.paths`).
      */
     fun uri(local: File?, download: () -> URI?): URI? = when {
         local == null -> download()

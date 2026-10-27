@@ -10,12 +10,7 @@ import org.gradle.api.tasks.TaskAction
 import org.gradle.work.DisableCachingByDefault
 import java.io.File
 
-/**
- * `appDockerfile`: keeps the project's [dockerfile] (its root `Dockerfile` by default) in step with
- * the plugin. It is created if missing; the block the plugins own ([ManagedDockerfile]) is rewritten
- * when it changes, and everything outside it is left as written. A Dockerfile without that block is
- * the project's alone, and is left untouched.
- */
+/** Only the plugins' block ([ManagedDockerfile]) is rewritten; a Dockerfile without one is the project's alone. */
 @DisableCachingByDefault(because = "Edits a file in the project")
 abstract class UpdateDockerfile : DefaultTask() {
     /** What belongs in the plugins' block. */

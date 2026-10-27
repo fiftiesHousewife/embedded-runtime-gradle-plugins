@@ -14,12 +14,7 @@ import org.gradle.api.tasks.PathSensitivity
 import org.gradle.api.tasks.TaskAction
 import java.nio.file.Files
 
-/**
- * Extracts a runtime packaged as an RPM: unpacks the whole package, finds the runtime's home inside
- * it (wherever the package installs it), and leaves that home's contents in [outputDir], as the
- * archive extraction leaves a `.tar.gz`'s. Symbolic links become copies of what they point to, so the
- * same runtime comes out on every OS, Windows included.
- */
+/** Symbolic links become copies of what they point to, so the same runtime comes out on every OS, Windows included. */
 @CacheableTask
 abstract class ExtractRpmRuntime : DefaultTask() {
     @get:InputFile

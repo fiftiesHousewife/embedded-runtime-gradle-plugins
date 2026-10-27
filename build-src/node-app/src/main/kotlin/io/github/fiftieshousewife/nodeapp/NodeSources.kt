@@ -12,10 +12,7 @@ import io.github.fiftieshousewife.appcore.settingsPrefixedBy
 import org.gradle.api.provider.ProviderFactory
 import java.net.URI
 
-/**
- * Where Node.js archives and npm packages come from: nodejs.org and the public npm registry, or the
- * curated binary repository tree and its npm repository when one is configured.
- */
+/** nodejs.org and the public npm registry, or the binary repository's curated tree and npm repository. */
 class NodeSources(private val binaryRepo: BinaryRepository?, private val overrides: NodeOverrides = NodeOverrides()) {
     val repository: RuntimeRepository
         get() =
@@ -51,7 +48,6 @@ class NodeSources(private val binaryRepo: BinaryRepository?, private val overrid
         get() = binaryRepo?.repo(overrides.binaryRepoNpm) ?: RuntimeRepository.slash(overrides.publicNpmRegistry)
 
     companion object {
-        /** Ivy organisation of the Node.js archives. */
         const val GROUP = "nodejs"
 
         const val DEFAULT_URL = "https://nodejs.org/dist"
@@ -64,11 +60,9 @@ class NodeSources(private val binaryRepo: BinaryRepository?, private val overrid
         /** `nodeApp.node.version=24.22.1` overrides the catalogue pin. */
         const val VERSION = "nodeApp.node.version"
 
-        /** Where Node archives live without a binary repository, and how they are laid out under that root. */
         const val PUBLIC_URL = "nodeApp.node.url"
         const val PUBLIC_PATTERN = "nodeApp.node.pattern"
 
-        /** Ivy pattern for the curated binary repository tree, when it cannot use the default layout. */
         const val BINARY_REPO_PATTERN = "nodeApp.node.binaryRepoPattern"
 
         const val NPM_REGISTRY = "nodeApp.npm.registry"
@@ -77,10 +71,7 @@ class NodeSources(private val binaryRepo: BinaryRepository?, private val overrid
         /** `nodeApp.node.token.<name>.<target or os>=<value>`: a pattern token of your own. */
         const val TOKEN_PREFIX = "nodeApp.node.token."
 
-        /**
-         * PEM bundle of corporate CAs for npm, which does not use the JVM trust store. Gradle itself
-         * trusts whatever the JVM trust store trusts.
-         */
+        /** npm does not use the JVM trust store, so it needs the corporate CAs as a PEM bundle of their own. */
         const val NPM_CA_FILE = "nodeApp.npm.caFile"
 
         fun from(providers: ProviderFactory) = NodeSources(
@@ -121,11 +112,9 @@ class NodeSources(private val binaryRepo: BinaryRepository?, private val overrid
     }
 }
 
-/** Where Node.js and npm packages come from when a machine overrides the defaults. */
 data class NodeOverrides(
     val publicUrl: String = NodeSources.DEFAULT_URL,
     val publicPattern: String? = null,
-    /** Override of [RuntimeRepository.CURATED_PATTERN]; null means the default curated layout. */
     val binaryRepoPattern: String? = null,
     val publicNpmRegistry: String = NodeSources.DEFAULT_NPM_REGISTRY,
     val binaryRepoNpm: String = NodeSources.DEFAULT_BINARY_REPO_NPM,

@@ -21,18 +21,15 @@ data class RpmLayout(
     }
 
     /**
-     * RPM versions cannot contain `-`, which separates version from release. A Maven qualifier
-     * becomes a `~` pre-release, which RPM sorts before the release itself: `1.2.0~SNAPSHOT` <
-     * `1.2.0`, just as `1.2.0-SNAPSHOT` < `1.2.0` in Maven.
+     * `-` separates RPM's version from its release, so a Maven qualifier becomes a `~` pre-release, which
+     * RPM sorts first just as Maven does: `1.2.0~SNAPSHOT` < `1.2.0`.
      */
     val rpmVersion: String get() = version.replace('-', '~').also {
         if (!VERSION.matches(it)) throw GradleException("'$version' cannot be expressed as an RPM version")
     }
 
-    /** The architecture name RPM and dnf use. */
     val arch: String get() = target.arch.rpm
 
-    /** `<name>-<version>-<release>.<arch>.rpm`, the name every RPM tool expects. */
     val fileName: String get() = "$name-$rpmVersion-$release.$arch.rpm"
 
     val home: String get() = "/opt/$name"
@@ -41,7 +38,6 @@ data class RpmLayout(
     val logDir: String get() = "/var/log/$name"
     val unitFile: String get() = "/usr/lib/systemd/system/$name.service"
 
-    /** A packaged template (`app.service`, `pre.sh`, …) with this package's names filled in. */
     fun render(template: String): String = template
         .replace("@NAME@", name)
         .replace("@USER@", user)

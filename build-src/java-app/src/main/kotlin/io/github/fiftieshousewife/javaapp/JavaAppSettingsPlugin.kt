@@ -10,13 +10,8 @@ import org.gradle.jvm.toolchain.JvmToolchainManagement
 import javax.inject.Inject
 
 /**
- * `io.github.fiftieshousewife.java-app.settings` — the Maven and plugin repositories every build
- * needs (see [AppSettings]), plus the two Java-specific ones:
- *
- * - compile JDK toolchains, provisioned by [JdkToolchainResolver] at the exact pinned version;
- * - an Ivy repository for the JDK archives linked into each app, from [JdkSources].
- *
- * Both read the same distribution, pin and source, so the compiler and the runtime always agree.
+ * The shared repositories ([AppSettings]) plus compile JDK toolchains ([JdkToolchainResolver]) and the runtime JDKs'
+ * Ivy repository ([JdkSources]), which read the same pin so the compiler and the runtime always agree.
  */
 abstract class JavaAppSettingsPlugin
 @Inject

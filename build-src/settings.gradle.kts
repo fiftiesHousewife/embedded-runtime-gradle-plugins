@@ -27,4 +27,6 @@ rootProject.name = "embedded-runtime-gradle-plugins"
 
 // Published as io.github.fiftieshousewife:app-core / java-app / node-app.
 include("app-core", "java-app", "node-app")
+// The repository's own detekt rules, loaded by the modules' detekt runs; not published.
+include("detekt-rules")
 project(":app-core").projectDir = file("core")

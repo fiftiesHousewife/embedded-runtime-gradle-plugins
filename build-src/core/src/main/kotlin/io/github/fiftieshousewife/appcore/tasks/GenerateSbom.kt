@@ -20,15 +20,8 @@ import org.gradle.api.tasks.TaskAction
 import java.nio.file.Files
 
 /**
- * Writes a CycloneDX 1.5 SBOM to `META-INF/sbom.cdx.json` and alongside the published archive.
- *
- * The bundled runtime is listed as a `platform` component. Vulnerability scanners cannot see a
- * bundled JRE or Node binary through the OS package database, so without this entry a vulnerable
- * runtime is invisible.
- *
- * Java libraries come from the resolved `runtimeClasspath`; Node packages from npm's hidden lockfile
- * (`node_modules/.package-lock.json`) of the production install, which lists exactly what was
- * installed for the target.
+ * The runtime is listed as a `platform` component: scanners can't see a bundled JRE or Node binary through the
+ * OS package database. Node packages come from npm's hidden lockfile, which lists exactly what was installed.
  */
 @CacheableTask
 abstract class GenerateSbom : DefaultTask() {

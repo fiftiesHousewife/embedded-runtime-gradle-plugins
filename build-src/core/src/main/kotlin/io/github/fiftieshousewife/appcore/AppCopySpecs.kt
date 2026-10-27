@@ -3,20 +3,12 @@ package io.github.fiftieshousewife.appcore
 import org.gradle.api.file.CopySpec
 import org.gradle.api.file.RelativePath
 
-/** How the app directory's files are copied, wherever they are copied to. */
 object AppCopySpecs {
-    /**
-     * The files that must be executable, relative to the app directory. Exec bits are set
-     * explicitly rather than trusted from the filesystem: a Windows checkout or a jlink run on
-     * Windows has none, and a missing bit on `jspawnhelper` breaks `ProcessBuilder` on Linux at
-     * runtime, long after the build succeeded.
-     */
+    /** Set explicitly: Windows checkouts and jlink runs have none, and `ProcessBuilder` needs `jspawnhelper`'s. */
     val executables = listOf("bin/**", "runtime/bin/**", "runtime/lib/jspawnhelper", "runtime/lib/jexec")
 
-    /** Also inside an archive's top-level directory. */
     private val executablePatterns = executables + executables.map { "*/$it" }
 
-    /** Whether [path], relative to the app directory, is one of [executables]. */
     fun isExecutable(path: String): Boolean =
         executables.any { if (it.endsWith("/**")) path.startsWith(it.removeSuffix("**")) else path == it }
 
@@ -24,12 +16,7 @@ object AppCopySpecs {
         spec.filesMatching(executablePatterns) { permissions { unix("rwxr-xr-x") } }
     }
 
-    /**
-     * Adds the owner's write bit to every copied file, keeping the rest of its mode (exec bits
-     * included), so a runtime with read-only files (a JDK's `legal/`) can be replaced next build.
-     * Computed from each file's own mode: `filePermissions {}` and `permissions {}` both start from
-     * the default `rw-r--r--`, which would drop every exec bit.
-     */
+    /** So a read-only runtime (a JDK's `legal/`) can be replaced; `permissions {}` alone would drop exec bits. */
     fun ownerWritable(spec: CopySpec) {
         spec.eachFile {
             val mode = permissions.toUnixNumeric() or OWNER_WRITE
@@ -39,10 +26,6 @@ object AppCopySpecs {
 
     private const val OWNER_WRITE = 0b010_000_000
 
-    /**
-     * Strips an archive's single top-level directory (`node-v24.../`, `<app>-<version>/`) while
-     * copying, or renames it to [replacement].
-     */
     fun dropTopLevelDirectory(spec: CopySpec, replacement: String? = null) {
         spec.eachFile {
             val segments = listOfNotNull(replacement) + relativePath.segments.drop(1)

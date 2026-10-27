@@ -8,15 +8,8 @@ import org.gradle.work.DisableCachingByDefault
 import java.io.File
 
 /**
- * `aiSkills`: writes the plugins' AI assistant files into the project, where each tool looks:
- *
- * - skills into `.agents/skills/` (GitHub Copilot in its IDE agent modes, app, CLI and cloud agent,
- *   and Devin);
- * - the post-edit build check into `.github/hooks/` (Copilot);
- * - Devin's CLI hook file `.devin/hooks.v1.json`, only if the project has none.
- *
- * Every file it writes is named `embedded-runtime-*`, so a project's own skills and hooks are left
- * alone; running it again updates them to this plugin version.
+ * Skills go to `.agents/skills/` (Copilot and Devin), the post-edit check to `.github/hooks/`, and Devin's hook
+ * file only if the project has none. Every file is named `embedded-runtime-*`, so a project's own are left alone.
  */
 @DisableCachingByDefault(because = "Writes into the project's own source tree")
 abstract class InstallAiSkills : DefaultTask() {

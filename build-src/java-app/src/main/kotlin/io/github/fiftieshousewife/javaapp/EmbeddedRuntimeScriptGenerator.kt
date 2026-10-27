@@ -7,13 +7,8 @@ import java.io.Serializable
 import java.io.Writer
 
 /**
- * The script generator the java-app plugin sets on Gradle's own `startScripts` task: the same
- * `bin/<app>` and `bin/<app>.bat` as Gradle's, but starting the embedded runtime instead of
- * whatever `JAVA_HOME` or `PATH` finds, with `run`, `healthcheck` and `version`.
- *
- * It uses what Gradle passes every generator: the main class, the classpath (the app's own jar
- * first) and `defaultJvmOpts`. A build can replace it the usual way, with
- * `tasks.startScripts { unixStartScriptGenerator = … }`; the smoke test still has to pass.
+ * Gradle's `bin/<app>` and `bin/<app>.bat`, but starting the embedded runtime instead of whatever `JAVA_HOME` or
+ * `PATH` finds. A build can replace it on `startScripts` as usual; the smoke test still has to pass.
  */
 class EmbeddedRuntimeScriptGenerator(
     private val windows: Boolean,

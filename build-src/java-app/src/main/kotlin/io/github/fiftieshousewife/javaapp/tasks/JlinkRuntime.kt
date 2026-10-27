@@ -16,15 +16,8 @@ import org.gradle.process.ExecOperations
 import javax.inject.Inject
 
 /**
- * Links the trimmed Java runtime that ships inside the archive, for [target].
- *
- * `jlink` always runs from the build host's JDK ([toolJdk]) and links the target JDK's `jmods`
- * ([targetJdk]). When target and host differ this is a cross link, which is how a Windows desktop
- * without WSL2 or containers can still produce the linux-x64 runtime. Both JDKs must be the same
- * exact version, which the plugin guarantees by resolving both from one pin.
- *
- * The JDK directories are `@Internal`: they are derived from the exact pinned version, which is
- * the tracked input, so Gradle need not hash ~300 MB of JDK on every build.
+ * Runs the host's jlink against the target JDK's `jmods`, so a cross link needs no container. The JDKs are
+ * `@Internal` since the pin they come from is the tracked input: Gradle need not hash ~300 MB of JDK every build.
  */
 @CacheableTask
 abstract class JlinkRuntime
@@ -37,7 +30,6 @@ constructor(
 
     @get:Internal abstract val targetJdk: DirectoryProperty
 
-    /** The target JDK's `jmods/`, when its vendor ships them separately; else the JDK's own. */
     @get:Internal abstract val targetJmods: DirectoryProperty
 
     @get:Input abstract val jdkVersion: Property<String>

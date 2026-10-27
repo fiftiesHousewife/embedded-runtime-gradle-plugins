@@ -9,11 +9,6 @@ import org.gradle.api.tasks.Sync
 import org.gradle.api.tasks.TaskProvider
 import java.io.File
 
-/**
- * `appDockerContext`: a container build context holding the project's Dockerfile, which
- * `appDockerfile` creates and keeps up to date ([ManagedDockerfile]), and every Linux archive
- * extracted under `app/<cpu>/` (`amd64`, `arm64`).
- */
 internal class DockerContext(
     private val project: Project,
     private val wiring: AppWiring,
@@ -23,10 +18,7 @@ internal class DockerContext(
 
     private val task: TaskProvider<Sync> = register()
 
-    /**
-     * Containers run Linux: every Linux archive goes under `app/<cpu>/`, named as container
-     * platforms name CPUs (`amd64`, `arm64`), so one context builds an image for each.
-     */
+    /** Named as container platforms name CPUs (`amd64`, `arm64`), so one context builds an image for each. */
     fun useLinuxArchives(built: List<TargetTasks>) {
         val linux = built.filter { it.target.os == Os.LINUX }
         val archiveOps = archives
@@ -59,7 +51,6 @@ internal class DockerContext(
                 managedBlock.set(identity().map { DockerfileTemplate.render(template, it) })
                 this.dockerfile.set(extension.dockerfile)
             }
-        // The context's copy: the project's Dockerfile with this build's release, commit and time.
         val forContext =
             project.tasks.register("appDockerContextFile", WriteTextFile::class.java) {
                 description = "Writes the Dockerfile for the container build context, with this build's release"
@@ -77,12 +68,10 @@ internal class DockerContext(
         }
     }
 
-    /** What the image says about itself and doesn't change from build to build. */
     private fun identity() = extension.appName
         .zip(extension.license) { name, license -> ImageIdentity(name, license) }
         .zip(extension.sourceUrl.orElse("")) { identity, url -> identity.copy(source = url.ifEmpty { null }) }
 
-    /** The per-build values for the Dockerfile's `ARG`s: the release, its commit and that commit's time. */
     private fun buildArguments() = wiring.version
         .zip(wiring.gitCommit) { version, commit -> mapOf("APP_VERSION" to version, "GIT_COMMIT" to commit) }
         .zip(wiring.gitCommitTime.orElse("")) { values, time ->
@@ -90,13 +79,8 @@ internal class DockerContext(
         }
 }
 
-/**
- * What an image built from the generated Dockerfile says about itself, beside the per-build release,
- * commit and time it takes as `ARG`s; [source] is left out when unknown.
- */
 internal data class ImageIdentity(val name: String, val licenses: String, val source: String? = null)
 
-/** The plugins' block of the Dockerfile: the template with the app's name, labels and base image filled in. */
 internal object DockerfileTemplate {
     private const val PREFIX = "org.opencontainers.image"
 
@@ -125,11 +109,7 @@ internal object DockerfileTemplate {
     fun escape(value: String) = value.replace("\\", "\\\\").replace("\"", "\\\"").replace("$", "\\$")
 }
 
-/**
- * The block of the project's Dockerfile the plugins own, between two marker lines. The plugins
- * create the file with just that block, and later rewrite only the block, so anything written
- * outside it stays. A Dockerfile without the markers is the project's alone.
- */
+/** Only the block between the markers is rewritten, so anything outside it stays; without them the file is left be. */
 internal object ManagedDockerfile {
     private const val START = "# >>> embedded-runtime"
     private const val END = "# <<< embedded-runtime"
@@ -139,10 +119,7 @@ internal object ManagedDockerfile {
             "#     everything up to the closing line. Add your own instructions after it.\n" +
             content.trimEnd() + "\n$END\n"
 
-    /**
-     * [existing] with the plugins' block made [content]: a new file holding just the block when
-     * there is none, or null when the file has no block, being the project's own.
-     */
+    /** Null when the file has no block, being the project's own. */
     fun update(existing: String?, content: String): String? {
         existing ?: return block(content)
         val lines = existing.lines()
@@ -155,7 +132,6 @@ internal object ManagedDockerfile {
     }
 }
 
-/** The Dockerfile as it goes in the build context: its per-build `ARG`s given this build's values. */
 internal object ContextDockerfile {
     private val BARE_ARG = Regex("""^ARG\s+(\w+)\s*$""")
 
@@ -167,9 +143,8 @@ internal object ContextDockerfile {
 }
 
 /**
- * A project's own Dockerfile. The context holds one archive per CPU, under `app/amd64/` and
- * `app/arm64/`, so a Dockerfile that copies all of `app/` (as one written for 0.0.2 and earlier
- * does) builds an image with no `/app/bin` that fails only when it starts; it is refused here.
+ * Refuses a Dockerfile that copies all of `app/` (as one written for 0.0.2 and earlier does): with one archive
+ * per CPU it builds an image with no `/app/bin` that fails only when it starts.
  */
 internal object OwnDockerfile {
     private val copiesWholeApp = Regex("""(?m)^\s*(COPY|ADD)\b.*\sapp/?\s""")

@@ -17,11 +17,7 @@ import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 import java.nio.file.attribute.PosixFilePermission
 
-/**
- * The files inside an RPM, for a runtime packaged as one (a vendor's JDK RPM, or an organisation's own
- * repackaging). Redline reads the RPM headers; Commons Compress decompresses and reads the cpio
- * payload; this object only writes the entries out and finds the runtime's home among them.
- */
+/** For a runtime packaged as an RPM: a vendor's JDK RPM, or an organisation's own repackaging. */
 internal object RpmPayload {
     /** What RPM calls each payload compressor, in Commons Compress's names. */
     private val COMPRESSORS =
@@ -36,10 +32,9 @@ internal object RpmPayload {
     private const val PERMISSION_MASK = 0x1FF
 
     /**
-     * Writes every file in [rpm] under [into], as installing it at [into] would, except that each
-     * symbolic link becomes a copy of what it points to: links need privileges on Windows and would
-     * make the unpacked runtime differ by OS. Returns the links left out because they point at
-     * nothing in the package (a JDK's `cacerts` at the system's `/etc/pki/…`, say) or loop.
+     * Symbolic links become copies of their targets: links need privileges on Windows and would make the
+     * runtime differ by OS. Returns the links left out because they loop or point outside the package (a
+     * JDK's `cacerts` at the system's `/etc/pki/…`, say).
      */
     fun unpack(rpm: File, into: File): List<String> = FileChannel.open(rpm.toPath()).use { channel ->
         val header = Format().apply { read(ReadableChannelWrapper(channel)) }.header
@@ -50,7 +45,6 @@ internal object RpmPayload {
         }
     }
 
-    /** [payload] decompressed as RPM's [compressor] says; `none` for an uncompressed payload. */
     fun decompressed(compressor: String, payload: InputStream): InputStream {
         if (compressor == "none") return payload
         val name = COMPRESSORS[compressor]
@@ -58,10 +52,7 @@ internal object RpmPayload {
         return CompressorStreamFactory().createCompressorInputStream(name, payload)
     }
 
-    /**
-     * The runtime's home among the unpacked files: the shallowest directory holding [marker] (`release`
-     * for a JDK) beside a `bin` directory, wherever the package installs it.
-     */
+    /** The shallowest directory holding [marker] (`release` for a JDK) beside `bin`, wherever the package puts it. */
     fun home(unpacked: File, marker: String, rpmName: String): File =
         unpacked.walkTopDown().filter { it.isDirectory && it.resolve(marker).isFile && it.resolve("bin").isDirectory }
             .minByOrNull { it.toPath().nameCount }
@@ -95,7 +86,6 @@ internal object RpmPayload {
         return SymlinkCopies(root, symlinks).write()
     }
 
-    /** Refuses names that would land outside [root]. */
     private fun safePath(root: Path, name: String, rpmName: String): Path {
         val path = root.resolve(name.removePrefix(".").trimStart('/')).normalize()
         if (!path.startsWith(root)) throw GradleException("$rpmName has an entry outside its root: $name")
@@ -123,14 +113,8 @@ internal object RpmPayload {
     }
 }
 
-/**
- * Writes each link in [links] (where it sits, and what it points to) as a copy of its target, once
- * every file is in place: a link to a file becomes the file, a link to a directory the directory, a
- * link to a link whatever that one ends at. Links to directories are copied last, so the copies hold
- * the copies made for any links inside them.
- */
+/** Links to directories are copied last, so their copies hold the copies made for any links inside them. */
 private class SymlinkCopies(private val root: Path, private val links: Map<Path, Link>) {
-    /** Where a link points in the unpacked tree, and what the package wrote. */
     data class Link(val target: Path, val written: String)
 
     fun write(): List<String> {

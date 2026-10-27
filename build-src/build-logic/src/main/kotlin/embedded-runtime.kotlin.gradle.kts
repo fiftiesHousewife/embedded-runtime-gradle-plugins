@@ -88,6 +88,7 @@ tasks.withType<JacocoReport>().configureEach {
 }
 tasks.named("check") { dependsOn(tasks.withType<JacocoReport>()) }
 
+dependencies { "detektPlugins"(project(":detekt-rules")) }
 detekt {
     buildUponDefaultConfig = true
     config.setFrom(rootProject.files("config/detekt/detekt.yml"))

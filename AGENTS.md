@@ -13,6 +13,7 @@ build-src/                  the plugin build, included by the root build
   core/                     io.github.fiftieshousewife:app-core      package …appcore (+ app-smoke-test plugin)
   java-app/                 io.github.fiftieshousewife:java-app      package …javaapp
   node-app/                 io.github.fiftieshousewife:node-app      package …nodeapp
+  detekt-rules/             the repository's own detekt rules (FileLength, CommentDensity); not published
   config/detekt/detekt.yml  deviations from detekt's defaults only
 scripts/                    curate-runtimes.sh (mirrors approved runtimes into the binary repository)
 renovate/                   Renovate presets for users: temurin and nodejs pin overrides; ubi, a reference example
@@ -252,6 +253,7 @@ enforced with standard tools rather than the plugin itself; the thresholds live 
 |---|---|
 | Lines of at most 120 characters | ktlint (Spotless) and detekt |
 | Functions of at most 30 lines, at most 4 parameters (data classes exempt), classes of at most 150 lines | detekt |
+| Files of at most 200 non-blank lines; at most 15% of a file's lines comments (the DSL types users configure exempt: their KDoc is the reference) | detekt, with `detekt-rules` |
 | Cyclomatic and cognitive complexity at most 10, nesting at most 3 | detekt |
 | No magic strings, no `*Helper`/`*Util`/`*Manager`/`*Processor`, no `handle`/`process`/`do`/`perform` names | detekt |
 | No swallowed exceptions, no `println`/`printStackTrace`, no legacy `java.io` streams | detekt |

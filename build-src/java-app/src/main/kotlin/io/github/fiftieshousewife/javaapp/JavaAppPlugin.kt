@@ -16,19 +16,8 @@ import org.gradle.jvm.application.tasks.CreateStartScripts
 import javax.inject.Inject
 
 /**
- * `io.github.fiftieshousewife.java-app` — a Java application packaged with a jlink-trimmed runtime
- * of the configured JDK distribution into a self-contained `.tar.gz` per target.
- *
- * Compilation and the embedded runtime use the same feature release and the same exact pin: the
- * toolchain resolver ([JavaAppSettingsPlugin]) and the runtime archives both come from [JdkCatalog]
- * and [JdkSources].
- *
- * The archive layout follows the `application` plugin's: `bin/<app>`, `lib/` (the application jar
- * and its dependencies), plus `runtime/` (jlink image), `conf.defaults/` and
- * `META-INF/{app.json,sbom.cdx.json}`.
- *
- * The runtime's modules default to what `jdeps` finds plus `additionalModules`; `jlinkFindModules`
- * finds the ones jdeps cannot see by running the app.
+ * A Java application packaged with a jlink-trimmed runtime, one archive per target. Compiler and runtime share one
+ * pin, since the toolchain resolver and the runtime archives both come from [JdkCatalog] and [JdkSources].
  */
 abstract class JavaAppPlugin
 @Inject
@@ -44,13 +33,11 @@ constructor(
         val detectedModules = project.objects.listProperty(String::class.java)
         val conventions = JavaConventions(project, extension).also { it.apply(detectedModules) }
 
-        // The archive replaces the application plugin's script-based distributions; keeping both
-        // would publish two different ways to run the same app. installDist remains available.
+        // Keeping the application plugin's distributions would publish two different ways to run the same app.
         listOf("distTar", "distZip").forEach { name -> project.tasks.named(name) { enabled = false } }
         useEmbeddedRuntimeScripts(project, extension)
 
-        // Targets and the JDK release are final once the build script has run; the JDK tasks
-        // are registered then, before the shared pipeline asks for each target's contribution.
+        // Targets and the JDK release are final only once the build script has run.
         val runtimeTasks = JavaRuntimeTasks(project, extension, wiring)
         project.afterEvaluate {
             detectedModules.set(runtimeTasks.jdeps().flatMap { it.outputFile }.map { JdepsModules.read(it.asFile) })
@@ -69,10 +56,7 @@ constructor(
         }
     }
 
-    /**
-     * Configured when the task is created, after the build script has run, so a build's own
-     * `tasks.startScripts { … }` still wins and `runtimeOptions` is final.
-     */
+    /** Configured on creation, so a build's own `startScripts { … }` wins and `runtimeOptions` is final. */
     private fun useEmbeddedRuntimeScripts(project: Project, extension: JavaAppExtension) {
         val application = project.extensions.getByType(JavaApplication::class.java)
         project.tasks.named("startScripts", CreateStartScripts::class.java) {

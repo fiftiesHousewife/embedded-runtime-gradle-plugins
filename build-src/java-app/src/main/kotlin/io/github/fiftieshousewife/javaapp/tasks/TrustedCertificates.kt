@@ -17,11 +17,9 @@ internal object TrustedCertificates {
     private val EXTENSIONS = setOf("pem", "crt", "cer", "der")
     private val FINGERPRINT = HexFormat.ofDelimiter(":").withUpperCase()
 
-    /** The certificate files among [files], in a stable order. */
     fun certificateFiles(files: Collection<File>) =
         files.filter { it.extension.lowercase() in EXTENSIONS }.sortedBy { it.name }
 
-    /** Every certificate in [file], a PEM bundle or a single DER certificate. */
     fun read(file: File): List<X509Certificate> = try {
         Files.newInputStream(file.toPath()).use { CertificateFactory.getInstance("X.509").generateCertificates(it) }
             .filterIsInstance<X509Certificate>()
@@ -29,7 +27,6 @@ internal object TrustedCertificates {
         throw GradleException("${file.name} is not a PEM or DER certificate: ${e.message}", e)
     }
 
-    /** `<prefix>-<file name>`, numbered when the file holds several certificates. */
     fun alias(file: File, index: Int, count: Int, prefix: String = APPROVED) =
         "$prefix-" + file.nameWithoutExtension.lowercase() + if (count > 1) "-${index + 1}" else ""
 
@@ -41,10 +38,7 @@ internal object TrustedCertificates {
     fun fingerprint(certificate: X509Certificate): String =
         FINGERPRINT.formatHex(MessageDigest.getInstance("SHA-256").digest(certificate.encoded))
 
-    /**
-     * Adds every certificate in [files] to [cacerts] (or replaces its contents when [replace]) and
-     * returns one line per certificate for the customisation record.
-     */
+    /** Returns one line per certificate for the customisation record. */
     fun install(cacerts: File, files: List<File>, replace: Boolean, prefix: String = APPROVED): List<String> {
         requireDistinctNames(files)
         val store = if (replace) {

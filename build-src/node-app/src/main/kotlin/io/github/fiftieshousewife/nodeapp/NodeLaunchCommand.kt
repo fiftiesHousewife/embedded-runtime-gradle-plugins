@@ -3,13 +3,9 @@ package io.github.fiftieshousewife.nodeapp
 import io.github.fiftieshousewife.appcore.tasks.LauncherTemplate.cmdQuote
 import io.github.fiftieshousewife.appcore.tasks.LauncherTemplate.shQuote
 
-/** What the launcher starts: the script under `app/` and the fixed Node options. */
 internal data class NodeLaunch(val entryPoint: String, val nodeArgs: List<String>)
 
-/**
- * The lines in `bin/<app>` that start Node.js: trust `security/trusted-cas.pem` when the archive has
- * one (from `nodeApp.security` or the runtime policy), then run the entry point.
- */
+/** Trusts `security/trusted-cas.pem` when the archive has one (from `nodeApp.security` or the runtime policy). */
 internal object NodeLaunchCommand {
     const val CA_BUNDLE = "security/trusted-cas.pem"
     private const val POSIX_CA_CERTS =

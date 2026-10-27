@@ -4,13 +4,8 @@ import java.net.Authenticator
 import java.net.PasswordAuthentication
 
 /**
- * The HTTP proxy, from the standard JVM properties Gradle already uses for every download it makes:
- * `systemProp.https.proxyHost`, `…proxyPort`, `…proxyUser`, `…proxyPassword` and
- * `systemProp.http.nonProxyHosts` in `gradle.properties`. Inside a corporate network the binary
- * repository is usually reached directly and none of this is set.
- *
- * For what Gradle doesn't download itself: npm (as `.npmrc` settings) and uploads made with the
- * JDK's `HttpClient`.
+ * The standard JVM proxy properties Gradle uses for its own downloads, passed on to what Gradle doesn't
+ * download itself: npm (as `.npmrc` settings) and uploads made with the JDK's `HttpClient`.
  */
 data class ProxySettings(val http: String?, val https: String?, val noProxy: List<String>) {
     /** Lines for an `.npmrc`; npm writes `*.example.com` as `.example.com`. */
@@ -27,17 +22,13 @@ data class ProxySettings(val http: String?, val https: String?, val noProxy: Lis
             noProxy = property("http.nonProxyHosts").orEmpty().split('|').map(String::trim).filter(String::isNotEmpty),
         )
 
-        /** The proxy's login, from `https.proxyUser`/`proxyPassword` (else the `http.` ones), if set. */
         fun proxyLogin(property: (String) -> String? = System::getProperty): PasswordAuthentication? {
             val user = property("https.proxyUser") ?: property("http.proxyUser") ?: return null
             val password = (property("https.proxyPassword") ?: property("http.proxyPassword")).orEmpty()
             return PasswordAuthentication(user, password.toCharArray())
         }
 
-        /**
-         * Answers the proxy's challenges with [proxyLogin] and the server's with [server]. One
-         * authenticator for both: `HttpClient` drops a hand-set `Authorization` header once it has one.
-         */
+        /** One for proxy and server: `HttpClient` drops a hand-set `Authorization` header once it has one. */
         fun authenticator(server: PasswordAuthentication?, property: (String) -> String? = System::getProperty) =
             object : Authenticator() {
                 private val proxy = proxyLogin(property)

@@ -49,6 +49,7 @@ javaApp {
 
 `moduleSets.set(mapOf(...))` replaces the plugin's sets with your own. Choose them from the runtimes
 you actually ship: each archive's `runtime/release` file lists its modules on its `MODULES=` line.
+[Image layers and caching](caching.md) has heuristics for choosing them.
 
 `jlinkOptions` passes options straight to `jlink`. Besides the defaults (no debug information, man
 pages or headers; compressed), some are worth knowing: `--include-locales=en,de` keeps only the

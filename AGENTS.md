@@ -215,7 +215,7 @@ catalogue pins (`node`). Node.js comes from nodejs.org through a repository decl
 `settings.gradle.kts`, since the settings plugins prefer settings repositories over the Node
 plugin's own; `BinaryRepository` counts nodejs.org as public, or it would take it for the
 organisation's binary repository. `ubi.json` is a reference example for Renovate maintainers
-(`docs/runtime-updates.md`).
+(`docs/renovate.md`).
 
 **Add a JDK vendor.** Add a `JdkDistribution` entry (vendor spec, `JdkSite`, `VersionForm`, and an
 `artifact()` built from an `ArchiveName` and the vendor's `Spelling`), `jdk-<id>-<feature>` pins in the catalogue,

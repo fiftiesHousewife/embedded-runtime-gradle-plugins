@@ -302,7 +302,9 @@ built for the machine it runs on. It takes `-PappSmokeTest.securityPolicy` or
 | [Java: modules, hardening and JDKs](docs/java.md) | jdeps and jlink, certificates and security policy, choosing a JDK distribution |
 | [Packaging and deploying](docs/packaging.md) | tar.gz, tar, zip, RPM and container images; Gradle distributions and launchers |
 | [Performance tuning](docs/performance.md) | Java Flight Recorder on the embedded runtime, heap, GC and startup |
-| [Keeping the runtime patched](docs/runtime-updates.md) | When runtime fixes come out, `checkRuntimeSupport`, Renovate presets |
+| [Keeping the runtime patched](docs/runtime-updates.md) | When runtime fixes come out, `checkRuntimeSupport` |
+| [Renovate presets](docs/renovate.md) | Pull requests for runtime pin overrides and a base image you pin yourself |
+| [Image layers and caching](docs/caching.md) | What makes images share layers, and how to choose module sets |
 | [Publishing](docs/publishing.md) | Maven repositories, signing, smoke-testing a published app |
 | [Behind a corporate binary repository](docs/binary-repository.md) | One setting per machine; the repositories to create |
 | [Reference](docs/reference.md) | Every setting and its default, every Gradle property |

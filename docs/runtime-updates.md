@@ -64,49 +64,5 @@ the URL once per machine in `~/.gradle/gradle.properties`, as with
 
 ## Renovate
 
-Two [Renovate](https://docs.renovatebot.com) presets open a pull request when a newer patch of the
-pinned runtime is out. They update overrides of the pin, in `gradle.properties` or a build script;
-the plugins themselves are updated by Renovate's own Gradle support.
-
-```json
-{
-  "extends": [
-    "config:recommended",
-    "github>fiftiesHousewife/embedded-runtime-gradle-plugins//renovate/temurin",
-    "github>fiftiesHousewife/embedded-runtime-gradle-plugins//renovate/nodejs"
-  ]
-}
-```
-
-- [`renovate/temurin.json`](../renovate/temurin.json): `javaApp.jdk.<feature>=…` and
-  `jdkVersion = "…"`, from Adoptium's releases on GitHub. Updates wait seven days, since Adoptium
-  uploads a release one target at a time. For other distributions, rely on `checkRuntimeSupport`.
-- [`renovate/nodejs.json`](../renovate/nodejs.json): `nodeApp.node.version=…` and
-  `nodeVersion = "…"`, from nodejs.org.
-
-Self-hosted Renovate needs a GitHub token (`RENOVATE_GITHUB_COM_TOKEN`, read-only) to look up
-Adoptium's releases; the hosted Renovate app has one already.
-
-Both stay within the release line: moving from Java 21 to 25 or Node.js 24 to 26 is a decision,
-not an update.
-
-### The container base image
-
-The Dockerfile's base image, `registry.access.redhat.com/ubi9/ubi-minimal` pinned by tag and
-digest, comes from the plugin release like the runtimes, so upgrading the plugin moves it. Teams
-that pass their own with `--build-arg BASE_IMAGE=…`, a registry mirror say, pin it themselves.
-[`renovate/ubi.json`](../renovate/ubi.json) is a reference example for whoever runs Renovate for
-your organisation, to copy into the central configuration and adapt. It does two things:
-
-- **Finds `BASE_IMAGE=<image>:<tag>@sha256:<digest>`** in CI configuration (GitHub Actions, GitLab
-  CI, Jenkins), Makefiles, shell scripts and `gradle.properties`, mirror registries included, and
-  updates tag and digest in one pull request: for a new minor (9.6 to 9.8), and for a rebuild of
-  the same tag, which is how Red Hat ships security fixes, under a new digest. Renovate's Docker
-  versioning keeps to tags like the current one, so `latest` and Red Hat's `9.<minor>-<build>`
-  tags are never proposed.
-- **Leaves the plugin's Dockerfile alone.** Renovate's own Dockerfile support finds the
-  `ARG BASE_IMAGE` default in the plugin's managed block, which each plugin release rewrites, so
-  the preset turns it off for that image rather than open pull requests the next build undoes.
-
-A mirror needs the same `hostRules` credentials Renovate already uses for that registry. Check an
-adapted copy with `npx --package renovate renovate-config-validator <file>`.
+Renovate can open the pull requests for you: for overrides of the runtime pins, and for a base
+image you pin yourself. The presets, and what each matches, are in [Renovate presets](renovate.md).

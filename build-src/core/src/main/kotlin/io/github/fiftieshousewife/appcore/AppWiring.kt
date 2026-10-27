@@ -4,7 +4,6 @@ import io.github.fiftieshousewife.appcore.tasks.CheckRuntimeSupport
 import io.github.fiftieshousewife.appcore.tasks.GenerateAppManifest
 import io.github.fiftieshousewife.appcore.tasks.GenerateLaunchers
 import io.github.fiftieshousewife.appcore.tasks.GenerateSbom
-import io.github.fiftieshousewife.appcore.tasks.GitValueSource
 import io.github.fiftieshousewife.appcore.tasks.InstallAiSkills
 import io.github.fiftieshousewife.appcore.tasks.WriteTextFile
 import org.gradle.api.GradleException
@@ -126,25 +125,26 @@ class AppWiring(
     val taskGroup: String get() = ecosystem.taskGroup
     val version: Provider<String> = providers.provider { project.version.toString() }
 
-    /** `-P<ecosystem>.gitCommit`, else `git rev-parse HEAD`, else `unknown` outside a checkout. */
-    val gitCommit: Provider<String> =
-        providers.gradleProperty(ecosystem.property("gitCommit")).orElse(git("rev-parse", "HEAD")).orElse("unknown")
+    /** [AppExtension.gitCommit]. */
+    val gitCommit: Provider<String> = extension.gitCommit
 
     /**
      * When the commit was made (ISO 8601), the image's `created` label: rebuilding the same commit
      * then produces the same image. Absent outside a checkout.
      */
-    val gitCommitTime: Provider<String> = git("log", "-1", "--format=%cI")
-
-    private fun git(vararg arguments: String): Provider<String> = providers.of(GitValueSource::class.java) {
-        parameters.workingDirectory.set(layout.projectDirectory)
-        parameters.arguments.set(arguments.toList())
-    }
+    val gitCommitTime: Provider<String> = Git(project).output("log", "-1", "--format=%cI")
 
     private val rpmPackages by lazy { RpmPackages(project, this) }
 
     /** The organisation's runtime policy, if one is configured; see [RuntimePolicySource]. */
-    val runtimePolicy: FileCollection = RuntimePolicySource.files(project, ecosystem.extensionName)
+    val runtimePolicy: FileCollection =
+        RuntimePolicySource.files(
+            project,
+            providers.gradleProperty(ecosystem.property("securityPolicy")).orElse(extension.securityPolicy),
+            providers.gradleProperty(
+                ecosystem.property("securityPolicyArtifact"),
+            ).orElse(extension.securityPolicyArtifact),
+        )
 
     fun applyConventions() {
         AppSettings.requireApplied(project, ecosystem.settingsPluginId)
@@ -163,8 +163,7 @@ class AppWiring(
             ),
         )
         extension.configDefaults.convention(projectDir.dir("src/deploy/conf"))
-        extension.license.convention("LicenseRef-Proprietary")
-        extension.sourceUrl.convention(git("remote", "get-url", "origin").map(SourceUrl::fromRemote))
+        ExtensionConventions(project, ecosystem).apply(extension)
         extension.archiveFormat.convention(setting("archiveFormat", ArchiveFormat::parse).orElse(ArchiveFormat.TAR_GZ))
         extension.runtimeOptions.convention(
             setting("runtimeOptions", RuntimeOptions::parse).orElse(RuntimeOptions.OPEN),
@@ -229,7 +228,7 @@ class AppWiring(
 
     /** `checkRuntimeSupport`, for the runtime this ecosystem embeds; see [CheckRuntimeSupport]. */
     fun registerRuntimeSupportCheck(runtime: Provider<EmbeddedRuntime>) =
-        CheckRuntimeSupport.register(project, ecosystem, runtime)
+        CheckRuntimeSupport.register(project, runtime, extension.runtimeSupport)
 
     /**
      * Registers the whole pipeline. [contribute] is called once per target, after the build script

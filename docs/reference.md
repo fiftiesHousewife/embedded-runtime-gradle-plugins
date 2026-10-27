@@ -24,6 +24,14 @@ javaApp {                                       // nodeApp {} has the same first
     dockerfile = file("docker/Dockerfile")      // default: Dockerfile, else src/deploy/docker/Dockerfile
     configDefaults = file("src/deploy/conf")    // shipped as conf.defaults/
     sbom = file("build/reports/bom.json")       // your own CycloneDX SBOM instead of the built-in one
+    securityPolicy = "/etc/acme/java-policy"    // a directory or zip; -PjavaApp.securityPolicy wins over this
+    securityPolicyArtifact = "com.acme:java-runtime-policy:7" // or the policy's zip by coordinates
+    gitCommit = "902c348"                       // default: -PjavaApp.gitCommit, else git rev-parse HEAD
+    runtimeSupport {                            // checkRuntimeSupport
+        url = "https://endoflife.date/api/v1/products/" // default: -PjavaApp.runtimeSupportUrl
+        warningDays = 90                        // default: -PjavaApp.endOfLifeWarningDays
+        allowEndOfLife = false                  // default: -PjavaApp.allowEndOfLife
+    }
     smokeTestEnabled = true                     // start the archive during `check`
     smokeTestTimeout = Duration.ofSeconds(60)
     allowUntestedPublish = false
@@ -63,6 +71,50 @@ nodeApp {
 }
 ```
 
+## `embeddedRuntime {}` in `settings.gradle.kts`
+
+Everything the settings plugins read, set in code. Each setting stands for the Gradle property in
+its comment and wins over it; whatever is left unset still comes from the properties, so settings
+in `~/.gradle/gradle.properties` keep working.
+
+```kotlin
+embeddedRuntime {
+    binaryRepository {
+        repository = "artifactory"              // binaryRepo.repository: borrow a repository the build declares
+        url = "https://repo.example.com"        // binaryRepo.url
+        mavenRepo = "maven-virtual"             // binaryRepo.repo.maven; likewise gradlePluginsRepo,
+        runtimesRepo = "runtimes"               // runtimesRepo, releasesRepo, snapshotsRepo, rpmRepo, npmRepo
+        allowInsecureProtocol = false           // binaryRepo.allowInsecureProtocol
+    }
+    jdk {
+        distribution = "oracle"                 // javaApp.jdk.distribution
+        pin(21, "21.0.5")                       // javaApp.jdk.21
+        yumRepo = "yum-local"                   // javaApp.jdk.yumRepo; and yumPackage
+        binaryRepo = "generic-local"            // javaApp.jdk.binaryRepo; and binaryRepoPattern,
+        revisionFormat = "[feature]_[update]"   // revisionFormat, url, pattern, localPath, localPattern
+        path(21, "windows-x64", "C:/Program Files/Java/jdk-21") // javaApp.jdk.21.windows-x64.path
+    }
+    node {
+        version = "24.22.1"                     // nodeApp.node.version; and url, pattern, binaryRepoPattern,
+        npmRegistry = "https://npm.example.com" // nodeApp.npm.registry; and npmCaFile
+    }
+}
+```
+
+## `appSmokeTest {}`, in a build applying `app-smoke-test`
+
+```kotlin
+appSmokeTest {
+    signerIdentity = "^https://github\\.com/acme/orders/\\.github/workflows/release\\.yml@refs/tags/v.*$"
+    signerIssuer = "https://token.actions.githubusercontent.com" // the default
+    sigstoreTrustedRoot = file("/etc/sigstore/trusted_root.json")
+    securityPolicy = "/etc/acme/java-policy"    // -PappSmokeTest.securityPolicy wins over this
+    healthTimeout = Duration.ofSeconds(90)
+}
+```
+
+Each defaults to the `-PappSmokeTest.<name>` property of the same name.
+
 ## Tasks
 
 | Task | Does |
@@ -89,7 +141,9 @@ nodeApp {
 
 ## Configuration
 
-Gradle properties, set in `gradle.properties`, `~/.gradle/gradle.properties` or with `-P`:
+Gradle properties, set in `gradle.properties`, `~/.gradle/gradle.properties` or with `-P`. Each can
+also be set in code: the repository and runtime ones in `embeddedRuntime {}`, the rest in
+`javaApp {}`, `nodeApp {}` or `appSmokeTest {}` as above.
 
 | Property | Default | |
 |---|---|---|

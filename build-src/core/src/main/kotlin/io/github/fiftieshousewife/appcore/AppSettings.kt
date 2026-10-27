@@ -29,16 +29,26 @@ object AppSettings {
     private const val REPOSITORIES_CONFIGURED = "io.github.fiftieshousewife.appcore.repositories"
 
     /**
-     * Runs [configure] with the binary repository, or null for the public internet. A borrowed one
-     * is declared further down `settings.gradle.kts` than the plugins block that applies this, so
-     * [configure] then runs once the settings script has finished.
+     * Runs [configure] with the binary repository, or null for the public internet, once the
+     * settings script has finished: the `embeddedRuntime {}` block ([EmbeddedRuntimeSettings]) and
+     * a borrowed repository are both written further down `settings.gradle.kts` than the plugins
+     * block that applies this.
      */
     fun withBinaryRepository(settings: Settings, configure: (BinaryRepository?) -> Unit) {
-        val borrowed = BinaryRepository.borrowedName(settings.providers)
-        if (borrowed != null) {
-            settings.gradle.settingsEvaluated { configure(BinaryRepository.borrow(this, borrowed)) }
-        } else {
-            configure(BinaryRepository.from(settings.providers))
+        val inCode = EmbeddedRuntimeSettings.on(settings)
+        if (settings.gradle.parent == null) SettingsInCode.reset()
+        settings.gradle.settingsEvaluated {
+            SettingsInCode.add(inCode.asProperties())
+            val borrowed = BinaryRepository.borrowedName(providers)
+            configure(
+                if (borrowed !=
+                    null
+                ) {
+                    BinaryRepository.borrow(this, borrowed)
+                } else {
+                    BinaryRepository.from(providers)
+                },
+            )
         }
     }
 

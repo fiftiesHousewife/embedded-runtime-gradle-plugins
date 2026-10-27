@@ -174,5 +174,30 @@ data class RepositoryLogin(val username: String, val password: String) : Seriali
     }
 }
 
-/** A Gradle property, with a blank value treated as unset so `-Pname=` clears a machine-wide setting. */
-fun ProviderFactory.setting(name: String): String? = gradleProperty(name).orNull?.takeIf { it.isNotBlank() }
+/**
+ * A setting: set in `settings.gradle.kts`'s `embeddedRuntime {}` block ([EmbeddedRuntimeSettings]),
+ * else the Gradle property of that name. A blank value counts as unset, so `-Pname=` (or setting it
+ * to "") clears a machine-wide setting.
+ */
+fun ProviderFactory.setting(name: String): String? =
+    (SettingsInCode[name] ?: gradleProperty(name).orNull)?.takeIf { it.isNotBlank() }
+
+/**
+ * The values `embeddedRuntime {}` set, by property name, recorded once the settings script has run.
+ * Kept here because the JDK toolchain resolver, which Gradle creates itself, can't see the settings;
+ * a daemon runs one build at a time, and the root build's settings plugin starts each build afresh.
+ */
+internal object SettingsInCode {
+    @Volatile
+    private var values: Map<String, String> = emptyMap()
+
+    operator fun get(name: String): String? = values[name]
+
+    fun reset() {
+        values = emptyMap()
+    }
+
+    fun add(more: Map<String, String>) {
+        values = values + more
+    }
+}

@@ -78,6 +78,28 @@ abstract class AppExtension {
      */
     abstract val sbom: RegularFileProperty
 
+    /**
+     * The organisation's runtime policy ([RuntimePolicySource]): a directory or zip, every archive
+     * is checked against before it is built. `-P<javaApp|nodeApp>.securityPolicy`, set per machine,
+     * wins over this, so a project can't loosen the policy a machine requires.
+     */
+    abstract val securityPolicy: Property<String>
+
+    /** The policy as the `group:name:version` of a zip; `-P…securityPolicyArtifact` wins over this. */
+    abstract val securityPolicyArtifact: Property<String>
+
+    /**
+     * The commit recorded in `META-INF/app.json` and the container image's labels. Defaults to
+     * `-P<javaApp|nodeApp>.gitCommit`, else `git rev-parse HEAD`, else `unknown` outside a checkout.
+     */
+    abstract val gitCommit: Property<String>
+
+    /** How `checkRuntimeSupport` judges the embedded runtime. */
+    @get:Nested
+    abstract val runtimeSupport: RuntimeSupportSettings
+
+    fun runtimeSupport(action: Action<RuntimeSupportSettings>) = action.execute(runtimeSupport)
+
     /** Default configuration shipped as `conf.defaults/`. Defaults to `src/deploy/conf`. */
     abstract val configDefaults: DirectoryProperty
 

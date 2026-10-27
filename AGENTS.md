@@ -163,6 +163,15 @@ intact; disabled-algorithm lists are extended, never replaced), copies the overl
 the CycloneDX reference model and package-url's purl builder (no timestamp, so rebuilds are
 byte-identical); `DockerfileTemplate` fills in the OCI `org.opencontainers.image.*` annotations.
 
+**Settings in code.** Every setting the settings plugins read can be set in `settings.gradle.kts`'s
+`embeddedRuntime {}` block (`EmbeddedRuntimeSettings`), whose setters are named for the Gradle
+properties they stand for (unit tests check the names). Once the settings script has run, the
+values are recorded in `SettingsInCode`, which `ProviderFactory.setting()` consults before the
+property, so every reader, the toolchain resolver included, sees them; the settings plugins
+therefore configure repositories in `settingsEvaluated`, not when applied. Project-level settings
+are extension properties whose conventions are the properties (the runtime policy is the
+exception: its machine-wide property wins over the build).
+
 **Binary repository credentials** come one of two ways. With `binaryRepo.repository`, the settings
 plugins wait for the settings script (`AppSettings.withBinaryRepository`), find that repository,
 and record its server and login (`BinaryRepository.borrow`), read with the public

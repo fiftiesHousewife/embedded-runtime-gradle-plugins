@@ -1,7 +1,6 @@
 package io.github.fiftieshousewife.appcore
 
 import io.github.fiftieshousewife.appcore.tasks.AppSmokeTest
-import io.github.fiftieshousewife.appcore.tasks.SignerIdentity
 import org.gradle.api.NamedDomainObjectProvider
 import org.gradle.api.Project
 import org.gradle.api.artifacts.ResolvableConfiguration
@@ -21,25 +20,10 @@ internal object SigstoreBundles {
     /** The OIDC issuer of GitHub Actions' identity tokens, the default `signerIssuer`. */
     const val GITHUB_ACTIONS = "https://token.actions.githubusercontent.com"
 
-    /**
-     * Makes [task] verify every archive's bundle when `appSmokeTest.signerIdentity` is set, with
-     * `appSmokeTest.signerIssuer` and `appSmokeTest.sigstoreTrustedRoot`. Those are Gradle
-     * properties, so known now: a build that doesn't verify never resolves the bundles or sigstore-java.
-     */
-    fun requireSigner(
-        project: Project,
-        archives: NamedDomainObjectProvider<ResolvableConfiguration>,
-        task: AppSmokeTest,
-    ) {
-        fun setting(name: String) = project.providers.gradleProperty("appSmokeTest.$name")
-        val signer = setting("signerIdentity").zip(setting("signerIssuer").orElse(GITHUB_ACTIONS), ::SignerIdentity)
-        val projectDir = project.layout.projectDirectory.asFile
-        task.signer.set(signer)
-        task.trustedRoot.set(project.layout.file(setting("sigstoreTrustedRoot").map(projectDir::resolve)))
-        if (signer.isPresent) {
-            task.signatures.from(of(project, archives).get().incoming.artifactView { lenient(true) }.files)
-            task.verifierClasspath.from(verifierClasspath(project))
-        }
+    /** Gives [task] each archive's bundle and the verifier, for a build that requires a signer. */
+    fun verify(project: Project, archives: NamedDomainObjectProvider<ResolvableConfiguration>, task: AppSmokeTest) {
+        task.signatures.from(of(project, archives).get().incoming.artifactView { lenient(true) }.files)
+        task.verifierClasspath.from(verifierClasspath(project))
     }
 
     /**

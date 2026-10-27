@@ -1,5 +1,6 @@
 package io.github.fiftieshousewife.nodeapp
 
+import io.github.fiftieshousewife.appcore.setting
 import org.gradle.api.provider.Provider
 import org.gradle.api.provider.ProviderFactory
 import java.util.Properties
@@ -21,5 +22,5 @@ object NodeCatalog {
     }
 
     fun nodeVersion(providers: ProviderFactory): Provider<String> =
-        providers.gradleProperty(NodeSources.VERSION).orElse(cataloguedNode)
+        providers.provider { providers.setting(NodeSources.VERSION) }.orElse(cataloguedNode)
 }

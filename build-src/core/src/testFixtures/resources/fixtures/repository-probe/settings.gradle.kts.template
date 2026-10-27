@@ -1,7 +1,10 @@
 plugins { @PLUGINS@ }
 rootProject.name = "probe"
-dependencyResolutionManagement.repositories.forEach { repo ->
-    val url = (repo as? org.gradle.api.artifacts.repositories.UrlArtifactRepository)?.url
-    println("REPO ${repo.name} $url")
+// After the settings plugins, which configure the repositories once the settings script has run.
+gradle.settingsEvaluated {
+    dependencyResolutionManagement.repositories.forEach { repo ->
+        val url = (repo as? org.gradle.api.artifacts.repositories.UrlArtifactRepository)?.url
+        println("REPO ${repo.name} $url")
+    }
+    pluginManagement.repositories.forEach { println("PLUGINS ${it.name}") }
 }
-pluginManagement.repositories.forEach { println("PLUGINS ${it.name}") }

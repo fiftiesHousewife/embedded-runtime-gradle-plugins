@@ -4,7 +4,9 @@ Artifactory, Nexus or any server with Maven-layout repositories. The examples us
 repository names; use your own with the `binaryRepo.repo.*` properties.
 
 There are two ways to point the plugins at it. Pick the first if your build already declares the
-repository, as most corporate builds do.
+repository, as most corporate builds do. Every property on this page can also be set in
+`settings.gradle.kts`, in an `embeddedRuntime {}` block ([Reference](reference.md)), which wins over
+the property: `embeddedRuntime { binaryRepository { repository = "artifactory" }; jdk { yumRepo = "yum-local" } }`.
 
 ## Your build already declares the repository
 

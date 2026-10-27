@@ -1,6 +1,7 @@
 package io.github.fiftieshousewife.nodeapp
 
 import io.github.fiftieshousewife.appcore.AppWiring
+import io.github.fiftieshousewife.appcore.setting
 import io.github.fiftieshousewife.nodeapp.tasks.GenerateNpmrc
 import io.github.fiftieshousewife.nodeapp.tasks.NodeLayout
 import io.github.fiftieshousewife.nodeapp.tasks.NpmTask
@@ -84,7 +85,7 @@ internal class NpmTasks(
                 group = NodeAppPlugin.ECOSYSTEM.taskGroup
                 description = "Writes the npm user config for the configured npm registry"
                 registry.set(sources.npmRegistry.toString())
-                caFile.set(project.providers.gradleProperty(NodeSources.NPM_CA_FILE))
+                caFile.set(project.provider { project.providers.setting(NodeSources.NPM_CA_FILE) })
                 wiring.binaryRepo?.let { credentials.set(it.login(project.providers)) }
                 outputFile.set(wiring.workDir.map { it.file("npm/npmrc") })
             }

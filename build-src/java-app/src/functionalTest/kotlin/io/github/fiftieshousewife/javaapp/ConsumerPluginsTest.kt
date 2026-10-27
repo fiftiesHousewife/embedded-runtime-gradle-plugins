@@ -80,6 +80,31 @@ class ConsumerPluginsTest {
         )
     }
 
+    @Test
+    fun `the signer and the policy can be set in the build script instead of as properties`() {
+        val policy = File(ConsumerPluginsTest::class.java.getResource("/fixtures/policy")!!.toURI())
+        val project = verifyingConsumer(published())
+        project.file(
+            "build.gradle.kts",
+            project.project.resolve("build.gradle.kts").readText() +
+                "\nappSmokeTest { signerIdentity = \"^https://github\\\\.com/example/.*$\" }\n",
+        )
+        val unsigned = project.buildAndFail("appSmokeTest").output
+        project.file(
+            "build.gradle.kts",
+            project.project.resolve("build.gradle.kts").readText()
+                .replace(
+                    Regex("appSmokeTest \\{.*}"),
+                    "appSmokeTest { securityPolicy = \"${policy.invariantSeparatorsPath}\" }",
+                ),
+        )
+        val unlocked = project.buildAndFail("appSmokeTest").output
+        assertAll(
+            { assertTrue(unsigned.contains("svc-2.0.0-$host.tar.gz has no Sigstore bundle"), unsigned) },
+            { assertTrue(unlocked.contains("breaks runtime policy acme-java-runtime 7"), unlocked) },
+        )
+    }
+
     /** A consumer that can also fetch sigstore-java, as a real one would from its binary repository. */
     private fun verifyingConsumer(repo: String) =
         consumer("deploy-check", "consumer/build.gradle.kts.template", "@REPO@" to repo).apply {

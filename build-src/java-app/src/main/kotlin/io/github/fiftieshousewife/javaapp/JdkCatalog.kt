@@ -1,5 +1,6 @@
 package io.github.fiftieshousewife.javaapp
 
+import io.github.fiftieshousewife.appcore.setting
 import org.gradle.api.GradleException
 import org.gradle.api.provider.Provider
 import org.gradle.api.provider.ProviderFactory
@@ -58,7 +59,7 @@ object JdkCatalog {
      * null. Shared by the archive and the toolchain resolver so they cannot disagree.
      */
     fun pinnedJdk(providers: ProviderFactory, distribution: JdkDistribution, feature: Int): JdkVersion? =
-        (providers.gradleProperty(JdkSources.VERSION_PREFIX + feature).orNull ?: cataloguedJdk(distribution, feature))
+        (providers.setting(JdkSources.VERSION_PREFIX + feature) ?: cataloguedJdk(distribution, feature))
             ?.let(::JdkVersion)
             ?.also(distribution::requireVersion)
 

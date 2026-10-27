@@ -68,4 +68,40 @@ class JavaAppSettingsPluginTest {
             { assertTrue(repos.any { it.startsWith("REPO nodejsDist") }, repos.toString()) },
         )
     }
+
+    @Test
+    fun `settings set in code win over the same Gradle properties`() {
+        val project =
+            TestProject(tmp).apply {
+                file(
+                    "gradle.properties",
+                    "binaryRepo.url=https://ignored.example.com\nbinaryRepo.repo.runtimes=ignored\n",
+                )
+                file("settings.gradle.kts", settingsInCode)
+            }
+        val repos = project.repositories(project.build("help").output)
+        assertAll(
+            { assertTrue(repos.contains("REPO binaryRepoJdks https://repo.example.com/jdks/"), repos.toString()) },
+            { assertFalse(repos.any { it.contains("ignored") }, repos.toString()) },
+        )
+    }
+
+    /** Settings that set the binary repository in code, and print the repositories once evaluated. */
+    private val settingsInCode =
+        """
+        plugins { id("${JavaAppSettingsPlugin.ID}") }
+        rootProject.name = "probe"
+        embeddedRuntime {
+            binaryRepository {
+                url = "https://repo.example.com"
+                runtimesRepo = "jdks"
+            }
+        }
+        gradle.settingsEvaluated {
+            dependencyResolutionManagement.repositories.forEach { repo ->
+                val url = (repo as? org.gradle.api.artifacts.repositories.UrlArtifactRepository)?.url
+                println("REPO ${'$'}{repo.name} ${'$'}url")
+            }
+        }
+        """
 }

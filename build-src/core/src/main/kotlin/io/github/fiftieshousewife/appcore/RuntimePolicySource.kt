@@ -5,20 +5,18 @@ import org.gradle.api.Project
 import org.gradle.api.file.ArchiveOperations
 import org.gradle.api.file.FileCollection
 import org.gradle.api.file.FileSystemOperations
+import org.gradle.api.provider.Provider
 import java.io.File
 
 /**
- * Where a build gets the [RuntimePolicy] from: `-P<block>.securityPolicy`, a directory or zip on
- * disk, or `-P<block>.securityPolicyArtifact`, the `group:name:version` of a zip in the build's
- * Maven repositories (normally a binary repository, so the policy is versioned and reviewed like any
- * release). Set it per machine or CI agent, in `~/.gradle/gradle.properties` or as an
- * `ORG_GRADLE_PROJECT_…` variable, where it overrides anything a project sets.
+ * Where a build gets the [RuntimePolicy] from: `securityPolicy`, a directory or zip on disk, or
+ * `securityPolicyArtifact`, the `group:name:version` of a zip in the build's Maven repositories
+ * (normally a binary repository, so the policy is versioned and reviewed like any release). Each
+ * can be set in the build, or per machine or CI agent as the `-P<block>.…` property of that name,
+ * in `~/.gradle/gradle.properties` or an `ORG_GRADLE_PROJECT_…` variable, which wins over the build.
  */
 object RuntimePolicySource {
-    fun files(project: Project, block: String): FileCollection {
-        val providers = project.providers
-        val path = providers.gradleProperty("$block.securityPolicy")
-        val artifact = providers.gradleProperty("$block.securityPolicyArtifact")
+    fun files(project: Project, path: Provider<String>, artifact: Provider<String>): FileCollection {
         val projectDir = project.layout.projectDirectory
         val dependencies = project.dependencies
         val configurations = project.configurations

@@ -305,6 +305,7 @@ built for the machine it runs on. It takes `-PappSmokeTest.securityPolicy` or
 | [Keeping the runtime patched](docs/runtime-updates.md) | When runtime fixes come out, `checkRuntimeSupport` |
 | [Renovate presets](docs/renovate.md) | Pull requests for runtime pin overrides and a base image you pin yourself |
 | [Image layers and caching](docs/caching.md) | What makes images share layers, and how to choose module sets |
+| [Testing the container image](docs/container-testing.md) | Testcontainers against the built image, and running on UBI micro |
 | [Publishing](docs/publishing.md) | Maven repositories, signing, smoke-testing a published app |
 | [Behind a corporate binary repository](docs/binary-repository.md) | One setting per machine; the repositories to create |
 | [Reference](docs/reference.md) | Every setting and its default, every Gradle property |

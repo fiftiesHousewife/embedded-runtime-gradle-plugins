@@ -5,6 +5,54 @@ log, not to a "done" list, when it lands.
 
 Last updated 2026-10-27.
 
+## Consolidation: proposals awaiting the owner's approval
+
+Proposed 2026-10-27, nothing changed yet. Today: 14 public tasks for a Java app, 69 extension
+options, 41 Gradle properties. Each row is keep, merge or drop, with what a user would change.
+
+**Tasks** (a Java app; node-app has the same shape)
+
+| Task | Proposal | Why, and what users change |
+|---|---|---|
+| `appArchive`, `appSmokeTest`, `runApp`, `jlinkFindModules`, `checkRuntimeSupport` | Keep | The jobs people run |
+| `appDockerContext` | Keep | The image entry point; the Dockerfile engine and the container smoke test hang off it |
+| `appDockerfile` | Keep as the engine's write task | With the engine it writes a Dockerfile and its variants; `check` reports drift |
+| `appDockerContextFile`, `appVerifyPublishable`, `jdeps` | Make internal (no group) | Steps of other tasks; nobody calls them |
+| `appRpm` | Keep | Only present with `rpm { enabled = true }` |
+| `appPublishRpm` | Merge into `publish` | One publish; the RPM goes up when RPMs are enabled |
+| `aiSkills` | Drop from the plugins | Unrelated to packaging; the AI files ship through `ai/` and the Claude plugin |
+
+**`javaApp {}` / `nodeApp {}`**
+
+| Option | Proposal | Why, and what users change |
+|---|---|---|
+| `appName`, `targets`, `license`, `configDefaults`, `jvmArgs`, `nodeArgs`, `entryPoint`, `appFiles`, `buildScript`, `testScript`, `runtimeOverlay`, `sbom` | Keep | Each is a real choice per app |
+| `sourceUrl`, `gitCommit` | Derive only | From the `origin` remote and `HEAD`; nobody sets them |
+| `dockerfile` | Drop | Always the project root's `Dockerfile` (and its variants) |
+| `archiveFormat` | Drop | Each target gets its OS's format (tar.gz, zip on Windows) |
+| `jdkVersion`, `nodeVersion` | Drop the DSL | One way to set a version: `javaApp.jdk.<feature>` / `nodeApp.node.version` |
+| `jlinkModules` | Drop | `additionalModules` adds to jdeps' list, `moduleSets` shares them; full control is rare |
+| `sharedModuleSets` | Merge into `moduleSets` | An empty `moduleSets` turns sharing off |
+| `jlinkOptions` | Drop | The defaults (strip, compress) are right for servers |
+| `runtimeDefaults { 6 }` | Collapse to `runtimeDefaults = true/false` | Heap share, OOM handling and GC are `jvmArgs` when someone needs them |
+| `runtimeOptions` | Drop the DSL | Locking is an organisation's decision: the runtime policy keeps it |
+| `securityPolicy`, `securityPolicyArtifact` | Merge | One `securityPolicy`: a path, or `group:name:version` |
+| `security { disabledTlsAlgorithms, disabledCertPathAlgorithms, disabledJarAlgorithms }` | Merge | One `disableAlgorithms(kind, …)`; the policy file already does it in one place |
+| `security { propertiesFiles, properties }` | Merge | `properties` only; a file's content is `properties.putAll(…)` |
+| `rpm { 10 }` | Collapse to `enabled`, `user`, `systemd` | Summary, licence and URL come from the project; release and vendor are dropped |
+| `smokeTestTimeout`, `allowUntestedPublish` | Properties only | Machine or CI choices, not the app's |
+| `runtimeSupport { url, warningDays, allowEndOfLife }` | Properties only | Machine-wide already; the DSL block duplicates them |
+| `ignoreInstallScripts`, `portableInstallScripts` | Merge | One `installScripts` list: none, or the portable ones named |
+
+**Gradle properties**
+
+| Property | Proposal | Why |
+|---|---|---|
+| `binaryRepo.url`, `.repository`, login | Keep | The two ways to reach a binary repository |
+| `binaryRepo.repo.*` (7 names) | Keep, documented as rarely needed | Defaults match Artifactory's usual names |
+| `javaApp.jdk.url`, `.pattern`, `.binaryRepo`, `.binaryRepoPattern`, `.localPath`, `.localPattern`, `.yumRepo`, `.yumPackage`, `.revisionFormat`, `.token.*` | Merge into `javaApp.jdk.source` + `javaApp.jdk.pattern` | Eleven ways to say where a JDK is: one URL (`https:`, `file:`, or a YUM repository) and one pattern |
+| `nodeApp.node.url`, `.pattern`, `.binaryRepoPattern`, `.token.*` | Same merge | As for the JDK |
+
 ## Next: Dockerfiles parsed and rewritten with OpenRewrite
 
 Decided 2026-10-27: one engine creates and updates the Dockerfile. `org.openrewrite:rewrite-docker`

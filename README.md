@@ -11,7 +11,7 @@ installed, and the archive that passes CI is the archive that runs in production
 
 | Plugin | For | Embeds |
 |---|---|---|
-| `io.github.fiftieshousewife.java-app` | Java and Kotlin/JVM apps | A jlink-trimmed JDK from Temurin, Oracle, Corretto, Zulu, Liberica, Microsoft or SapMachine |
+| `io.github.fiftieshousewife.java-app` | Java and Kotlin/JVM apps | A jlink-trimmed JDK from Oracle, Temurin, Corretto, Zulu, Liberica, Microsoft or SapMachine |
 | `io.github.fiftieshousewife.node-app` | Node.js apps | The official Node.js runtime |
 | `io.github.fiftieshousewife.app-smoke-test` | Any build checking a published app | |
 
@@ -95,9 +95,9 @@ javaApp {
     allowUntestedPublish = true                // publish the targets this machine couldn't start
 
     // The runtime: an exact JDK, compiled with and embedded. The vendor is a Gradle property
-    // (javaApp.jdk.distribution=temurin, oracle, corretto, zulu, liberica, microsoft, sapmachine).
-    javaVersion = 21                           // 11 to 27
-    jdkVersion = "21.0.12.1+1"                 // default: the plugin's pin for javaVersion
+    // (javaApp.jdk.distribution=oracle, temurin, corretto, zulu, liberica, microsoft, sapmachine).
+    javaVersion = 25                           // 11 to 27
+    jdkVersion = "25.0.3"                      // pinned by the plugin only for Temurin's LTS releases
 
     // jlink links only the modules jdeps finds, plus these, which code loads by name at runtime
     // (`./gradlew jlinkFindModules` finds them by running the app).
@@ -144,8 +144,9 @@ Put the machine's settings in `gradle.properties` or `~/.gradle/gradle.propertie
 `ORG_GRADLE_PROJECT_…` variables in CI:
 
 ```properties
-# the JDK vendor
-javaApp.jdk.distribution=temurin
+# the JDK vendor, and its exact version
+javaApp.jdk.distribution=oracle
+javaApp.jdk.25=25.0.3
 # the repository settings.gradle.kts already declares: its server and credentials are used for
 # runtimes, npm and publishing (see "Behind a corporate binary repository")
 binaryRepo.repository=artifactory

@@ -249,7 +249,7 @@ To use JDKs you already have instead of downloading them, point at a shared dire
 laid out like the [binary repository's runtimes repository](binary-repository.md#repositories-to-create):
 
 ```properties
-# /shared/jdks/temurin/jdk/21.0.12.1_1/jdk-21.0.12.1_1-linux-x64.tar.gz
+# /shared/jdks/oracle/jdk/25.0.3/jdk-25.0.3-linux-x64.tar.gz
 javaApp.jdk.localPath=/shared/jdks
 ```
 

@@ -36,8 +36,8 @@ javaApp {                                       // nodeApp {} has the same first
     smokeTestTimeout = Duration.ofSeconds(60)
     allowUntestedPublish = false
 
-    javaVersion = 21                            // 11 to 27
-    jdkVersion = "21.0.13+9"                    // default: the plugin's pin
+    javaVersion = 25                            // 11 to 27
+    jdkVersion = "25.0.3"                       // default: the plugin's pin (Temurin's LTS releases only)
     additionalModules = listOf("jdk.crypto.ec") // added to what jdeps finds
     jlinkModules = listOf("java.base")          // instead: exactly these modules
     sharedModuleSets = true                     // link the smallest shared set holding them; default: -PjavaApp.sharedModuleSets
@@ -151,7 +151,7 @@ also be set in code: the repository and runtime ones in `embeddedRuntime {}`, th
 | Property | Default | |
 |---|---|---|
 | `javaApp.jdk.distribution` | `temurin` | JDK vendor |
-| `javaApp.jdk.<feature>` | the plugin's pin | Exact JDK version, e.g. `javaApp.jdk.21=21.0.13+9` |
+| `javaApp.jdk.<feature>` | the plugin's pin (Temurin's LTS releases) | Exact JDK version, e.g. `javaApp.jdk.25=25.0.3` |
 | `javaApp.jdk.url`, `javaApp.jdk.pattern` | the vendor's site | Download JDKs from a mirror |
 | `javaApp.jdk.localPath`, `javaApp.jdk.localPattern` | | Read JDK archives from a shared directory |
 | `javaApp.jdk.<feature>.<target>.path` | | One JDK, as a directory or archive, e.g. `javaApp.jdk.21.linux-x64.path` |

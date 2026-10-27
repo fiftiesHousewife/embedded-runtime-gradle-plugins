@@ -139,7 +139,7 @@ The JDK refuses Basic proxy authentication for HTTPS tunnels by default; to allo
 JDK and Node.js archives are read from `runtimes` in this layout:
 
 ```
-runtimes/temurin/jdk/21.0.12.1_1/jdk-21.0.12.1_1-linux-x64.tar.gz
+runtimes/oracle/jdk/25.0.3/jdk-25.0.3-linux-x64.tar.gz
 runtimes/nodejs/node/24.22.1/node-24.22.1-linux-x64.tar.gz
 ```
 
@@ -154,7 +154,7 @@ can be used as it is, by giving its pattern:
 javaApp.jdk.binaryRepoPattern=jdks/[organisation]/[classifier]/[revision].[ext]
 ```
 
-A pattern can use `[organisation]` (the distribution, e.g. `temurin`, or `nodejs`), `[module]` and
+A pattern can use `[organisation]` (the distribution, e.g. `oracle`, or `nodejs`), `[module]` and
 `[artifact]` (both `jdk` or `node`), `[revision]` (the version, with `+` written as `_`) and `[ext]`
 (`tar.gz`, or `zip` for a Windows runtime), and these for the target, shown for `linux-x64` and
 `linux-aarch64`:

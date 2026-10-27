@@ -69,7 +69,12 @@ data class BinaryRepository(
             "repo.maven.apache.org", "repo1.maven.org", "central.sonatype.com", "oss.sonatype.org",
             "s01.oss.sonatype.org", "plugins.gradle.org", "plugins-artifacts.gradle.org", "repo.gradle.org",
             "maven.google.com", "dl.google.com", "jitpack.io", "jcenter.bintray.com",
+            // The Node.js downloads the node-app plugin defaults to, and the Node Gradle plugin's.
+            "nodejs.org",
         )
+
+        /** Whether [url] is a public repository's, which is never taken for the organisation's own. */
+        internal fun isPublic(url: URI) = PUBLIC_HOSTS.any { url.host == it || url.host.endsWith(".$it") }
         const val MAVEN_REPO = "binaryRepo.repo.maven"
         const val GRADLE_PLUGINS_REPO = "binaryRepo.repo.gradlePlugins"
         const val RUNTIMES_REPO = "binaryRepo.repo.runtimes"
@@ -119,8 +124,7 @@ data class BinaryRepository(
                 .filterIsInstance<UrlArtifactRepository>()
                 .filter { repo ->
                     val url = repo.url
-                    url.scheme in setOf("http", "https") &&
-                        PUBLIC_HOSTS.none { url.host == it || url.host.endsWith(".$it") }
+                    url.scheme in setOf("http", "https") && !isPublic(url)
                 }
             val servers = own.groupBy { URI.create(it.url.toString().trimEnd('/') + "/").resolve("..") }
             if (servers.size > 1) {

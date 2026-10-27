@@ -2,7 +2,7 @@
 // that `./gradlew build`, `check` and `publish` at the repository root do the expected thing.
 plugins {
     base
-    alias(libs.plugins.gradle.node)
+    id("embedded-runtime.renovate-presets")
 }
 
 description = "Gradle plugins that package Java and Node.js apps with their runtime embedded"
@@ -78,24 +78,3 @@ val verifyAiSkills =
         }
     }
 tasks.named("check") { dependsOn(verifyAiSkills) }
-
-// Renovate presets in renovate/: Renovate's own validator, on the Node.js the catalogue pins.
-// Renovate's version and lockfile sit beside the presets, where Renovate keeps them current.
-node {
-    version = libs.versions.node
-    download = true
-    distBaseUrl = null
-    nodeProjectDir = layout.projectDirectory.dir("renovate")
-    npmInstallCommand = "ci"
-}
-val validateRenovatePresets =
-    tasks.register<com.github.gradle.node.npm.task.NpxTask>("validateRenovatePresets") {
-        group = "verification"
-        description = "Checks the Renovate presets in renovate/ with Renovate's config validator"
-        dependsOn(tasks.named("npmInstall"))
-        val presets = layout.projectDirectory.dir("renovate").asFileTree.matching { include("*.json").exclude("package.json", "package-lock.json") }
-        inputs.files(presets)
-        command = "renovate-config-validator"
-        args = presets.elements.map { files -> files.map { it.asFile.absolutePath }.sorted() }
-    }
-tasks.named("check") { dependsOn(validateRenovatePresets) }

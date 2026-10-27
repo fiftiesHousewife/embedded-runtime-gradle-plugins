@@ -11,14 +11,14 @@ that links into `docs/`.
 build-logic/                included build: the build's own tooling
   conventions/              convention plugins: embedded-runtime.kotlin, .gradle-plugin, .central-release
   detekt-rules/             the repository's own detekt rules (FileLength, CommentDensity)
+  renovate-validator/       Renovate's validator (package.json, lockfile) for validateRenovatePresets
   detekt.yml                deviations from detekt's defaults only
 plugins/                    included build: what is published
   app-core/                 io.github.fiftieshousewife:app-core      package …appcore (+ app-smoke-test plugin)
   java-app/                 io.github.fiftieshousewife:java-app      package …javaapp
   node-app/                 io.github.fiftieshousewife:node-app      package …nodeapp
 samples/                    builds of their own, included by the root build; CI builds each with -p
-renovate/                   presets for users (temurin, nodejs; ubi, a reference example), and the
-                            validator validateRenovatePresets runs on them (package.json, lockfile)
+renovate/                   presets for users: temurin, nodejs; ubi, a reference example
 docs/                       user documentation, linked from the README; article.md is the article's home
 ai/                         the AI assistant files the plugins ship: skills, the shared post-edit hook,
                             Copilot and Devin hook configs, the Claude plugin (see ai/README.md); ./gradlew
@@ -200,7 +200,7 @@ the Node.js pin (`node`) and the Dockerfile base image (`ubi-minimal-tag` and `u
 `jdks.properties`, `node.properties` and `version.properties` in the jars by `jdkPins`, `nodePin` and
 `versionResource`. Outside it by necessity: the Gradle version (`gradle-wrapper.properties`), Kotlin
 (embedded in Gradle, used by `kotlin-dsl`), and CI's setup versions (`.github/workflows/ci.yml`). Renovate's own version is in
-`renovate/package.json` and its lockfile, which Renovate's npm support updates (a
+`build-logic/renovate-validator/package.json` and its lockfile, which Renovate's npm support updates (a
 catalogue version names no Maven module, so Renovate would not).
 
 **Bump runtime pins.** Edit the `jdk-…` or `node` version in `gradle/libs.versions.toml`. A pin must resolve on **every** supported target: vendors upload a
@@ -211,8 +211,8 @@ URL shape, not that the file exists). The `every catalogue pin…` test checks e
 move together; take the digest from the registry as the comment there says.
 
 **Renovate presets** in `renovate/` are checked by `validateRenovatePresets` (part of the root
-`check`): Renovate's own validator, run with npx by the Node Gradle plugin on the Node.js the
-catalogue pins (`node`). Node.js comes from nodejs.org through a repository declared in
+`check`, from the `embedded-runtime.renovate-presets` convention): Renovate's own validator, run with
+npx by the Node Gradle plugin on the Node.js the catalogue pins (`node`). Node.js comes from nodejs.org through a repository declared in
 `settings.gradle.kts`, since the settings plugins prefer settings repositories over the Node
 plugin's own; `BinaryRepository` counts nodejs.org as public, or it would take it for the
 organisation's binary repository. `ubi.json` is a reference example for Renovate maintainers

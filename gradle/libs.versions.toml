@@ -26,7 +26,7 @@ spring-boot = "4.1.2"
 
 # The build's own tools.
 # Runs Renovate's config validator on renovate/ (validateRenovatePresets, part of check), with the
-# Node.js pinned below; Renovate's own version is in tools/renovate-validator/package.json.
+# Node.js pinned below; Renovate's own version is in build-logic/renovate-validator/package.json.
 gradle-node-plugin = "7.1.0"
 jacoco = "0.8.15"
 # Bytecode level of the plugins: Gradle 9 runs on Java 17 or newer.
@@ -124,6 +124,4 @@ gradle-spotless = { module = "com.diffplug.spotless:com.diffplug.spotless.gradle
 gradle-detekt = { module = "dev.detekt:dev.detekt.gradle.plugin", version.ref = "detekt" }
 gradle-forbiddenapis = { module = "de.thetaphi:forbiddenapis", version.ref = "forbiddenapis" }
 gradle-dokka = { module = "org.jetbrains.dokka:dokka-gradle-plugin", version.ref = "dokka" }
-
-[plugins]
-gradle-node = { id = "com.github.node-gradle.node", version.ref = "gradle-node-plugin" }
+gradle-node = { module = "com.github.node-gradle:gradle-node-plugin", version.ref = "gradle-node-plugin" }

@@ -16,6 +16,7 @@ dependencies {
     implementation(libs.gradle.detekt)
     implementation(libs.gradle.forbiddenapis)
     implementation(libs.gradle.dokka)
+    implementation(libs.gradle.node)
 }
 
 // The release logic (CentralBundle, CentralPortal) is tested like any other code.

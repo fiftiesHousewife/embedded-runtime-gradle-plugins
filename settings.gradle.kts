@@ -5,6 +5,8 @@
 // can. Dogfooding them here means a change that breaks consumers breaks this build too.
 pluginManagement {
     includeBuild("plugins")
+    // The build's own tooling: here, the Renovate preset check (embedded-runtime.renovate-presets).
+    includeBuild("build-logic")
 }
 
 plugins {
@@ -19,7 +21,7 @@ rootProject.name = "embedded-runtime-gradle-plugins"
 listOf("java-service", "spring-boot-service", "node-service", "docker-service", "release-check")
     .forEach { includeBuild("samples/$it") }
 
-// Node.js for the Node plugin (validateRenovatePresets). The settings plugins prefer settings
+// Node.js for validateRenovatePresets. The settings plugins prefer settings
 // repositories, so this one is declared here rather than by the Node plugin, for its one module.
 dependencyResolutionManagement {
     repositories {

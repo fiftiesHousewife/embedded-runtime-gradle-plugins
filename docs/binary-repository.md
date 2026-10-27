@@ -16,7 +16,7 @@ Nothing is copied into a new property, and your build's own repositories are lef
 ```kotlin
 // settings.gradle.kts: what your build already has
 plugins {
-    id("io.github.fiftieshousewife.java-app.settings") version "0.0.3"
+    id("io.github.fiftieshousewife.java-app.settings") version "0.0.4"
 }
 dependencyResolutionManagement {
     repositories {

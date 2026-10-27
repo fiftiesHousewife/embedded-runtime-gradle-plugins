@@ -40,8 +40,7 @@ and `./gradlew aiSkills` to install them in a project. Prompt files were dropped
 
 ## Older open items
 
-- **Gradle Plugin Portal**, optional on top of Maven Central (0.0.3 released there on 2026-10-26 as
-  the deployment `embedded-runtime-gradle-plugins-0.0.3`): `publishPlugins`, its own key, manual
+- **Gradle Plugin Portal**, optional on top of Maven Central (0.0.4, the latest, released there on 2026-10-27): `publishPlugins`, its own key, manual
   review.
 - Signing RPMs: the plugin doesn't sign the RPMs it builds (archives are signed with Sigstore).
   dnf can check them through the repository's GPG-signed metadata (`repo_gpgcheck=1`, documented

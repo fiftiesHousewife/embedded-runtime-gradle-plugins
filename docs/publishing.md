@@ -63,7 +63,7 @@ out, with the same smoke test the app's own build runs:
 ```kotlin
 // build.gradle.kts of the checking build
 plugins {
-    id("io.github.fiftieshousewife.app-smoke-test") version "0.0.3"
+    id("io.github.fiftieshousewife.app-smoke-test") version "0.0.4"
 }
 repositories { maven("https://repo.example.com/libs-release-local") }
 dependencies { smokeTest("com.example:orders-service:1.4.2") }

@@ -1,0 +1,8 @@
+{
+  "name": "renovate-validator",
+  "private": true,
+  "description": "Renovate's config validator, run on the presets in renovate/ by ./gradlew validateRenovatePresets (part of check). Renovate keeps this version and the lockfile up to date.",
+  "devDependencies": {
+    "renovate": "44.190.0"
+  }
+}

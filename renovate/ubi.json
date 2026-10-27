@@ -1,10 +1,10 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "description": "Reference example for Renovate server maintainers: keep a UBI 9 base image pinned by tag and digest up to date. One pull request moves the tag and digest together, for a new minor (9.8 to 9.9) or for a rebuild of the same tag, which Red Hat publishes for security fixes under a new digest. Stays within UBI 9: UBI 10 is another image name, a decision rather than an update. Copy and adapt the file patterns and key names to your repositories.",
+  "description": "Reference example: keep a base image override pinned by tag and digest (BASE_IMAGE=<image>:<tag>@sha256:<digest>) up to date, and leave the plugin-managed Dockerfile to plugin releases.",
   "customManagers": [
     {
       "customType": "regex",
-      "description": "A base image override, BASE_IMAGE=<image>:<tag>@sha256:<digest>, in CI configuration, scripts or properties: a registry mirror or another base image passed with --build-arg. Not the Dockerfile, whose plugin-managed block each plugin release rewrites.",
+      "description": "BASE_IMAGE=<image>:<tag>@sha256:<digest> in CI configuration, scripts or gradle.properties",
       "managerFilePatterns": [
         "/(^|/)\\.github/workflows/[^/]+\\.ya?ml$/",
         "/(^|/)\\.gitlab-ci\\.ya?ml$/",
@@ -14,47 +14,21 @@
         "/(^|/)gradle\\.properties$/"
       ],
       "matchStrings": [
-        "BASE_IMAGE[=:]\\s*\"?(?<depName>[a-z0-9.-]+(?::\\d+)?/[a-z0-9._/-]*ubi9/ubi-minimal):(?<currentValue>9\\.\\d+)@(?<currentDigest>sha256:[0-9a-f]{64})"
+        "BASE_IMAGE[=:]\\s*\"?(?<depName>[^\\s\"@:]+(?::\\d+)?/[^\\s\"@:]+):(?<currentValue>[^\\s\"@]+)@(?<currentDigest>sha256:[0-9a-f]{64})"
       ],
-      "datasourceTemplate": "docker",
-      "versioningTemplate": "docker"
-    },
-    {
-      "customType": "regex",
-      "description": "A tag and digest kept as separate, adjacent values, as in a version catalogue: ubi-minimal-tag = \"9.8\" then ubi-minimal-digest = \"sha256:…\". Rename the keys and the file pattern for your own catalogue.",
-      "managerFilePatterns": [
-        "/(^|/)gradle/libs\\.versions\\.toml$/"
-      ],
-      "matchStrings": [
-        "ubi-minimal-tag\\s*=\\s*\"(?<currentValue>[^\"]+)\"\\s*\\nubi-minimal-digest\\s*=\\s*\"(?<currentDigest>sha256:[0-9a-f]{64})\""
-      ],
-      "autoReplaceStringTemplate": "ubi-minimal-tag = \"{{{newValue}}}\"\nubi-minimal-digest = \"{{{newDigest}}}\"",
-      "depNameTemplate": "registry.access.redhat.com/ubi9/ubi-minimal",
-      "datasourceTemplate": "docker",
-      "versioningTemplate": "docker"
+      "datasourceTemplate": "docker"
     }
   ],
   "packageRules": [
     {
-      "matchDatasources": [
-        "docker"
-      ],
-      "matchPackageNames": [
-        "/(^|/)ubi9/ubi-minimal$/"
-      ],
-      "allowedVersions": "/^9\\.\\d+$/",
-      "groupName": "UBI base image",
-      "description": "Plain 9.<minor> tags only: Red Hat also publishes 9.<minor>-<build> tags and latest."
-    },
-    {
+      "description": "The ARG BASE_IMAGE default in a java-app or node-app Dockerfile is rewritten by each plugin release: update the plugin, not the line.",
       "matchManagers": [
         "dockerfile"
       ],
       "matchPackageNames": [
         "/(^|/)ubi9/ubi-minimal$/"
       ],
-      "enabled": false,
-      "description": "The ARG BASE_IMAGE default in a java-app or node-app Dockerfile belongs to the plugin, which rewrites it from each release; update the plugin instead."
+      "enabled": false
     }
   ]
 }

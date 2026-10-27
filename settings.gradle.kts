@@ -13,3 +13,20 @@ plugins {
 }
 
 rootProject.name = "embedded-runtime-gradle-plugins"
+
+// Node.js for the Node plugin (validateRenovatePresets). The settings plugins prefer settings
+// repositories, so this one is declared here rather than by the Node plugin, for its one module.
+dependencyResolutionManagement {
+    repositories {
+        exclusiveContent {
+            forRepository {
+                ivy("https://nodejs.org/dist/") {
+                    name = "Node.js"
+                    patternLayout { artifact("v[revision]/[artifact](-v[revision]-[classifier]).[ext]") }
+                    metadataSources { artifact() }
+                }
+            }
+            filter { includeModule("org.nodejs", "node") }
+        }
+    }
+}

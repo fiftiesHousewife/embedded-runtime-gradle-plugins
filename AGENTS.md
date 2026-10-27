@@ -26,6 +26,7 @@ ai/                         the AI assistant files the plugins ship: skills, the
 gradle/init.d/              init script for machines behind a binary repository
 gradle/libs.versions.toml   the one version catalogue, shared by every build here
 samples/                    a Java and a Node service, built in CI end to end
+tools/renovate-validator/   Renovate's config validator (package.json and lockfile) for validateRenovatePresets
 ```
 
 The root build applies **both** settings plugins to itself, so a change that breaks consumers, or
@@ -197,16 +198,24 @@ JaCoCo and bytecode level, and what the plugins embed. The JDK pins (`jdk-<distr
 the Node.js pin (`node`) and the Dockerfile base image (`ubi-minimal-tag` and `ubi-minimal-digest`) are written into
 `jdks.properties`, `node.properties` and `version.properties` in the jars by `jdkPins`, `nodePin` and
 `versionResource`. Outside it by necessity: the Gradle version (`gradle-wrapper.properties`), Kotlin
-(embedded in Gradle, used by `kotlin-dsl`), and CI's setup versions (`.github/workflows/ci.yml`).
+(embedded in Gradle, used by `kotlin-dsl`), and CI's setup versions (`.github/workflows/ci.yml`). Renovate's own version is in
+`tools/renovate-validator/package.json` and its lockfile, which Renovate's npm support updates (a
+catalogue version names no Maven module, so Renovate would not).
 
 **Bump runtime pins.** Edit the `jdk-…` or `node` version in `gradle/libs.versions.toml`. A pin must resolve on **every** supported target: vendors upload a
 release one platform at a time, so check all five URLs exist before pinning (the unit tests prove the
 URL shape, not that the file exists). The `every catalogue pin…` test checks each pin's form.
 
 **Bump the Dockerfile base image.** `ubi-minimal-tag` and `ubi-minimal-digest` in the catalogue
-move together; take the digest from the registry as the comment there says. The catalogue's two
-lines are also the second example in `renovate/ubi.json` (a reference for Renovate maintainers,
-documented in `docs/runtime-updates.md`), so keep them adjacent and in that order.
+move together; take the digest from the registry as the comment there says.
+
+**Renovate presets** in `renovate/` are checked by `validateRenovatePresets` (part of the root
+`check`): Renovate's own validator, run with npx by the Node Gradle plugin on the Node.js the
+catalogue pins (`node`). Node.js comes from nodejs.org through a repository declared in
+`settings.gradle.kts`, since the settings plugins prefer settings repositories over the Node
+plugin's own; `BinaryRepository` counts nodejs.org as public, or it would take it for the
+organisation's binary repository. `ubi.json` is a reference example for Renovate maintainers
+(`docs/runtime-updates.md`).
 
 **Add a JDK vendor.** Add a `JdkDistribution` entry (vendor spec, `JdkSite`, `VersionForm`, and an
 `artifact()` built from an `ArchiveName` and the vendor's `Spelling`), `jdk-<id>-<feature>` pins in the catalogue,

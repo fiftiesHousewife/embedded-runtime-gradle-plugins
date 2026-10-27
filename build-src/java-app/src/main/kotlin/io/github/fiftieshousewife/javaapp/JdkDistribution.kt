@@ -229,6 +229,17 @@ enum class JdkDistribution(
     /** The JDK's package name in a YUM repository, where the vendor fixes one: Oracle's `jdk-21`. */
     val yumPackage: String? get() = if (this == ORACLE) "jdk-[feature]" else null
 
+    /** The `IMPLEMENTOR` this distribution's JDKs write in their `release` file. */
+    val implementor: String get() = when (this) {
+        TEMURIN -> "Eclipse Adoptium"
+        ORACLE -> "Oracle Corporation"
+        CORRETTO -> "Amazon.com Inc."
+        ZULU -> "Azul Systems, Inc."
+        LIBERICA -> "BellSoft"
+        MICROSOFT -> "Microsoft"
+        SAPMACHINE -> "SAP SE"
+    }
+
     /** The product's name on endoflife.date, which `checkRuntimeSupport` asks. */
     val supportProduct: String get() = when (this) {
         TEMURIN -> "eclipse-temurin"

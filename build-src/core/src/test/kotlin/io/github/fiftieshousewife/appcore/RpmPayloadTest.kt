@@ -32,21 +32,52 @@ class RpmPayloadTest {
             addFile("$home/bin/java", java, OCTAL_755)
             addLink("$home/legal/LICENSE", "../release")
             addLink("$home/bin/java-absolute", "$home/bin/java")
+            addLink("$home/bin/java-chained", "java-absolute")
+            addLink("$home/conf", "bin")
+            addLink("$home/lib/security/cacerts", "/etc/pki/java/cacerts")
+            addLink("$home/loop-a", "loop-b")
+            addLink("$home/loop-b", "loop-a")
         }.build(tmp)
         return tmp.resolve(built)
     }
 
     @Test
-    fun `a JDK's home is found wherever the package installs it, with modes and links intact`() {
+    fun `a JDK's home is found wherever the package installs it, with its modes`() {
         val unpacked = tmp.resolve("unpacked")
         RpmPayload.unpack(jdkRpm(), unpacked)
         val home = RpmPayload.home(unpacked, "release", "jdk.rpm")
         assertAll(
             { assertEquals("jdk-21.0.5-oracle-x64", home.name) },
             { assertTrue(home.resolve("bin/java").canExecute()) },
-            { assertTrue(Files.isSymbolicLink(home.resolve("legal/LICENSE").toPath())) },
+        )
+    }
+
+    /** Windows can't create links without privileges, so every link is written as what it points to. */
+    @Test
+    fun `links become copies of their targets, relative, absolute, chained or to a directory`() {
+        val unpacked = tmp.resolve("unpacked")
+        RpmPayload.unpack(jdkRpm(), unpacked)
+        val home = RpmPayload.home(unpacked, "release", "jdk.rpm")
+        val copies = listOf("legal/LICENSE", "bin/java-absolute", "bin/java-chained", "conf/java").map(home::resolve)
+        assertAll(
+            { assertTrue(copies.none { Files.isSymbolicLink(it.toPath()) }, copies.toString()) },
             { assertEquals("JAVA_VERSION=\"21.0.5\"\n", home.resolve("legal/LICENSE").readText()) },
-            { assertEquals("java", Files.readSymbolicLink(home.resolve("bin/java-absolute").toPath()).toString()) },
+            { assertEquals("#!/bin/sh\n", home.resolve("bin/java-absolute").readText()) },
+            { assertEquals("#!/bin/sh\n", home.resolve("bin/java-chained").readText()) },
+            { assertTrue(home.resolve("bin/java-chained").canExecute()) },
+            { assertTrue(home.resolve("conf").isDirectory && home.resolve("conf/java").isFile) },
+        )
+    }
+
+    @Test
+    fun `links outside the package, or in a loop, are left out and reported`() {
+        val unpacked = tmp.resolve("unpacked")
+        val skipped = RpmPayload.unpack(jdkRpm(), unpacked)
+        val home = RpmPayload.home(unpacked, "release", "jdk.rpm")
+        assertAll(
+            { assertTrue(!home.resolve("lib/security/cacerts").exists()) },
+            { assertEquals(3, skipped.size, skipped.toString()) },
+            { assertTrue(skipped.any { it.endsWith("cacerts -> /etc/pki/java/cacerts") }, skipped.toString()) },
         )
     }
 

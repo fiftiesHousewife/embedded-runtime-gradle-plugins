@@ -203,6 +203,15 @@ on, but not for another one, which is why a cross build needs the jmods.
 
 To download from a mirror instead, see `javaApp.jdk.url` under [Configuration](reference.md#configuration).
 
+### The JDK running the build
+
+When the JDK running Gradle is exactly the pinned one (the same distribution, by the `IMPLEMENTOR`
+in its `release` file, and the same version) and jlink can link from it (it has `jmods/`, or the
+vendor ships those separately), this machine's archive embeds it directly: nothing is downloaded or
+unpacked for this machine's target. Other targets are fetched as usual. Set
+`javaApp.jdk.reuseRunning=false` (or `embeddedRuntime { jdk { reuseRunning = false } }`) to always
+use the configured source instead.
+
 ### JDKs already on disk
 
 To use JDKs you already have instead of downloading them, point at a shared directory of archives,

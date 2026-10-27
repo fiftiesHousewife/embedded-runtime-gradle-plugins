@@ -2,11 +2,13 @@ package io.github.fiftieshousewife.nodeapp
 
 import io.github.fiftieshousewife.appcore.Arch
 import io.github.fiftieshousewife.appcore.BinaryRepository
+import io.github.fiftieshousewife.appcore.CustomTokens
 import io.github.fiftieshousewife.appcore.Os
 import io.github.fiftieshousewife.appcore.RuntimeArtifact
 import io.github.fiftieshousewife.appcore.RuntimeRepository
 import io.github.fiftieshousewife.appcore.Target
 import io.github.fiftieshousewife.appcore.setting
+import io.github.fiftieshousewife.appcore.settingsPrefixedBy
 import org.gradle.api.provider.ProviderFactory
 import java.net.URI
 
@@ -37,7 +39,12 @@ class NodeSources(private val binaryRepo: BinaryRepository?, private val overrid
         RuntimeArtifact(GROUP, "node", version, "node", distClassifier(target), target.archiveExtension)
     } else {
         // Renamed on upload to the archive's own target ids, as for JDKs.
-        repository.curated("node", version, target)
+        repository.curated(
+            "node",
+            version,
+            target,
+            mapOf("version" to version) + overrides.customTokens.forTarget(target),
+        )
     }
 
     val npmRegistry: URI
@@ -67,6 +74,9 @@ class NodeSources(private val binaryRepo: BinaryRepository?, private val overrid
         const val NPM_REGISTRY = "nodeApp.npm.registry"
         const val BINARY_REPO_NPM = "binaryRepo.repo.npm"
 
+        /** `nodeApp.node.token.<name>.<target or os>=<value>`: a pattern token of your own. */
+        const val TOKEN_PREFIX = "nodeApp.node.token."
+
         /**
          * PEM bundle of corporate CAs for npm, which does not use the JVM trust store. Gradle itself
          * trusts whatever the JVM trust store trusts.
@@ -82,6 +92,7 @@ class NodeSources(private val binaryRepo: BinaryRepository?, private val overrid
                 binaryRepoPattern = providers.setting(BINARY_REPO_PATTERN),
                 publicNpmRegistry = providers.setting(NPM_REGISTRY) ?: DEFAULT_NPM_REGISTRY,
                 binaryRepoNpm = providers.setting(BINARY_REPO_NPM) ?: DEFAULT_BINARY_REPO_NPM,
+                customTokens = CustomTokens.parse(providers.settingsPrefixedBy(TOKEN_PREFIX), TOKEN_PREFIX),
             ),
         )
 
@@ -118,4 +129,6 @@ data class NodeOverrides(
     val binaryRepoPattern: String? = null,
     val publicNpmRegistry: String = NodeSources.DEFAULT_NPM_REGISTRY,
     val binaryRepoNpm: String = NodeSources.DEFAULT_BINARY_REPO_NPM,
+    /** The organisation's own tokens for [binaryRepoPattern]; see [NodeSources.TOKEN_PREFIX]. */
+    val customTokens: CustomTokens = CustomTokens(emptyMap()),
 )

@@ -25,6 +25,8 @@ object JdkFixture {
                 .toURI()
                 .toString(),
         JdkSources.VERSION_PREFIX + javaFeature to jdkVersion,
+        // The fixture serves the running JDK's own bytes; tests of reusing it say so themselves.
+        JdkSources.REUSE_RUNNING to "false",
     )
 
     /** The JDK running the tests, which the fixtures repackage. */

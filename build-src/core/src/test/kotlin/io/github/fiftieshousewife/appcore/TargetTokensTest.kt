@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Assertions.assertAll
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertThrows
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.function.Executable
 import java.net.URI
@@ -31,13 +32,13 @@ class TargetTokensTest {
     }
 
     @Test
-    fun `Ivy's own tokens are filled from the artifact, and unknown ones are left alone`() {
+    fun `Ivy's own tokens are filled from the artifact`() {
         val rendered = TargetTokens.render(
-            "[organisation]/[module]-[revision]-[os].[ext] [unknown]",
+            "[organisation]/[module]-[revision]-[os].[ext]",
             Target.LINUX_X64,
             mapOf("organisation" to "oracle", "module" to "jdk", "revision" to "21_5", "ext" to "rpm"),
         )
-        assertEquals("oracle/jdk-21_5-linux.rpm [unknown]", rendered)
+        assertEquals("oracle/jdk-21_5-linux.rpm", rendered)
     }
 
     @Test
@@ -102,6 +103,65 @@ class TargetTokensTest {
                 uri(nested, "21.0.5", Target.LINUX_AARCH64) to "oracle/linux/aarch64/jdk-21.0.5.rpm",
             )
         assertAll(expected.map { (actual, path) -> Executable { assertEquals("$REPO/$path", actual) } })
+    }
+
+    @Test
+    fun `version tokens can sit in the pattern itself, beside the target's`() {
+        val repository =
+            RuntimeRepository.curated(
+                "jdks",
+                URI("$REPO/"),
+                "java/jdk[feature]_[update]-64_[os].[rpmArch].rpm",
+                "oracle",
+            )
+        val artifact = repository.curated(
+            "jdk",
+            "21.0.5",
+            Target.LINUX_AARCH64,
+            mapOf(
+                "feature" to "21",
+                "update" to "5",
+            ),
+        )
+        assertEquals("$REPO/java/jdk21_5-64_linux.aarch64.rpm", repository.downloadUri(artifact).toString())
+    }
+
+    @Test
+    fun `tokens of your own take a value per OS, or per target, which wins`() {
+        val tokens = CustomTokens.parse(
+            mapOf(
+                "javaApp.jdk.token.plat.linux" to "l64",
+                "javaApp.jdk.token.plat.windows" to "w64",
+                "javaApp.jdk.token.plat.linux-aarch64" to "la64",
+                "javaApp.jdk.token.ignored" to "no name and place",
+            ),
+            "javaApp.jdk.token.",
+        )
+        val repository = RuntimeRepository.curated("jdks", URI("$REPO/"), "jdk-[revision]-[plat].zip", "oracle")
+        fun file(target: Target) =
+            repository.downloadUri(repository.curated("jdk", "21.0.5", target, tokens.forTarget(target)))
+                .toString().removePrefix("$REPO/")
+        assertAll(
+            { assertEquals("jdk-21.0.5-l64.zip", file(Target.LINUX_X64)) },
+            { assertEquals("jdk-21.0.5-la64.zip", file(Target.LINUX_AARCH64)) },
+            { assertEquals("jdk-21.0.5-w64.zip", file(Target.WINDOWS_X64)) },
+        )
+    }
+
+    @Test
+    fun `a token with no value fails, naming the tokens there are`() {
+        val repository = RuntimeRepository.curated("jdks", URI("$REPO/"), "jdk-[revision]-[plat].zip", "oracle")
+        val failure =
+            assertThrows(GradleException::class.java) { repository.curated("jdk", "21.0.5", Target.MAC_AARCH64) }
+        assertAll(
+            {
+                assertTrue(
+                    failure.message!!.startsWith("No value for [plat] in '[plat]' for mac-aarch64."),
+                    failure.message,
+                )
+            },
+            { assertTrue(failure.message!!.contains("[rpmArch]"), failure.message) },
+        )
     }
 
     private companion object {

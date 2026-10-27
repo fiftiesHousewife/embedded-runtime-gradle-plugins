@@ -55,8 +55,21 @@ data class BinaryRepository(
         /** Setting this switches every build on the machine to the binary repository. */
         const val URL = "binaryRepo.url"
 
-        /** The name of a repository the build declares, whose server and credentials the plugins use. */
+        /**
+         * The name of a repository the build declares, whose server and credentials the plugins use.
+         * Unset, it is found ([discover]); [NONE] turns that off.
+         */
         const val REPOSITORY = "binaryRepo.repository"
+
+        /** `binaryRepo.repository=none`: borrow nothing, even when a repository could be found. */
+        const val NONE = "none"
+
+        /** Hosts of public repositories, which are never taken for the organisation's own. */
+        private val PUBLIC_HOSTS = listOf(
+            "repo.maven.apache.org", "repo1.maven.org", "central.sonatype.com", "oss.sonatype.org",
+            "s01.oss.sonatype.org", "plugins.gradle.org", "plugins-artifacts.gradle.org", "repo.gradle.org",
+            "maven.google.com", "dl.google.com", "jitpack.io", "jcenter.bintray.com",
+        )
         const val MAVEN_REPO = "binaryRepo.repo.maven"
         const val GRADLE_PLUGINS_REPO = "binaryRepo.repo.gradlePlugins"
         const val RUNTIMES_REPO = "binaryRepo.repo.runtimes"
@@ -81,7 +94,7 @@ data class BinaryRepository(
 
         /** The configured instance, or null for the public internet. */
         fun from(providers: ProviderFactory): BinaryRepository? {
-            val name = providers.setting(REPOSITORY)
+            val name = providers.setting(REPOSITORY)?.takeUnless { it == NONE }
             return if (name != null) {
                 borrowed[name] ?: throw GradleException(
                     "$REPOSITORY=$name, but no settings plugin has found that repository yet: apply " +
@@ -94,6 +107,31 @@ data class BinaryRepository(
 
         /** The repository named by [REPOSITORY], which the settings plugins wait for the settings script to declare. */
         fun borrowedName(providers: ProviderFactory): String? = providers.setting(REPOSITORY)
+
+        /**
+         * The repository to borrow when none is named and no [URL] is set: among those [settings]
+         * declares, the ones on a server of the organisation's own (not a public host, not a local
+         * `file:` tree). Several on one server (a `maven-virtual` and a `gradle-plugins-virtual`) are
+         * one server, and the first is taken; repositories on several servers must be named.
+         */
+        fun discover(settings: Settings): String? {
+            val own = (settings.dependencyResolutionManagement.repositories + settings.pluginManagement.repositories)
+                .filterIsInstance<UrlArtifactRepository>()
+                .filter { repo ->
+                    val url = repo.url
+                    url.scheme in setOf("http", "https") &&
+                        PUBLIC_HOSTS.none { url.host == it || url.host.endsWith(".$it") }
+                }
+            val servers = own.groupBy { URI.create(it.url.toString().trimEnd('/') + "/").resolve("..") }
+            if (servers.size > 1) {
+                throw GradleException(
+                    "settings.gradle.kts declares repositories on several servers (" +
+                        own.joinToString { "${(it as ArtifactRepository).name} at ${it.url}" } +
+                        "): set $REPOSITORY to the one whose server and login hold the runtimes, or to $NONE",
+                )
+            }
+            return own.firstOrNull()?.let { (it as ArtifactRepository).name }
+        }
 
         /**
          * Finds the repository named [REPOSITORY] among the ones [settings] declares, and records it.
@@ -182,6 +220,10 @@ data class RepositoryLogin(val username: String, val password: String) : Seriali
 fun ProviderFactory.setting(name: String): String? =
     (SettingsInCode[name] ?: gradleProperty(name).orNull)?.takeIf { it.isNotBlank() }
 
+/** Every setting whose name starts with [prefix], set in code or as a property; the code's win. */
+fun ProviderFactory.settingsPrefixedBy(prefix: String): Map<String, String> =
+    (gradlePropertiesPrefixedBy(prefix).get() + SettingsInCode.prefixed(prefix)).filterValues { it.isNotBlank() }
+
 /**
  * The values `embeddedRuntime {}` set, by property name, recorded once the settings script has run.
  * Kept here because the JDK toolchain resolver, which Gradle creates itself, can't see the settings;
@@ -192,6 +234,8 @@ internal object SettingsInCode {
     private var values: Map<String, String> = emptyMap()
 
     operator fun get(name: String): String? = values[name]
+
+    fun prefixed(prefix: String): Map<String, String> = values.filterKeys { it.startsWith(prefix) }
 
     fun reset() {
         values = emptyMap()

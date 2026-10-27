@@ -20,10 +20,16 @@ data class RuntimeRepository(
 ) {
     /**
      * An archive in a curated tree, for [target]: renamed on upload to the archive's target id by
-     * default, or named as the tree's pattern says with [TargetTokens].
+     * default, or named as the tree's pattern says with [TargetTokens] and the further [tokens] (the
+     * version's, the organisation's own).
      */
-    fun curated(module: String, revision: String, target: Target): RuntimeArtifact {
-        val tokens = mapOf(
+    fun curated(
+        module: String,
+        revision: String,
+        target: Target,
+        tokens: Map<String, String> = emptyMap(),
+    ): RuntimeArtifact {
+        val ivy = mapOf(
             "organisation" to group,
             "module" to module,
             "artifact" to module,
@@ -35,7 +41,7 @@ data class RuntimeRepository(
             module,
             revision,
             artifact = module,
-            classifier = classifierTemplate?.let { TargetTokens.render(it, target, tokens) } ?: target.id,
+            classifier = classifierTemplate?.let { TargetTokens.render(it, target, ivy + tokens) } ?: target.id,
             extension = target.archiveExtension,
         )
     }

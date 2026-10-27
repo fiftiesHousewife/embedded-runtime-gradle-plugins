@@ -93,6 +93,7 @@ embeddedRuntime {
         binaryRepo = "generic-local"            // javaApp.jdk.binaryRepo; and binaryRepoPattern,
         revisionFormat = "[feature]_[update]"   // revisionFormat, url, pattern, localPath, localPattern
         path(21, "windows-x64", "C:/Program Files/Java/jdk-21") // javaApp.jdk.21.windows-x64.path
+        token("plat", mapOf("linux" to "l64", "windows" to "w64")) // javaApp.jdk.token.plat.linux, …
     }
     node {
         version = "24.22.1"                     // nodeApp.node.version; and url, pattern, binaryRepoPattern,
@@ -169,7 +170,7 @@ also be set in code: the repository and runtime ones in `embeddedRuntime {}`, th
 | `javaApp.runtimeSupportUrl`, `nodeApp.runtimeSupportUrl` | `https://endoflife.date/api/v1/products/` | Where `checkRuntimeSupport` reads end-of-life data; a mirror behind a corporate network |
 | `javaApp.endOfLifeWarningDays`, `nodeApp.endOfLifeWarningDays` | `90` | How early `checkRuntimeSupport` warns of an end of life |
 | `javaApp.allowEndOfLife`, `nodeApp.allowEndOfLife` | `false` | `checkRuntimeSupport` warns instead of failing on an end-of-life runtime |
-| `binaryRepo.repository` | | The name of a repository the build declares: its server and credentials are used for the runtime archives, npm, publishing and uploads, and the build's own repositories are kept |
+| `binaryRepo.repository` | found | The name of a repository the build declares (found when not set; `none` borrows nothing): its server and credentials are used for the runtime archives, npm, publishing and uploads, and the build's own repositories are kept |
 | `binaryRepo.url` | | With no repository declared: download everything through this binary repository (Artifactory, Nexus, …), logging in with `binaryRepoUsername` / `binaryRepoPassword` |
 | `binaryRepo.repo.maven` | `maven-virtual` | |
 | `binaryRepo.repo.gradlePlugins` | `gradle-plugins-virtual` | |
@@ -181,5 +182,7 @@ also be set in code: the repository and runtime ones in `embeddedRuntime {}`, th
 | `javaApp.jdk.yumRepo` | | A YUM repository holding the JDK as an RPM package: a repository beside the binary repository (`yum-local`, `yum-local/rhel/9`) or a full URL; the package is found in its metadata by name, pinned version and CPU |
 | `javaApp.jdk.yumPackage` | `jdk-[feature]` for Oracle | The JDK package's name in `javaApp.jdk.yumRepo` |
 | `javaApp.jdk.binaryRepo` | `binaryRepo.repo.runtimes` | The repository holding JDKs, e.g. `yum-local` |
+| `javaApp.jdk.reuseRunning` | `true` | Embed the JDK running the build for this machine's target when it is exactly the pinned distribution and version |
+| `javaApp.jdk.token.<name>.<os or target>` | | A pattern token of your own, e.g. `javaApp.jdk.token.plat.linux=l64` for `[plat]`; `nodeApp.node.token.…` for Node.js |
 | `javaApp.jdk.revisionFormat` | `[underscored]` | How a curated pattern's `[revision]` spells the version: `[feature]_[update]` gives `21_5` for 21.0.5 |
 | `binaryRepo.allowInsecureProtocol` | `false` | Allow `http://` (test instances only) |

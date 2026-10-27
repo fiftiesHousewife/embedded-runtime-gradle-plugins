@@ -3,8 +3,10 @@ package io.github.fiftieshousewife.javaapp
 import io.github.fiftieshousewife.appcore.AppWiring
 import io.github.fiftieshousewife.appcore.RuntimeArtifact
 import io.github.fiftieshousewife.appcore.Target
+import io.github.fiftieshousewife.appcore.setting
 import io.github.fiftieshousewife.appcore.tasks.DownloadYumPackage
 import io.github.fiftieshousewife.appcore.tasks.ExtractRpmRuntime
+import io.github.fiftieshousewife.javaapp.tasks.JdkTools
 import org.gradle.api.GradleException
 import org.gradle.api.Project
 import org.gradle.api.Task
@@ -46,7 +48,7 @@ internal class Jdks(
         val feature = JdkCatalog.requireSupported(extension.javaVersion.get())
         val local = JdkSources.localJdk(project.providers, feature, target)
         return when {
-            local == null -> downloadedJdk(target, feature)
+            local == null -> runningJdk(target, feature) ?: downloadedJdk(target, feature)
 
             local.isDirectory -> JdkHome(project.layout.dir(project.provider { local }), builtBy = null)
 
@@ -59,6 +61,33 @@ internal class Jdks(
         }
     }
 
+    /**
+     * The JDK running this build, for this machine's target, when it is exactly the pinned
+     * distribution and version and jlink can link from it: nothing to download or unpack. Only a
+     * vendor's separate jmods ([JdkDistribution.separateJmods]) are still fetched.
+     */
+    private fun runningJdk(target: Target, feature: Int): JdkHome? {
+        val reuse = project.providers.setting(JdkSources.REUSE_RUNNING)?.toBoolean() ?: true
+        val home = File(project.providers.systemProperty("java.home").get())
+        val sources = JdkSources.from(project.providers)
+        if (target != wiring.host || !reuse || !isPinned(home, sources.distribution, feature)) return null
+        project.logger.info("Using the JDK running this build for ${target.id}: $home")
+        val dir = project.layout.dir(project.provider { home })
+        if (home.resolve(JMODS).isDirectory) return JdkHome(dir, builtBy = null)
+        val jmods =
+            extract("extractJmods${target.taskSuffix}", jmodsArchive(sources, target), "jdk/${target.id}-$JMODS")
+        return JdkHome(dir, builtBy = null, project.layout.dir(jmods.map { it.destinationDir }), jmods)
+    }
+
+    /** Whether the JDK at [home] is the pinned [distribution] and version, and jlink can link from it. */
+    private fun isPinned(home: File, distribution: JdkDistribution, feature: Int): Boolean =
+        JdkTools.implementor(home) == distribution.implementor &&
+            JdkTools.isPinned(extension.jdkVersion.get(), home) &&
+            (home.resolve(JMODS).isDirectory || distribution.separateJmods(feature))
+
+    private fun jmodsArchive(sources: JdkSources, target: Target) =
+        resolved(JMODS, target) { sources.jmodsArtifact(it, target) }
+
     /** The pinned JDK for [target], resolved like any other dependency, with its jmods if separate. */
     private fun downloadedJdk(target: Target, feature: Int): JdkHome {
         val sources = JdkSources.from(project.providers)
@@ -70,8 +99,8 @@ internal class Jdks(
         }
         // A YUM package is a whole JDK, jmods/ included.
         if (yum != null || !sources.distribution.separateJmods(feature)) return jdk
-        val archive = resolved("jmods", target) { sources.jmodsArtifact(it, target) }
-        val jmods = extract("extractJmods${target.taskSuffix}", archive, "jdk/${target.id}-jmods")
+        val jmods =
+            extract("extractJmods${target.taskSuffix}", jmodsArchive(sources, target), "jdk/${target.id}-$JMODS")
         return JdkHome(jdk.dir, jdk.builtBy, project.layout.dir(jmods.map { it.destinationDir }), jmods)
     }
 
@@ -116,4 +145,8 @@ internal class Jdks(
 
     private fun extract(name: String, archive: Provider<File>, path: String) =
         wiring.extractRuntime(name, archive, wiring.workDir.map { it.dir(path) })
+
+    private companion object {
+        const val JMODS = "jmods"
+    }
 }

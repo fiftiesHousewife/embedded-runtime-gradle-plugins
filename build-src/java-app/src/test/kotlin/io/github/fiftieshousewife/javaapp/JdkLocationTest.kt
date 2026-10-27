@@ -1,6 +1,7 @@
 package io.github.fiftieshousewife.javaapp
 
 import io.github.fiftieshousewife.appcore.BinaryRepository
+import io.github.fiftieshousewife.appcore.CustomTokens
 import io.github.fiftieshousewife.appcore.Target
 import org.junit.jupiter.api.Assertions.assertAll
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -60,7 +61,7 @@ class JdkLocationTest {
         val reshaped =
             JdkSources(
                 JdkDistribution.ORACLE,
-                JdkLocation.binaryRepo(binaryRepo, "[module]/[revision]-[classifier].[ext]"),
+                JdkLocation.binaryRepo(binaryRepo).copy(pattern = "[module]/[revision]-[classifier].[ext]"),
             )
         assertAll(
             {
@@ -108,6 +109,33 @@ class JdkLocationTest {
                 assertEquals(
                     shared.toURI().resolve("temurin/jmods/25.0.4.1_1/jmods-25.0.4.1_1-linux-x64.tar.gz").toString(),
                     curated.repository.downloadUri(curated.jmodsArtifact(version, Target.LINUX_X64)).toString(),
+                )
+            },
+        )
+    }
+
+    @Test
+    fun `a corporate pattern names the version and platform directly, with tokens of its own`() {
+        val tokens = CustomTokens(mapOf("plat" to mapOf("linux" to "l64", "windows" to "w64")))
+        val sources = JdkSources(
+            JdkDistribution.ORACLE,
+            JdkLocation.binaryRepo(binaryRepo).copy(
+                pattern = "java/[feature]/jdk-[feature].[interim].[update]_[plat]_bin.[ext]",
+                customTokens = tokens,
+            ),
+        )
+        val version = JdkVersion("21.0.5")
+        assertAll(
+            {
+                assertEquals(
+                    "https://repo.example.com/runtimes/java/21/jdk-21.0.5_l64_bin.tar.gz",
+                    sources.downloadUri(version, Target.LINUX_X64).toString(),
+                )
+            },
+            {
+                assertEquals(
+                    "https://repo.example.com/runtimes/java/21/jdk-21.0.5_w64_bin.zip",
+                    sources.downloadUri(version, Target.WINDOWS_X64).toString(),
                 )
             },
         )

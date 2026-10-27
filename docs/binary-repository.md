@@ -32,6 +32,12 @@ dependencyResolutionManagement {
 }
 ```
 
+Nothing else is needed: the plugins find it. Among the repositories `settings.gradle.kts` declares,
+they pass over public ones (Maven Central, the Gradle Plugin Portal, Google, JitPack, Sonatype) and
+local `file:` trees, and borrow what is left. Several repositories on one server (a `maven-virtual`
+and a `gradle-plugins-virtual`) count as one server, and the first is taken. If the build declares
+repositories on several servers, name the one to borrow; `none` borrows nothing:
+
 ```properties
 # gradle.properties of the project: no secrets, so it can be committed
 binaryRepo.repository=artifactory
@@ -149,8 +155,29 @@ A pattern can use `[organisation]` (the distribution, e.g. `temurin`, or `nodejs
 | `[containerArch]` | `amd64` | `arm64` | container platforms, Debian |
 
 So one pattern names every CPU's file: `java/jdk[revision]-64_[os].[rpmArch].rpm` gives
-`java/jdk21_5-64_linux.x86_64.rpm` and `java/jdk21_5-64_linux.aarch64.rpm`. The target tokens may
-sit anywhere, across folders too, but not reach across the edge of an optional `(…)` part.
+`java/jdk21_5-64_linux.x86_64.rpm` and `java/jdk21_5-64_linux.aarch64.rpm`.
+
+A JDK pattern can also use the version's parts directly, without `revisionFormat`: `[version]`
+(`21.0.5+9`), `[underscored]` (`21.0.5_9`), `[feature]` (`21`), `[interim]` (`0`), `[update]` (`5`),
+`[patch]` (`0`) and `[build]` (`9`); a Node.js pattern can use `[version]`. So
+`java/[feature]/jdk[feature]_[update]-64_[os].[rpmArch].rpm` needs nothing else.
+
+Where your tree spells a platform its own way, define a token, with a value per OS or per target
+(a target's own value wins over its OS's):
+
+```properties
+# [plat] is l64 on Linux, w64 on Windows, and la64 on 64-bit ARM Linux
+javaApp.jdk.token.plat.linux=l64
+javaApp.jdk.token.plat.windows=w64
+javaApp.jdk.token.plat.linux-aarch64=la64
+javaApp.jdk.binaryRepoPattern=java/jdk-[feature].[interim].[update]_[plat]_bin.[ext]
+```
+
+or in `settings.gradle.kts`: `embeddedRuntime { jdk { token("plat", mapOf("linux" to "l64", "windows"
+to "w64")) } }`. Node.js tokens are `nodeApp.node.token.<name>.<os or target>`. A pattern naming a
+token with no value for some target stops the build and lists the tokens there are. These tokens may
+sit anywhere in a pattern, across folders too, but not reach across the edge of an optional `(…)`
+part.
 
 When your file names spell the version differently, `javaApp.jdk.revisionFormat` sets how
 `[revision]` is written, from these tokens (shown for `21.0.5+9`): `[version]` (`21.0.5+9`),
@@ -195,8 +222,11 @@ javaApp.jdk.binaryRepoPattern=java/jdk[revision]-64_[os].[rpmArch].rpm
 javaApp.jdk.revisionFormat=[feature]_[update]
 ```
 
-Either way the RPM is unpacked without being installed, and the JDK is found inside wherever the
-package puts it (the directory holding `release` and `bin/`; Oracle's is
+Either way the RPM is unpacked without being installed, on Linux, macOS and Windows alike: each
+symbolic link in it is written as a copy of what it points to, since Windows can't create links
+without privileges. A link to something outside the package, such as a JDK's `cacerts` pointing at
+the system's `/etc/pki/…`, is left out; jlink builds the runtime's own `cacerts` from the JDK's
+modules. The JDK is found inside wherever the package puts it (the directory holding `release` and `bin/`; Oracle's is
 `/usr/lib/jvm/jdk-21.0.5-oracle-x64`). gzip, xz, bzip2 and zstd payloads are read, the last being
 RHEL 9's default. The JDK must include `jmods/`, as Oracle's JDK 21 RPM does.
 

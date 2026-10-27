@@ -39,7 +39,7 @@ object AppSettings {
         if (settings.gradle.parent == null) SettingsInCode.reset()
         settings.gradle.settingsEvaluated {
             SettingsInCode.add(inCode.asProperties())
-            val borrowed = BinaryRepository.borrowedName(providers)
+            val borrowed = borrowedRepository(this)
             configure(
                 if (borrowed !=
                     null
@@ -51,6 +51,34 @@ object AppSettings {
             )
         }
     }
+
+    /**
+     * The repository to borrow: the one named, else one found among those the build declares
+     * ([BinaryRepository.discover]). Decided once per build, by whichever settings plugin gets there
+     * first, before either adds repositories of its own; recorded as if named, so projects and the
+     * toolchain resolver see it too.
+     */
+    private fun borrowedRepository(settings: Settings): String? {
+        val extra = settings.gradle.extensions.extraProperties
+        if (extra.has(BORROWED)) return extra.get(BORROWED) as String?
+        val providers = settings.providers
+        val named = BinaryRepository.borrowedName(providers)
+        val borrowed = when {
+            named == BinaryRepository.NONE -> null
+
+            named != null -> named
+
+            providers.setting(BinaryRepository.URL) != null -> null
+
+            else -> BinaryRepository.discover(settings)?.also {
+                SettingsInCode.add(mapOf(BinaryRepository.REPOSITORY to it))
+            }
+        }
+        extra.set(BORROWED, borrowed)
+        return borrowed
+    }
+
+    private const val BORROWED = "io.github.fiftieshousewife.appcore.borrowedRepository"
 
     /** Maven and plugin repositories: configured by whichever settings plugin is applied first. */
     fun configureRepositories(settings: Settings, binaryRepo: BinaryRepository?) {

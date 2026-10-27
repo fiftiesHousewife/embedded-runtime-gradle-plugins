@@ -112,10 +112,13 @@ data class JdkVersion(val value: String) {
      * your own way: `[version]` (`21.0.5+9`), `[underscored]` (`21.0.5_9`), `[feature]` (`21`),
      * `[interim]` (`0`), `[update]` (`5`), `[patch]` (`0` when absent) and `[build]` (`9`, empty when absent).
      */
-    fun format(format: String): String {
-        val numbers = value.substringBefore('+').substringBefore('-').split('.')
-        val tokens =
-            mapOf(
+    fun format(format: String): String = TOKEN.replace(format) { tokens[it.groupValues[1]] ?: it.value }
+
+    /** The version's tokens by name, for [format] and for file patterns, which may use them directly. */
+    val tokens: Map<String, String>
+        get() {
+            val numbers = value.substringBefore('+').substringBefore('-').split('.')
+            return mapOf(
                 "version" to value,
                 "underscored" to underscored,
                 "feature" to feature.toString(),
@@ -124,8 +127,7 @@ data class JdkVersion(val value: String) {
                 "patch" to numbers.getOrElse(3) { "0" },
                 "build" to value.substringAfter('+', ""),
             )
-        return TOKEN.replace(format) { tokens[it.groupValues[1]] ?: it.value }
-    }
+        }
 
     override fun toString() = value
 

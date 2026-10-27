@@ -17,7 +17,8 @@ import java.nio.file.Files
 /**
  * Extracts a runtime packaged as an RPM: unpacks the whole package, finds the runtime's home inside
  * it (wherever the package installs it), and leaves that home's contents in [outputDir], as the
- * archive extraction leaves a `.tar.gz`'s.
+ * archive extraction leaves a `.tar.gz`'s. Symbolic links become copies of what they point to, so the
+ * same runtime comes out on every OS, Windows included.
  */
 @CacheableTask
 abstract class ExtractRpmRuntime : DefaultTask() {
@@ -34,7 +35,9 @@ abstract class ExtractRpmRuntime : DefaultTask() {
     fun extract() {
         val staging = temporaryDir.resolve("payload").apply { deleteRecursively() }
         val rpmFile = rpm.get().asFile
-        RpmPayload.unpack(rpmFile, staging)
+        RpmPayload.unpack(rpmFile, staging).forEach {
+            logger.info("${rpmFile.name}: left out the link $it, which points at nothing in the package")
+        }
         val home = RpmPayload.home(staging, marker.get(), rpmFile.name)
         val out = outputDir.get().asFile.apply { deleteRecursively() }
         Files.move(home.toPath(), out.toPath())

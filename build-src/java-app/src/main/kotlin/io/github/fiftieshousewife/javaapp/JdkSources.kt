@@ -1,10 +1,12 @@
 package io.github.fiftieshousewife.javaapp
 
 import io.github.fiftieshousewife.appcore.BinaryRepository
+import io.github.fiftieshousewife.appcore.CustomTokens
 import io.github.fiftieshousewife.appcore.RuntimeArtifact
 import io.github.fiftieshousewife.appcore.RuntimeRepository
 import io.github.fiftieshousewife.appcore.Target
 import io.github.fiftieshousewife.appcore.setting
+import io.github.fiftieshousewife.appcore.settingsPrefixedBy
 import org.gradle.api.GradleException
 import org.gradle.api.provider.ProviderFactory
 import java.io.File
@@ -50,7 +52,7 @@ class JdkSources(
         // Renamed on upload, so the vendor's own naming is irrelevant here; the revision is spelled
         // as the tree names it.
         is JdkLocation.Curated ->
-            repository.curated("jdk", location.revision(version), target)
+            repository.curated("jdk", location.revision(version), target, location.tokens(version, target))
     }
 
     /**
@@ -67,7 +69,13 @@ class JdkSources(
      */
     fun jmodsArtifact(version: JdkVersion, target: Target): RuntimeArtifact = when (location) {
         is JdkLocation.Public -> distribution.jmodsArtifact(version, target)
-        is JdkLocation.Curated -> repository.curated("jmods", location.revision(version), target)
+
+        is JdkLocation.Curated -> repository.curated(
+            "jmods",
+            location.revision(version),
+            target,
+            location.tokens(version, target),
+        )
     }
 
     fun downloadUri(version: JdkVersion, target: Target): URI = repository.downloadUri(artifact(version, target))
@@ -107,6 +115,18 @@ class JdkSources(
 
         /** The package's name in [YUM_REPO]; `[feature]` is the Java release. Oracle's: `jdk-[feature]`. */
         const val YUM_PACKAGE = "javaApp.jdk.yumPackage"
+
+        /**
+         * Use the JDK running the build for this machine's target when it is exactly the pinned
+         * distribution and version, instead of downloading another copy. Default true.
+         */
+        const val REUSE_RUNNING = "javaApp.jdk.reuseRunning"
+
+        /**
+         * `javaApp.jdk.token.<name>.<target or os>=<value>`: a token of your own for curated and local
+         * patterns, e.g. `javaApp.jdk.token.plat.linux=l64` and `….windows=w64` for `[plat]`.
+         */
+        const val TOKEN_PREFIX = "javaApp.jdk.token."
 
         /** An absolute path to a shared directory of JDK archives, laid out like the curated binary repository tree. */
         const val LOCAL_PATH = "javaApp.jdk.localPath"
@@ -149,15 +169,17 @@ class JdkSources(
             val localPath = providers.setting(LOCAL_PATH)
             val binaryRepo = BinaryRepository.from(providers)
             val revision = providers.setting(REVISION_FORMAT)
+            val tokens = CustomTokens.parse(providers.settingsPrefixedBy(TOKEN_PREFIX), TOKEN_PREFIX)
             return when {
-                localPath != null -> JdkLocation.local(File(localPath), providers.setting(LOCAL_PATTERN), revision)
+                localPath != null -> JdkLocation.local(File(localPath))
+                    .copy(pattern = providers.setting(LOCAL_PATTERN), revisionFormat = revision, customTokens = tokens)
 
-                binaryRepo != null -> JdkLocation.binaryRepo(
-                    binaryRepo,
-                    providers.setting(BINARY_REPO_PATTERN),
-                    revision,
-                    providers.setting(BINARY_REPO_NAME),
-                )
+                binaryRepo != null -> JdkLocation.binaryRepo(binaryRepo, providers.setting(BINARY_REPO_NAME))
+                    .copy(
+                        pattern = providers.setting(BINARY_REPO_PATTERN),
+                        revisionFormat = revision,
+                        customTokens = tokens,
+                    )
 
                 else -> JdkLocation.Public(providers.setting(PUBLIC_URL), providers.setting(PUBLIC_PATTERN))
             }
@@ -178,29 +200,24 @@ sealed interface JdkLocation {
         val pattern: String? = null,
         /** How `[revision]` spells the version; see [JdkSources.REVISION_FORMAT]. */
         val revisionFormat: String? = null,
+        /** The organisation's own pattern tokens; see [JdkSources.TOKEN_PREFIX]. */
+        val customTokens: CustomTokens = CustomTokens(emptyMap()),
     ) : JdkLocation {
         fun revision(version: JdkVersion): String = revisionFormat?.let(version::format) ?: version.underscored
+
+        /** What the pattern may use besides Ivy's and the target's: the version's tokens, and the organisation's. */
+        fun tokens(version: JdkVersion, target: Target): Map<String, String> =
+            version.tokens + customTokens.forTarget(target)
     }
 
     companion object {
-        fun binaryRepo(
-            binaryRepo: BinaryRepository,
-            pattern: String? = null,
-            revisionFormat: String? = null,
-            repository: String? = null,
-        ) = Curated(
-            "binaryRepoJdks",
-            repository?.let(binaryRepo::repo) ?: binaryRepo.runtimesUrl,
-            pattern,
-            revisionFormat,
-        )
+        /** The binary repository's runtimes repository, or [repository] beside it; `copy(pattern = …)` names files. */
+        fun binaryRepo(binaryRepo: BinaryRepository, repository: String? = null) =
+            Curated("binaryRepoJdks", repository?.let(binaryRepo::repo) ?: binaryRepo.runtimesUrl)
 
-        fun local(directory: File, pattern: String? = null, revisionFormat: String? = null) = Curated(
-            "localJdks",
-            RuntimeRepository.slash(directory.absoluteFile.toURI().toString()),
-            pattern,
-            revisionFormat,
-        )
+        /** A shared directory laid out like the curated tree; name files with `copy(pattern = …)`. */
+        fun local(directory: File) =
+            Curated("localJdks", RuntimeRepository.slash(directory.absoluteFile.toURI().toString()))
     }
 }
 

@@ -35,15 +35,18 @@ internal object RpmPayload {
     private const val TYPE_MASK = 0xF000
     private const val PERMISSION_MASK = 0x1FF
 
-    /** Writes every file in [rpm] under [into], as installing it at [into] would. */
-    fun unpack(rpm: File, into: File) {
-        FileChannel.open(rpm.toPath()).use { channel ->
-            val header = Format().apply { read(ReadableChannelWrapper(channel)) }.header
-            val compressor = (header.getEntry(Header.HeaderTag.PAYLOADCOMPRESSOR)?.values as? Array<*>)
-                ?.firstOrNull()?.toString() ?: "gzip"
-            decompressed(compressor, BufferedInputStream(Channels.newInputStream(channel))).use { payload ->
-                CpioArchiveInputStream(payload).use { cpio -> write(cpio, into.toPath(), rpm.name) }
-            }
+    /**
+     * Writes every file in [rpm] under [into], as installing it at [into] would, except that each
+     * symbolic link becomes a copy of what it points to: links need privileges on Windows and would
+     * make the unpacked runtime differ by OS. Returns the links left out because they point at
+     * nothing in the package (a JDK's `cacerts` at the system's `/etc/pki/…`, say) or loop.
+     */
+    fun unpack(rpm: File, into: File): List<String> = FileChannel.open(rpm.toPath()).use { channel ->
+        val header = Format().apply { read(ReadableChannelWrapper(channel)) }.header
+        val compressor = (header.getEntry(Header.HeaderTag.PAYLOADCOMPRESSOR)?.values as? Array<*>)
+            ?.firstOrNull()?.toString() ?: "gzip"
+        decompressed(compressor, BufferedInputStream(Channels.newInputStream(channel))).use { payload ->
+            CpioArchiveInputStream(payload).use { cpio -> write(cpio, into.toPath(), rpm.name) }
         }
     }
 
@@ -64,16 +67,19 @@ internal object RpmPayload {
             .minByOrNull { it.toPath().nameCount }
             ?: throw GradleException("$rpmName holds no runtime: no directory has both $marker and bin/")
 
-    private fun write(cpio: CpioArchiveInputStream, root: Path, rpmName: String) {
+    private fun write(cpio: CpioArchiveInputStream, root: Path, rpmName: String): List<String> {
         // In a newc archive a hard-linked file's data comes with its last name; earlier names have none.
         val linkedNames = mutableMapOf<Long, MutableList<Path>>()
+        val symlinks = mutableMapOf<Path, SymlinkCopies.Link>()
         generateSequence { cpio.nextEntry }.forEach { entry ->
             val path = safePath(root, entry.name, rpmName)
             Files.createDirectories(path.parent)
             when {
                 entry.isDirectory -> Files.createDirectories(path)
 
-                entry.isSymbolicLink -> symlink(path, String(cpio.readBytes(), Charsets.UTF_8), root)
+                entry.isSymbolicLink -> String(cpio.readBytes(), Charsets.UTF_8).let { target ->
+                    symlinks[path] = SymlinkCopies.Link(linkTarget(path, target, root), target)
+                }
 
                 entry.numberOfLinks > 1 && entry.size == 0L -> linkedNames.getOrPut(entry.inode) {
                     mutableListOf()
@@ -86,6 +92,7 @@ internal object RpmPayload {
             }
             if (!entry.isSymbolicLink) permissions(path, entry)
         }
+        return SymlinkCopies(root, symlinks).write()
     }
 
     /** Refuses names that would land outside [root]. */
@@ -95,18 +102,14 @@ internal object RpmPayload {
         return path
     }
 
-    /** An absolute link into the package becomes a relative one, so it still resolves where we unpacked it. */
-    private fun symlink(path: Path, target: String, root: Path) {
-        val resolved = if (target.startsWith(
-                "/",
-            )
-        ) {
-            path.parent.relativize(root.resolve(target.trimStart('/')))
-        } else {
-            Path.of(target)
-        }
-        Files.deleteIfExists(path)
-        Files.createSymbolicLink(path, resolved)
+    /** Where a link points, in the unpacked tree: an absolute target is taken from the package's root. */
+    private fun linkTarget(path: Path, target: String, root: Path): Path = if (target.startsWith(
+            "/",
+        )
+    ) {
+        root.resolve(target.trimStart('/')).normalize()
+    } else {
+        path.parent.resolve(target).normalize()
     }
 
     private fun permissions(path: Path, entry: CpioArchiveEntry) {
@@ -117,5 +120,68 @@ internal object RpmPayload {
         val granted = byBit.filterIndexed { bit, _ -> ((mode shr bit) and 1) == 1 }.toSet()
         // Kept writable by its owner, so a later extraction can replace it.
         Files.setPosixFilePermissions(path, granted + PosixFilePermission.OWNER_WRITE)
+    }
+}
+
+/**
+ * Writes each link in [links] (where it sits, and what it points to) as a copy of its target, once
+ * every file is in place: a link to a file becomes the file, a link to a directory the directory, a
+ * link to a link whatever that one ends at. Links to directories are copied last, so the copies hold
+ * the copies made for any links inside them.
+ */
+private class SymlinkCopies(private val root: Path, private val links: Map<Path, Link>) {
+    /** Where a link points in the unpacked tree, and what the package wrote. */
+    data class Link(val target: Path, val written: String)
+
+    fun write(): List<String> {
+        val skipped = mutableListOf<String>()
+        val (toDirectories, toFiles) = links.keys.partition { finalTarget(it)?.let(Files::isDirectory) == true }
+        (toFiles + toDirectories).forEach { link ->
+            val target = finalTarget(link)
+            when {
+                target == null || !Files.exists(target) ->
+                    skipped +=
+                        "${root.relativize(link)} -> ${links.getValue(link).written}"
+
+                Files.isDirectory(target) -> copyTree(target, link)
+
+                else -> Files.copy(
+                    target,
+                    link,
+                    StandardCopyOption.REPLACE_EXISTING,
+                    StandardCopyOption.COPY_ATTRIBUTES,
+                )
+            }
+        }
+        return skipped
+    }
+
+    /** What [link] ends at after any chain of links, or null outside the package or in a loop. */
+    private fun finalTarget(link: Path): Path? {
+        val hops = generateSequence(links.getValue(link).target) { links[it]?.target }.take(MAX_HOPS + 1).toList()
+        return hops.last().takeIf { hops.size <= MAX_HOPS && hops.all { it.startsWith(root) } }
+    }
+
+    private fun copyTree(from: Path, to: Path) {
+        Files.walk(from).use { paths ->
+            paths.forEach { source ->
+                val destination = to.resolve(from.relativize(source).toString())
+                if (Files.isDirectory(source)) {
+                    Files.createDirectories(destination)
+                } else {
+                    Files.copy(
+                        source,
+                        destination,
+                        StandardCopyOption.REPLACE_EXISTING,
+                        StandardCopyOption.COPY_ATTRIBUTES,
+                    )
+                }
+            }
+        }
+    }
+
+    private companion object {
+        /** As many links in a chain as Linux follows before giving up (ELOOP). */
+        const val MAX_HOPS = 40
     }
 }

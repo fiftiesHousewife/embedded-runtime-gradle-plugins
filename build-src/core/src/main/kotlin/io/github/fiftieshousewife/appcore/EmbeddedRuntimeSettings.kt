@@ -42,7 +42,7 @@ abstract class EmbeddedRuntimeSettings {
     fun asProperties(): Map<String, String> = (binaryRepository.properties() + jdk.properties() + node.properties())
         .mapNotNull { (name, value) -> value.orNull?.toString()?.let { name to it } }
         .toMap() + jdk.pins.get().mapKeys { (feature, _) -> "javaApp.jdk.$feature" } +
-        jdk.paths.get()
+        jdk.paths.get() + jdk.tokens.get() + node.tokens.get()
 
     companion object {
         const val NAME = "embeddedRuntime"
@@ -97,6 +97,9 @@ abstract class JdkSettings {
     abstract val yumRepo: Property<String>
     abstract val yumPackage: Property<String>
 
+    /** `javaApp.jdk.reuseRunning`: use the JDK running the build when it is exactly the pinned one. */
+    abstract val reuseRunning: Property<Boolean>
+
     /** `javaApp.jdk.<feature>`: the exact JDK for a feature release. */
     abstract val pins: MapProperty<Int, String>
 
@@ -110,6 +113,13 @@ abstract class JdkSettings {
     fun path(feature: Int, target: String, path: String) =
         paths.put("javaApp.jdk.$feature.${Target.parse(target).id}.path", path)
 
+    /** `javaApp.jdk.token.<name>.<target or os>`: a pattern token of your own ([CustomTokens]). */
+    abstract val tokens: MapProperty<String, String>
+
+    /** `token("plat", mapOf("linux" to "l64", "windows" to "w64"))` for `[plat]` in a pattern. */
+    fun token(name: String, values: Map<String, String>) =
+        values.forEach { (where, value) -> tokens.put("javaApp.jdk.token.$name.$where", value) }
+
     internal fun properties(): Map<String, Provider<*>> = mapOf(
         "javaApp.jdk.distribution" to distribution,
         "javaApp.jdk.url" to url,
@@ -121,6 +131,7 @@ abstract class JdkSettings {
         "javaApp.jdk.revisionFormat" to revisionFormat,
         "javaApp.jdk.yumRepo" to yumRepo,
         "javaApp.jdk.yumPackage" to yumPackage,
+        "javaApp.jdk.reuseRunning" to reuseRunning,
     )
 }
 
@@ -132,6 +143,12 @@ abstract class NodeSettings {
     abstract val binaryRepoPattern: Property<String>
     abstract val npmRegistry: Property<String>
     abstract val npmCaFile: Property<String>
+
+    /** `nodeApp.node.token.<name>.<target or os>`: a pattern token of your own ([CustomTokens]). */
+    abstract val tokens: MapProperty<String, String>
+
+    fun token(name: String, values: Map<String, String>) =
+        values.forEach { (where, value) -> tokens.put("nodeApp.node.token.$name.$where", value) }
 
     internal fun properties(): Map<String, Provider<*>> = mapOf(
         "nodeApp.node.version" to version,

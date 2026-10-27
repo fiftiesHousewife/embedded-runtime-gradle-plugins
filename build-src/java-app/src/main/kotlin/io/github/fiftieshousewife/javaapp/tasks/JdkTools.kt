@@ -13,10 +13,21 @@ object JdkTools {
         ?: throw GradleException("No JDK found in $dir (expected a 'release' file)")
 
     /** `JAVA_VERSION` from the home's `release` file, e.g. `21.0.13`. */
-    fun javaVersion(home: File): String? = Properties()
-        .apply { Files.newInputStream(home.resolve("release").toPath()).use(::load) }
-        .getProperty("JAVA_VERSION")
-        ?.trim('"')
+    fun javaVersion(home: File): String? = release(home, "JAVA_VERSION")
+
+    /** Who built the JDK at [home], as its `release` file says: `Eclipse Adoptium`, `Oracle Corporation`. */
+    fun implementor(home: File): String? = release(home, "IMPLEMENTOR")
+
+    private fun release(home: File, key: String): String? = home.resolve("release").takeIf(File::isFile)?.let { file ->
+        Properties().apply { Files.newInputStream(file.toPath()).use(::load) }.getProperty(key)?.trim('"')
+    }
+
+    /** Whether the JDK at [home] is the release [pin] names; see [requirePinned]. */
+    fun isPinned(pin: String, home: File): Boolean {
+        val actual = javaVersion(home) ?: return false
+        // Whole version components only: 21.0.1 must not pass for 21.0.10.
+        return Regex("""(^|jdk)${Regex.escape(actual)}(\D|$)""").containsMatchIn(pin)
+    }
 
     /**
      * Refuses a JDK that isn't the pinned release, such as an installed one a patch behind: the
@@ -26,9 +37,7 @@ object JdkTools {
      */
     fun requirePinned(pin: String, home: File) {
         val actual = javaVersion(home) ?: return
-        // Whole version components only: 21.0.1 must not pass for 21.0.10.
-        val matches = Regex("""(^|jdk)${Regex.escape(actual)}(\D|$)""").containsMatchIn(pin)
-        if (matches) return
+        if (isPinned(pin, home)) return
         throw GradleException(
             "The JDK at $home is $actual, but the build pins $pin (javaApp.jdk.<feature> or the catalogue). " +
                 "Install $pin there, or pin the version that is installed.",

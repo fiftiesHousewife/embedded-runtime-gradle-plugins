@@ -19,30 +19,7 @@ class BorrowedRepositoryTest {
 
     private val server = "https://repo.example.com/artifactory"
 
-    /** Settings declaring [repository] and printing, once evaluated, every repository and its login. */
-    private fun probe(repository: String, properties: String): List<String> {
-        val project = TestProject(tmp).apply {
-            file("gradle.properties", properties)
-            file(
-                "settings.gradle.kts",
-                """
-                plugins { id("${JavaAppSettingsPlugin.ID}") }
-                rootProject.name = "probe"
-                dependencyResolutionManagement { repositories { $repository } }
-                gradle.settingsEvaluated {
-                    dependencyResolutionManagement.repositories.forEach { repo ->
-                        val url = (repo as? org.gradle.api.artifacts.repositories.UrlArtifactRepository)?.url
-                        val login = (repo as org.gradle.api.artifacts.repositories.AuthenticationSupported)
-                            .getCredentials(PasswordCredentials::class.java)
-                        println("REPO ${'$'}{repo.name} ${'$'}url ${'$'}{login.username} ${'$'}{login.password == "s3cret"}")
-                    }
-                    pluginManagement.repositories.forEach { println("PLUGINS ${'$'}{it.name}") }
-                }
-                """,
-            )
-        }
-        return project.repositories(project.build("help").output)
-    }
+    private fun probe(repository: String, properties: String) = probeRepositories(tmp, repository, properties)
 
     @Test
     fun `credentials under the build's own property names reach the runtime repository, on the same server`() {

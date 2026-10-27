@@ -2,10 +2,12 @@ package io.github.fiftieshousewife.javaapp
 
 import io.github.fiftieshousewife.appcore.Target
 import io.github.fiftieshousewife.appcore.TestProject
+import io.github.fiftieshousewife.javaapp.tasks.JdkTools
 import org.gradle.testkit.runner.TaskOutcome
 import org.junit.jupiter.api.Assertions.assertAll
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.Assumptions.assumeTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.io.File
@@ -126,5 +128,35 @@ class JdkSourceTest {
             )
         JdkFixture.publishCurated(shared)
         assertEquals(TaskOutcome.SUCCESS, project.build("build").task(":appSmokeTest")?.outcome)
+    }
+
+    @Test
+    fun `the JDK running the build is used for this machine when it is the pinned one`() {
+        val home = JdkFixture.home
+        val distribution = JdkDistribution.entries.firstOrNull { it.implementor == JdkTools.implementor(home) }
+        // The pin as the running JDK's own distribution spells its version.
+        val pin = listOfNotNull(JdkTools.javaVersion(home), JdkFixture.jdkVersion).firstOrNull { candidate ->
+            distribution != null && runCatching { distribution.requireVersion(JdkVersion(candidate)) }.isSuccess &&
+                JdkTools.isPinned(candidate, home)
+        }
+        assumeTrue(
+            pin != null && home.resolve("jmods").isDirectory,
+            "the running JDK is no distribution's pinnable JDK",
+        )
+        val project = javaService(
+            tmp,
+            JavaServiceOptions(
+                properties = listOf(
+                    JdkSources.DISTRIBUTION to checkNotNull(distribution).id,
+                    JdkSources.VERSION_PREFIX + JdkFixture.javaFeature to checkNotNull(pin),
+                    JdkSources.REUSE_RUNNING to "true",
+                ),
+            ),
+        )
+        val result = project.build("build")
+        assertAll(
+            { assertNull(result.task(":extractJdk${Target.parse(host).taskSuffix}"), "nothing to unpack") },
+            { assertEquals(TaskOutcome.SUCCESS, result.task(":appSmokeTest")?.outcome) },
+        )
     }
 }

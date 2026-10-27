@@ -182,7 +182,7 @@ also be set in code: the repository and runtime ones in `embeddedRuntime {}`, th
 | `javaApp.jdk.yumRepo` | | A YUM repository holding the JDK as an RPM package: a repository beside the binary repository (`yum-local`, `yum-local/rhel/9`) or a full URL; the package is found in its metadata by name, pinned version and CPU |
 | `javaApp.jdk.yumPackage` | `jdk-[feature]` for Oracle | The JDK package's name in `javaApp.jdk.yumRepo` |
 | `javaApp.jdk.binaryRepo` | `binaryRepo.repo.runtimes` | The repository holding JDKs, e.g. `yum-local` |
-| `javaApp.jdk.reuseRunning` | `true` | Embed the JDK running the build for this machine's target when it is exactly the pinned distribution and version |
+| `javaApp.jdk.reuseToolchain` | `true` | Embed the compile toolchain's JDK for this machine's target when it is exactly the pinned distribution and version |
 | `javaApp.jdk.token.<name>.<os or target>` | | A pattern token of your own, e.g. `javaApp.jdk.token.plat.linux=l64` for `[plat]`; `nodeApp.node.token.…` for Node.js |
 | `javaApp.jdk.revisionFormat` | `[underscored]` | How a curated pattern's `[revision]` spells the version: `[feature]_[update]` gives `21_5` for 21.0.5 |
 | `binaryRepo.allowInsecureProtocol` | `false` | Allow `http://` (test instances only) |

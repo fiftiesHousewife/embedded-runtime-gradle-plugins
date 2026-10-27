@@ -12,9 +12,11 @@ import org.gradle.api.GradleException
 import org.gradle.api.Project
 import org.gradle.api.Task
 import org.gradle.api.file.Directory
+import org.gradle.api.plugins.JavaPluginExtension
 import org.gradle.api.provider.Provider
 import org.gradle.api.tasks.Sync
 import org.gradle.api.tasks.TaskProvider
+import org.gradle.jvm.toolchain.JavaToolchainService
 import java.io.File
 
 /**
@@ -49,7 +51,7 @@ internal class Jdks(
         val feature = JdkCatalog.requireSupported(extension.javaVersion.get())
         val local = JdkSources.localJdk(project.providers, feature, target)
         return when {
-            local == null -> runningJdk(target, feature) ?: downloadedJdk(target, feature)
+            local == null -> toolchainJdk(target, feature) ?: downloadedJdk(target, feature)
 
             local.isDirectory -> JdkHome(project.layout.dir(project.provider { local }), builtBy = null)
 
@@ -63,15 +65,15 @@ internal class Jdks(
     }
 
     /**
-     * The JDK running this build, for this machine's target, when it is exactly the pinned
+     * The compile toolchain's JDK, for this machine's target, when it is exactly the pinned
      * distribution and version and jlink can link from it: nothing to download or unpack. Only a
      * vendor's separate jmods ([JdkDistribution.separateJmods]) are still fetched.
      */
-    private fun runningJdk(target: Target, feature: Int): JdkHome? {
+    private fun toolchainJdk(target: Target, feature: Int): JdkHome? {
         val sources = JdkSources.from(project.providers)
-        if (whyNotRunningJdk(target, sources.distribution, feature) != null) return null
-        val home = runningHome
-        project.logger.info("Using the JDK running this build for ${target.id}: $home")
+        if (whyNotToolchainJdk(target, sources.distribution, feature) != null) return null
+        val home = toolchainHome.getOrThrow()
+        project.logger.info("Using the compile toolchain's JDK for ${target.id}: $home")
         val dir = project.layout.dir(project.provider { home })
         if (home.resolve(JMODS).isDirectory) return JdkHome(dir, builtBy = null)
         val jmods =
@@ -79,23 +81,33 @@ internal class Jdks(
         return JdkHome(dir, builtBy = null, project.layout.dir(jmods.map { it.destinationDir }), jmods)
     }
 
-    private val runningHome: File get() = File(project.providers.systemProperty("java.home").get())
+    /**
+     * The JDK Gradle compiles with: `java.toolchain`, which the plugin sets to the pinned release and
+     * vendor, as Gradle resolves it (an installed JDK, or one it provisions). Not the JDK running the
+     * Gradle daemon, which is often another one.
+     */
+    private val toolchainHome: Result<File> by lazy {
+        runCatching {
+            val toolchain = project.extensions.getByType(JavaPluginExtension::class.java).toolchain
+            project.extensions.getByType(JavaToolchainService::class.java)
+                .compilerFor(toolchain).get().metadata.installationPath.asFile
+        }
+    }
 
     /**
-     * Why the JDK running this build can't be [target]'s, or null when it can: it must be this
+     * Why the compile toolchain's JDK can't be [target]'s, or null when it can: it must be this
      * machine's, be the pinned [distribution] and version, and have `jmods/` (or the vendor ships
      * those separately), and reuse must not be turned off.
      */
-    private fun whyNotRunningJdk(target: Target, distribution: JdkDistribution, feature: Int): String? {
-        val home = runningHome
+    private fun whyNotToolchainJdk(target: Target, distribution: JdkDistribution, feature: Int): String? {
+        if (project.providers.setting(JdkSources.REUSE_TOOLCHAIN)?.toBoolean() == false) {
+            return "reusing it is turned off (${JdkSources.REUSE_TOOLCHAIN}=false)"
+        }
+        if (target != wiring.host) return "it runs on ${wiring.host.id}, not ${target.id}"
+        val home = toolchainHome.getOrElse { return "Gradle could not resolve it: ${it.message}" }
         val pin = extension.jdkVersion.get()
         val implementor = JdkTools.implementor(home)
         return when {
-            project.providers.setting(JdkSources.REUSE_RUNNING)?.toBoolean() == false ->
-                "reusing it is turned off (${JdkSources.REUSE_RUNNING}=false)"
-
-            target != wiring.host -> "it runs on ${wiring.host.id}, not ${target.id}"
-
             implementor != distribution.implementor || !JdkTools.isPinned(pin, home) ->
                 "it is $implementor ${JdkTools.javaVersion(home)} at $home, not ${distribution.implementor} $pin"
 
@@ -128,14 +140,14 @@ internal class Jdks(
 
     /**
      * A YUM repository or `.rpm` pattern holds Linux JDKs, so another target needs its JDK by path, or
-     * the JDK running the build; this says why the latter wasn't used.
+     * the compile toolchain's; this says why the latter wasn't used.
      */
     private fun linuxOnly(target: Target, feature: Int, sources: JdkSources): GradleException {
         val source = if (sources.yum != null) JdkSources.YUM_REPO else "the .rpm pattern"
         return GradleException(
-            "No JDK for ${target.id}: $source serves Linux JDKs only. The JDK running this build can't be used: " +
-                "${whyNotRunningJdk(target, sources.distribution, feature)}. Run the build with the pinned JDK, " +
-                "or set ${JdkSources.pathProperty(feature, target)} to a ${target.os.id} JDK.",
+            "No JDK for ${target.id}: $source serves Linux JDKs only. The compile toolchain's JDK can't be used: " +
+                "${whyNotToolchainJdk(target, sources.distribution, feature)}. Install the pinned JDK where Gradle " +
+                "finds toolchains, or set ${JdkSources.pathProperty(feature, target)} to a ${target.os.id} JDK.",
         )
     }
 

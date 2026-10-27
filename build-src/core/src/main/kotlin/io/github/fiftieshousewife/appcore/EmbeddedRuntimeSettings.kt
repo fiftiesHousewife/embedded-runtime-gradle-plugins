@@ -97,8 +97,8 @@ abstract class JdkSettings {
     abstract val yumRepo: Property<String>
     abstract val yumPackage: Property<String>
 
-    /** `javaApp.jdk.reuseRunning`: use the JDK running the build when it is exactly the pinned one. */
-    abstract val reuseRunning: Property<Boolean>
+    /** `javaApp.jdk.reuseToolchain`: use the compile toolchain's JDK when it is exactly the pinned one. */
+    abstract val reuseToolchain: Property<Boolean>
 
     /** `javaApp.jdk.<feature>`: the exact JDK for a feature release. */
     abstract val pins: MapProperty<Int, String>
@@ -131,7 +131,7 @@ abstract class JdkSettings {
         "javaApp.jdk.revisionFormat" to revisionFormat,
         "javaApp.jdk.yumRepo" to yumRepo,
         "javaApp.jdk.yumPackage" to yumPackage,
-        "javaApp.jdk.reuseRunning" to reuseRunning,
+        "javaApp.jdk.reuseToolchain" to reuseToolchain,
     )
 }
 

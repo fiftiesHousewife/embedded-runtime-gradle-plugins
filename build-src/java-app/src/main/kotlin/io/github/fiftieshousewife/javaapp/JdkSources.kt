@@ -117,10 +117,10 @@ class JdkSources(
         const val YUM_PACKAGE = "javaApp.jdk.yumPackage"
 
         /**
-         * Use the JDK running the build for this machine's target when it is exactly the pinned
+         * Use the compile toolchain's JDK for this machine's target when it is exactly the pinned
          * distribution and version, instead of downloading another copy. Default true.
          */
-        const val REUSE_RUNNING = "javaApp.jdk.reuseRunning"
+        const val REUSE_TOOLCHAIN = "javaApp.jdk.reuseToolchain"
 
         /**
          * `javaApp.jdk.token.<name>.<target or os>=<value>`: a token of your own for curated and local

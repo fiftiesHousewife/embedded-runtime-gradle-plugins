@@ -203,14 +203,16 @@ on, but not for another one, which is why a cross build needs the jmods.
 
 To download from a mirror instead, see `javaApp.jdk.url` under [Configuration](reference.md#configuration).
 
-### The JDK running the build
+### The compile toolchain's JDK
 
-When the JDK running Gradle is exactly the pinned one (the same distribution, by the `IMPLEMENTOR`
-in its `release` file, and the same version) and jlink can link from it (it has `jmods/`, or the
-vendor ships those separately), this machine's archive embeds it directly: nothing is downloaded or
-unpacked for this machine's target. Other targets are fetched as usual. Set
-`javaApp.jdk.reuseRunning=false` (or `embeddedRuntime { jdk { reuseRunning = false } }`) to always
-use the configured source instead.
+The plugin sets `java.toolchain` to the pinned release and vendor, so Gradle compiles with that JDK,
+installed on the machine or provisioned. When that JDK is exactly the pinned one (the same
+distribution, by the `IMPLEMENTOR` in its `release` file, and the same version) and jlink can link
+from it (it has `jmods/`, or the vendor ships those separately), this machine's archive embeds it
+directly: nothing more is downloaded or unpacked for this machine's target. Other targets are
+fetched as usual. The JDK running the Gradle daemon plays no part. Set
+`javaApp.jdk.reuseToolchain=false` (or `embeddedRuntime { jdk { reuseToolchain = false } }`) to
+always use the configured source instead.
 
 ### JDKs already on disk
 

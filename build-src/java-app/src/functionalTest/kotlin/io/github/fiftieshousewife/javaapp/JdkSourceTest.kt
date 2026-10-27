@@ -124,7 +124,7 @@ class JdkSourceTest {
     }
 
     @Test
-    fun `the JDK running the build is used for this machine when it is the pinned one`() {
+    fun `the compile toolchain's JDK is used for this machine when it is the pinned one`() {
         val home = JdkFixture.home
         val distribution = JdkDistribution.entries.firstOrNull { it.implementor == JdkTools.implementor(home) }
         // The pin as the running JDK's own distribution spells its version.
@@ -142,7 +142,7 @@ class JdkSourceTest {
                 properties = listOf(
                     JdkSources.DISTRIBUTION to checkNotNull(distribution).id,
                     JdkSources.VERSION_PREFIX + JdkFixture.javaFeature to checkNotNull(pin),
-                    JdkSources.REUSE_RUNNING to "true",
+                    JdkSources.REUSE_TOOLCHAIN to "true",
                 ),
             ),
         )

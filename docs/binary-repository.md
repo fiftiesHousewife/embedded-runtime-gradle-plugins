@@ -211,11 +211,11 @@ repository's metadata records, then kept once per machine in Gradle's user home
 needs no network.
 
 A YUM repository, like an `.rpm` pattern below, serves Linux targets only. Any other target (a
-Windows or Mac machine building for itself) uses the JDK running the build when that is the pinned
-one ([The JDK running the build](java.md#the-jdk-running-the-build)), or a JDK given by path
-(`javaApp.jdk.21.windows-x64.path`). With neither, the build stops and says why the running JDK
-couldn't be used (another vendor or version, no `jmods/`, reuse turned off); it never unpacks a
-Linux RPM for another OS.
+Windows or Mac machine building for itself) uses the compile toolchain's JDK when that is the pinned
+one ([The compile toolchain's JDK](java.md#the-compile-toolchains-jdk)), or a JDK given by path
+(`javaApp.jdk.21.windows-x64.path`). With neither, the build stops and says why the toolchain's JDK
+couldn't be used (another vendor or version, no `jmods/`, reuse turned off, Gradle couldn't resolve
+it); it never unpacks a Linux RPM for another OS.
 
 RPMs in a plain file tree (a generic repository, a share) are read by file name instead, with a
 pattern that ends in `.rpm`:

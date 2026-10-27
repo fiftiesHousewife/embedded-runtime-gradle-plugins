@@ -85,7 +85,7 @@ class YumJdkTest {
 
     /** The bug: on Windows, with the running JDK unusable, the Linux RPM was unpacked as the Windows JDK. */
     @Test
-    fun `a target that isn't Linux never gets the Linux RPM, and the build says why the running JDK wasn't used`() {
+    fun `a target that isn't Linux never gets the Linux RPM, and the build says why the toolchain's JDK wasn't used`() {
         val host = Target.parse(TestProject.hostTarget())
         assumeTrue(host.os != Os.LINUX, "on Linux this machine's target is a Linux one")
         val project = javaService(
@@ -95,7 +95,7 @@ class YumJdkTest {
                 properties = listOf(
                     JdkSources.YUM_REPO to repository(pin).toURI().toString(),
                     JdkSources.YUM_PACKAGE to "jdk-[feature]",
-                    JdkSources.REUSE_RUNNING to "false",
+                    JdkSources.REUSE_TOOLCHAIN to "false",
                 ),
             ),
         )
@@ -104,7 +104,7 @@ class YumJdkTest {
             {
                 assertTrue(output.contains("No JDK for ${host.id}: javaApp.jdk.yumRepo serves Linux JDKs only"), output)
             },
-            { assertTrue(output.contains("reusing it is turned off (javaApp.jdk.reuseRunning=false)"), output) },
+            { assertTrue(output.contains("reusing it is turned off (javaApp.jdk.reuseToolchain=false)"), output) },
             { assertTrue(output.contains(JdkSources.pathProperty(JdkFixture.javaFeature, host)), output) },
         )
     }

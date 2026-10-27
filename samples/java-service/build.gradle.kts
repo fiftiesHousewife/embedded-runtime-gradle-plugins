@@ -21,7 +21,7 @@ javaApp {
     }
 }
 
-// Published to build/repo, where samples/release-check finds it. With -PsigstoreSign=true every
+// Published to build/repo, where samples/deployment-pipeline finds it. With -PsigstoreSign=true every
 // published file is also signed with Sigstore, keyless, as CI's release job does with the workflow's
 // own identity; anywhere else that would open a browser to sign in, so it is off by default.
 publishing { repositories { maven { name = "sample"; url = uri(layout.buildDirectory.dir("repo")) } } }

@@ -95,11 +95,11 @@ jobs:
         run: gh attestation verify "$REPO/java-service-1.0.0-linux-x64.tar.gz" --repo "${{ github.repository }}"
       - name: app-smoke-test verifies the signature, then starts the archive
         run: >
-          ./gradlew -p samples/release-check appSmokeTest
+          ./gradlew -p samples/deployment-pipeline appSmokeTest
           "-PappSmokeTest.signerIdentity=^https://github\.com/${{ github.repository }}/\.github/workflows/ci\.yml@${{ github.ref }}$"
       - name: An archive signed by anyone else is refused
         run: |
-          if ./gradlew -p samples/release-check appSmokeTest \
+          if ./gradlew -p samples/deployment-pipeline appSmokeTest \
               "-PappSmokeTest.signerIdentity=^https://github\.com/someone-else/.*$" > refused.txt 2>&1; then
             cat refused.txt; echo "::error::an archive signed by another identity was accepted"; exit 1
           fi

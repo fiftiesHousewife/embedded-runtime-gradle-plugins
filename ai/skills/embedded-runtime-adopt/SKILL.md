@@ -32,8 +32,9 @@ The launcher `bin/<app>` runs `run`, `healthcheck` and `version`. Make the app:
   `liveness` and `readiness` groups); ignoring it is fine;
 - Node.js only: handle SIGTERM (close the server, then exit), since in a container node runs as
   PID 1 and otherwise ignores it;
-- read configuration from `APP_CONF_DIR` first and fall back to the shipped `conf.defaults/`.
-Move default config files to `src/deploy/conf/`.
+- read overrides from `APP_CONF_DIR`. Java: keep defaults in `src/main/resources` (Spring Boot:
+  `SPRING_CONFIG_ADDITIONAL_LOCATION=$APP_CONF_DIR/`); Node.js: in `src/deploy/conf/`, which ships
+  as `conf.defaults/`, the fallback when `APP_CONF_DIR` has no file.
 
 ## 3. Build and fix modules
 

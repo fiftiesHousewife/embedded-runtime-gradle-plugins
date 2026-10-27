@@ -102,5 +102,5 @@ appSmokeTest.sigstoreTrustedRoot=/etc/sigstore/trusted_root.json
 
 CI in this repository does all of this for real on every push: the Java sample is signed with the
 workflow's identity and given build provenance, then
-[`samples/release-check`](../samples/release-check) verifies and starts it, and is shown to refuse
+[`samples/deployment-pipeline`](../samples/deployment-pipeline) verifies and starts it, and is shown to refuse
 it when another identity is required.

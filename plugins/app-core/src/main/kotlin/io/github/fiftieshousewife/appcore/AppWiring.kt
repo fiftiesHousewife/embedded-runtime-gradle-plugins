@@ -80,7 +80,6 @@ class AppWiring(
                 },
             ),
         )
-        extension.configDefaults.convention(projectDir.dir("src/deploy/conf"))
         ExtensionConventions(project, ecosystem).apply(extension)
         // Unset, each target gets the format native to it: ArchiveFormat.nativeTo.
         extension.archiveFormat.convention(setting("archiveFormat", ArchiveFormat::parse))

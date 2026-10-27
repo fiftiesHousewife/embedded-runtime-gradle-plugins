@@ -102,7 +102,7 @@ abstract class AppExtension {
 
     fun runtimeSupport(action: Action<RuntimeSupportSettings>) = action.execute(runtimeSupport)
 
-    /** Default configuration shipped as `conf.defaults/`. Defaults to `src/deploy/conf`. */
+    /** Configuration shipped as `conf.defaults/` and an RPM's `/etc/<name>/`. node-app: `src/deploy/conf`. */
     abstract val configDefaults: DirectoryProperty
 
     /** Start the extracted archive and wait for `bin/<app> healthcheck` to succeed. Default true. */

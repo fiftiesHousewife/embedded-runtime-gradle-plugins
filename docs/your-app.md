@@ -23,8 +23,13 @@ this on its own. A Node.js app in a container must handle SIGTERM itself; see
 The launcher also sets `APP_HOME`, `APP_ROOT`, `APP_CONF_DIR`, `APP_DATA_DIR` and `APP_LOG_DIR`,
 and adds `APP_JAVA_OPTS` / `APP_NODE_OPTS` to the runtime's options.
 
-Default configuration files go in `src/deploy/conf/` and ship as `conf.defaults/`. Read `conf/`
-first and fall back to `conf.defaults/`, so an upgrade never overwrites a deployed file.
+Configuration defaults belong with the app. A Java app keeps them in `src/main/resources`, inside
+its jar, and reads overrides from outside it: Spring Boot from `SPRING_CONFIG_ADDITIONAL_LOCATION`
+(say `$APP_CONF_DIR/`), environment variables, or an OpenShift ConfigMap mounted there. A Node.js
+app has no classpath, so its defaults go in `src/deploy/conf/` and ship as `conf.defaults/`: read
+`$APP_CONF_DIR` first and fall back to `conf.defaults/`, so an upgrade never overwrites a deployed
+file. A Java build can ship such a directory too, with `configDefaults`; an RPM installs it as
+`/etc/<name>/`.
 
 ## Inside the archive
 

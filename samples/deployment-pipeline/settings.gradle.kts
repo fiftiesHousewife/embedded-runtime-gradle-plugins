@@ -4,4 +4,4 @@ pluginManagement {
     includeBuild("../../plugins")
 }
 
-rootProject.name = "release-check"
+rootProject.name = "deployment-pipeline"

@@ -22,7 +22,7 @@ javaApp {                                       // nodeApp {} has the same first
     license = "Apache-2.0"                      // SPDX; default LicenseRef-Proprietary (image label, RPM)
     sourceUrl = "https://github.com/example/orders" // image label; default: the origin remote
     dockerfile = file("docker/Dockerfile")      // default: the root Dockerfile, which appDockerfile keeps up to date
-    configDefaults = file("src/deploy/conf")    // shipped as conf.defaults/
+    configDefaults = file("src/deploy/conf")    // shipped as conf.defaults/; default: node-app only
     sbom = file("build/reports/bom.json")       // your own CycloneDX SBOM instead of the built-in one
     securityPolicy = "/etc/acme/java-policy"    // a directory or zip; -PjavaApp.securityPolicy wins over this
     securityPolicyArtifact = "com.acme:java-runtime-policy:7" // or the policy's zip by coordinates

@@ -93,7 +93,7 @@ internal class TargetPipeline(private val project: Project, private val wiring: 
             from(parts.manifest)
             from(parts.sbom) { rename { "sbom.cdx.json" } }
         }
-        into("conf.defaults") { from(extension.configDefaults) }
+        into("conf.defaults") { from(extension.configDefaults.map { listOf(it) }.orElse(emptyList())) }
         spec.contents(this)
         AppCopySpecs.executableBits(this)
     }

@@ -14,6 +14,8 @@ internal object NodeConventions {
                 .orElse(projectDir.dir("src").asFileTree.matching { exclude("deploy/**") }),
         )
         extension.entryPoint.convention("main.js")
+        // Node.js has no classpath for defaults, so they ship beside the app.
+        extension.configDefaults.convention(projectDir.dir("src/deploy/conf"))
         extension.testScript.convention("test")
         extension.ignoreInstallScripts.convention(true)
         extension.nodeArgs.convention(emptyList())

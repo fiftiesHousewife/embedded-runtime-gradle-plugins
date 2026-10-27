@@ -18,7 +18,7 @@ rootProject.name = "embedded-runtime-gradle-plugins"
 
 // The samples, as builds of their own the IDE and the root build both see; CI also builds each
 // with -p samples/<name>.
-listOf("java-service", "spring-boot-service", "node-service", "docker-service", "release-check")
+listOf("java-service", "spring-boot-service", "node-service", "docker-service", "deployment-pipeline")
     .forEach { includeBuild("samples/$it") }
 
 // Node.js for validateRenovatePresets. The settings plugins prefer settings

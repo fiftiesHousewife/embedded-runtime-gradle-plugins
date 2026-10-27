@@ -4,6 +4,7 @@ version = providers.gradleProperty("appVersion").getOrElse("2.0.0")
 application { mainClass = "test.Main" }
 javaApp {
     javaVersion = @FEATURE@
+    configDefaults = layout.projectDirectory.dir("src/deploy/conf")
     @JAVA_APP@
 }
 java { toolchain { vendor = JvmVendorSpec.matching("") } }

@@ -128,7 +128,7 @@ javaApp {
     }
 
     // Packaging beyond the archive.
-    configDefaults = file("src/deploy/conf")   // shipped as conf.defaults/, the fallback for conf/
+    configDefaults = file("src/deploy/conf")   // shipped as conf.defaults/ and an RPM's /etc/<name>/
     rpm {
         enabled = true                         // an RPM per Linux target, installed under /opt
         vendor = "Example Ltd"

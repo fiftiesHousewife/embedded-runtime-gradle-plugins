@@ -159,6 +159,12 @@ policy's changes to `java.security` (`SecurityPolicy`: later entries win, so the
 intact; disabled-algorithm lists are extended, never replaced), copies the overlay, and writes
 `conf/security/java-app-customisations.txt`. It is an ordinary task so builds can extend it.
 
+**Shared module sets** (`ModuleSets`): jlink links the smallest of a few fixed sets holding the
+app's modules rather than exactly those, so apps on one set share a byte-identical runtime layer.
+The sets are data, in java-app's `module-sets.properties` (`set.<name>`, and `lastFeature.<module>`
+for a module later releases no longer have); keep each to modules every supported release has.
+`jlinkModules` stays the app's own need, which `jlinkFindModules` and the fallback use.
+
 **SBOMs and image labels come from standard libraries and specs:** `CycloneDx` builds the SBOM with
 the CycloneDX reference model and package-url's purl builder (no timestamp, so rebuilds are
 byte-identical); `DockerfileTemplate` fills in the OCI `org.opencontainers.image.*` annotations.

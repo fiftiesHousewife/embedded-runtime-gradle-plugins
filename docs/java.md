@@ -20,6 +20,36 @@ javaApp { additionalModules.addAll("jdk.crypto.ec") }
 
 To choose the modules yourself instead, set `jlinkModules = listOf(...)`.
 
+### Shared module sets
+
+By default the runtime doesn't hold exactly those modules, but the smallest of a few fixed sets that
+holds them all. Apps on the same set, JDK and target then ship byte-identical runtimes, so a
+container registry stores that layer once and a node that already pulled it for one app pulls nothing
+for the next. The plugin's sets, measured as Java 21 runtimes:
+
+| Set | Holds | Size |
+|---|---|---|
+| `base` | `java.base`, `jdk.httpserver` | 30 MB |
+| `service` | HTTP clients and servers, XML, JDBC, JNDI, TLS, `jdk.unsupported` | 38 MB |
+| `framework` | `service` plus what Spring Boot, Quarkus and Micronaut use (`java.desktop`, `java.instrument`, JFR, JMX) | 54 MB |
+| `server` | `framework` plus locales, Kerberos, PKCS#11, XML signatures | 66 MB |
+
+An app no set covers, such as one needing a module only it uses, gets exactly its own modules. A set
+holding a module in `security.forbiddenModules` is never chosen. `jlinkFindModules` always works on
+the app's own modules, so it still reports what the app really needs.
+
+Add or replace sets, or turn them off:
+
+```kotlin
+javaApp {
+    moduleSets.put("batch", listOf("java.base", "java.sql", "java.logging", "jdk.unsupported"))
+    sharedModuleSets = false        // exactly the app's modules; or -PjavaApp.sharedModuleSets=false
+}
+```
+
+`moduleSets.set(mapOf(...))` replaces the plugin's sets with your own. Choose them from the runtimes
+you actually ship: each archive's `runtime/release` file lists its modules on its `MODULES=` line.
+
 `jlinkOptions` passes options straight to `jlink`. Besides the defaults (no debug information, man
 pages or headers; compressed), some are worth knowing: `--include-locales=en,de` keeps only the
 locales you need when `jdk.localedata` is linked, `--dedup-legal-notices=error-if-not-same-content`

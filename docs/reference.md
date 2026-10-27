@@ -40,6 +40,8 @@ javaApp {                                       // nodeApp {} has the same first
     jdkVersion = "21.0.13+9"                    // default: the plugin's pin
     additionalModules = listOf("jdk.crypto.ec") // added to what jdeps finds
     jlinkModules = listOf("java.base")          // instead: exactly these modules
+    sharedModuleSets = true                     // link the smallest shared set holding them; default: -PjavaApp.sharedModuleSets
+    moduleSets.put("batch", listOf("java.base", "java.sql")) // default: base, service, framework, server
     runtimeOverlay = file("src/deploy/runtime") // copied over the runtime as it is
     security { … }                              // see Hardening the runtime
     jlinkOptions = listOf("--strip-debug", "--no-man-pages", "--no-header-files", "--compress=zip-6")
@@ -165,6 +167,7 @@ also be set in code: the repository and runtime ones in `embeddedRuntime {}`, th
 | `appSmokeTest.securityPolicy`, `appSmokeTest.securityPolicyArtifact` | | In a build applying `app-smoke-test`: the policy every archive must comply with before it is started |
 | `javaApp.archiveFormat`, `nodeApp.archiveFormat` | `zip` for Windows, `tar.gz` for the rest | `tar.gz`, `tar` or `zip`, for every target |
 | `javaApp.rpm`, `nodeApp.rpm` | `false` | Also build an RPM per Linux target |
+| `javaApp.sharedModuleSets` | `true` | Link the smallest shared module set holding the app's modules, not exactly those |
 | `javaApp.runtimeOptions`, `nodeApp.runtimeOptions` | `open` | `locked` refuses to start while anything would add runtime options |
 | `javaApp.allowUntestedPublish`, `nodeApp.allowUntestedPublish` | `false` | Allow publishing an archive that was never started |
 | `javaApp.runtimeSupportUrl`, `nodeApp.runtimeSupportUrl` | `https://endoflife.date/api/v1/products/` | Where `checkRuntimeSupport` reads end-of-life data; a mirror behind a corporate network |

@@ -23,6 +23,10 @@ internal class JavaConventions(private val project: Project, private val extensi
         extension.jlinkModules.convention(
             detectedModules.zip(extension.additionalModules) { detected, extra -> (detected + extra).distinct() },
         )
+        extension.sharedModuleSets.convention(
+            project.providers.gradleProperty(ModuleSets.ENABLED_PROPERTY).map(String::toBoolean).orElse(true),
+        )
+        extension.moduleSets.convention(javaFeature.map(ModuleSets::defaults))
         extension.jlinkOptions.convention(javaFeature.map(::jlinkOptions))
         extension.jvmArgs.convention(emptyList())
         JavaRuntimeDefaults.Settings().let { default ->

@@ -8,6 +8,7 @@ import io.github.fiftieshousewife.javaapp.tasks.JlinkFindModules
 import io.github.fiftieshousewife.javaapp.tasks.JlinkRuntime
 import org.gradle.api.GradleException
 import org.gradle.api.Project
+import org.gradle.api.provider.Provider
 import org.gradle.api.tasks.Sync
 import org.gradle.api.tasks.TaskProvider
 import org.gradle.api.tasks.bundling.Jar
@@ -27,6 +28,19 @@ internal class JavaRuntimeTasks(
     private val hostJdk get() = jdks.forTarget(wiring.host)
     private val group = JavaAppPlugin.ECOSYSTEM.taskGroup
 
+    /**
+     * What jlink links: the app's modules, or the smallest shared set holding them ([ModuleSets]).
+     * `jlinkFindModules` keeps the app's own modules, so it still finds what the app needs.
+     */
+    private val linkedModules: Provider<List<String>> = extension.sharedModuleSets.flatMap { shared ->
+        if (!shared) return@flatMap extension.jlinkModules
+        extension.jlinkModules
+            .zip(extension.moduleSets) { needed, sets -> needed to sets }
+            .zip(extension.security.forbiddenModules) { (needed, sets), forbidden ->
+                ModuleSets.choose(needed, sets, forbidden)
+            }
+    }
+
     /** Links [target]'s trimmed runtime with this machine's jlink, from [target]'s JDK. */
     fun jlink(target: Target): TaskProvider<JlinkRuntime> {
         val targetHome = jdks.forTarget(target)
@@ -41,7 +55,7 @@ internal class JavaRuntimeTasks(
             jdkVersion.set(extension.jdkVersion)
             host.set(wiring.host)
             this.target.set(target)
-            modules.set(extension.jlinkModules)
+            modules.set(linkedModules)
             options.set(extension.jlinkOptions)
             outputDir.set(wiring.workDir.map { it.dir("jlink/${target.id}") })
         }

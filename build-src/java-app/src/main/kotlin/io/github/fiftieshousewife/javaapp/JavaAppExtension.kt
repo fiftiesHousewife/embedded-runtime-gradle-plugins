@@ -4,6 +4,7 @@ import io.github.fiftieshousewife.appcore.AppExtension
 import org.gradle.api.Action
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.provider.ListProperty
+import org.gradle.api.provider.MapProperty
 import org.gradle.api.provider.Property
 import org.gradle.api.tasks.Nested
 
@@ -16,8 +17,9 @@ abstract class JavaAppExtension : AppExtension() {
     abstract val jdkVersion: Property<String>
 
     /**
-     * Modules linked into the runtime. Defaults to what `jdeps` finds in the app and its
-     * dependencies, plus [additionalModules]. Set it to take full control of the list.
+     * Modules the runtime must hold. Defaults to what `jdeps` finds in the app and its
+     * dependencies, plus [additionalModules]. Set it to take full control of the list; with
+     * [sharedModuleSets] the runtime links the smallest shared set that holds them.
      */
     abstract val jlinkModules: ListProperty<String>
 
@@ -27,6 +29,20 @@ abstract class JavaAppExtension : AppExtension() {
      * reports which ones an app needs.
      */
     abstract val additionalModules: ListProperty<String>
+
+    /**
+     * Whether the runtime is the smallest of [moduleSets] holding every module in [jlinkModules],
+     * rather than exactly those: apps on the same set ship identical runtimes, so a container
+     * registry or node stores that layer once. An app no set covers gets exactly its own modules.
+     * Default `true`, or the `javaApp.sharedModuleSets` property.
+     */
+    abstract val sharedModuleSets: Property<Boolean>
+
+    /**
+     * The shared module sets, by name. Defaults to the plugin's `base`, `service`, `framework` and
+     * `server`; `put` adds or replaces one, `set` replaces them all.
+     */
+    abstract val moduleSets: MapProperty<String, List<String>>
 
     /** Extra `jlink` options; defaults strip debug info, man pages and headers. */
     abstract val jlinkOptions: ListProperty<String>

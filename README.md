@@ -263,7 +263,7 @@ setting and its default is in the [reference](docs/reference.md).
 | `extractJdk<Target>`, `extractJmods<Target>` | Downloads and unpacks the target's pinned JDK (and, from Java 24, its separate jmods) | `javaVersion`, `jdkVersion`; `-PjavaApp.jdk.distribution`, `-PjavaApp.jdk.<feature>`, `-PjavaApp.jdk.url`, `-PjavaApp.jdk.localPath`, `-PjavaApp.jdk.<feature>.<target>.path`, `-PbinaryRepo.repository` or `-PbinaryRepo.url` |
 | `jdeps` | Lists the JDK modules the code refers to | |
 | `jlinkFindModules` | Runs the app, adding each JDK module it turns out to need, until it is healthy | `smokeTestTimeout` |
-| `jlink<Target>` | Links the target's trimmed runtime | `additionalModules`, `jlinkModules`, `jlinkOptions` |
+| `jlink<Target>` | Links the target's trimmed runtime | `additionalModules`, `jlinkModules`, `sharedModuleSets`, `moduleSets`, `jlinkOptions` |
 | `customiseRuntime<Target>` | Applies trusted certificates, security properties, the overlay and the runtime policy to it | `security { … }`, `runtimeOverlay`; `-PjavaApp.securityPolicy[Artifact]` |
 
 ### Node.js

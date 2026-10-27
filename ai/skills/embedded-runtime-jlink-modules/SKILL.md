@@ -51,6 +51,12 @@ until something runs the app.
 
 ## Notes
 
+- By default the runtime is the smallest shared module set (`base`, `service`, `framework`,
+  `server`) holding the modules found, so it can contain more than the app needs and a missing
+  module can go unnoticed. `jlinkFindModules` always works on the app's own modules; trust its
+  report over what the built runtime happens to contain. `javaApp { sharedModuleSets = false }`
+  links exactly the app's modules.
+
 - Modules must exist in every target JDK. Cross-target builds link against each target JDK's
   `jmods/`; the module list is shared by all targets.
 - Third-party libraries that are themselves modular can need JDK modules jdeps reports only with

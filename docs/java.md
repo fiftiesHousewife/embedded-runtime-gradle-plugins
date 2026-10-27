@@ -193,7 +193,8 @@ after the build's `jvmArgs`. Both the build's `jvmArgs` and `jvm.options` are ta
 
 ```properties
 # gradle.properties
-javaApp.jdk.distribution=corretto
+javaApp.jdk.distribution=oracle
+javaApp.jdk.25=25.0.3
 ```
 
 | Distribution | Exact version looks like |
@@ -206,15 +207,12 @@ javaApp.jdk.distribution=corretto
 | `microsoft` | `21.0.12` |
 | `sapmachine` | `21.0.13` |
 
-Each plugin release pins an exact, tested version of every distribution and Java release, and the
-same JDK compiles your code and runs inside the archive. To take a security patch before the next
-plugin release, override the pin:
-
-```properties
-javaApp.jdk.21=21.0.13+9
-```
-
-A version in the wrong form for its distribution is rejected before anything is downloaded.
+Each plugin release pins an exact, tested Temurin build of each long-term-support release (11, 17,
+21 and 25), and the same JDK compiles your code and runs inside the archive. Any other distribution,
+or a release in between, takes its exact version from the build, as above: the build stops and says
+what to set when one is missing, and a version in the wrong form for its distribution is rejected
+before anything is downloaded. The same property overrides a Temurin pin, to take a security patch
+before the next plugin release; [Renovate presets](renovate.md) keep such versions current.
 
 Not every distribution covers every release and target:
 

@@ -124,7 +124,7 @@ The tools each cover part of this:
 
 The last row is the gap these plugins close.
 
-**One coordinate for the runtime set.** A plugin release pins an exact JDK for every vendor and Java release, the Node.js version and the container base image. All of them come from one version catalogue and are tested together on every target. To Renovate or Dependabot that is one version in `settings.gradle.kts`, so a quarterly Java security update arrives as a single pull request, and nobody hunts down a toolchain line, a Dockerfile and a server package.
+**One coordinate for the runtime set.** A plugin release pins an exact JDK for each long-term-support Java release, the Node.js version and the container base image. All of them come from one version catalogue and are tested together on every target. To Renovate or Dependabot that is one version in `settings.gradle.kts`, so a quarterly Java security update arrives as a single pull request, and nobody hunts down a toolchain line, a Dockerfile and a server package.
 
 **The compatibility check uses the real JDK.** The compile toolchain is the exact JDK that will be embedded, so Gradle's `org.gradle.jvm.version` check compares a library against the Java release the app will really run on, not whatever JDK the build agent has.
 

@@ -203,7 +203,8 @@ the Node.js pin (`node`) and the Dockerfile base image (`ubi-minimal-tag` and `u
 `build-logic/renovate-validator/package.json` and its lockfile, which Renovate's npm support updates (a
 catalogue version names no Maven module, so Renovate would not).
 
-**Bump runtime pins.** Edit the `jdk-…` or `node` version in `gradle/libs.versions.toml`. A pin must resolve on **every** supported target: vendors upload a
+**Bump runtime pins.** Only the default vendor's long-term-support releases are pinned (`jdk-temurin-<feature>`);
+any other vendor or release takes `javaApp.jdk.<feature>` from the build. Edit the `jdk-…` or `node` version in `gradle/libs.versions.toml`. A pin must resolve on **every** supported target: vendors upload a
 release one platform at a time, so check all five URLs exist before pinning (the unit tests prove the
 URL shape, not that the file exists). The `every catalogue pin…` test checks each pin's form.
 
@@ -219,10 +220,10 @@ organisation's binary repository. `ubi.json` is a reference example for Renovate
 (`docs/renovate.md`).
 
 **Add a JDK vendor.** Add a `JdkDistribution` entry (vendor spec, `JdkSite`, `VersionForm`, and an
-`artifact()` built from an `ArchiveName` and the vendor's `Spelling`), `jdk-<id>-<feature>` pins in the catalogue,
+`artifact()` built from an `ArchiveName` and the vendor's `Spelling`), no catalogue pins (users give the version),
 Linux, macOS and Windows rows in `java-app/src/test/resources/jdk-download-urls.csv`, a rejected
 example in `JdkVersionFormsTest`, and a row in the README table. Then build `samples/java-service`
-with `-PjavaApp.jdk.distribution=<id>`.
+with `-PjavaApp.jdk.distribution=<id> -PjavaApp.jdk.21=<version>`.
 
 **Add a target.** One constant in `Arch` or `Os` and one entry in `Target.SUPPORTED`. Target ids
 are published Maven classifiers: never change an existing one.

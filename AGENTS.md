@@ -15,6 +15,7 @@ build-src/                  the plugin build, included by the root build
   node-app/                 io.github.fiftieshousewife:node-app      package …nodeapp
   config/detekt/detekt.yml  deviations from detekt's defaults only
 scripts/                    curate-runtimes.sh (mirrors approved runtimes into the binary repository)
+renovate/                   Renovate presets for users: temurin and nodejs pin overrides; ubi, a reference example
 docs/                       user documentation, linked from the README; article.md is the article's home
 .github/scripts/            verify-rpm.sh: CI installs the sample's RPM in a Rocky Linux container
 .claude-plugin/             the Claude Code marketplace manifest (must stay at the root)
@@ -201,6 +202,11 @@ the Node.js pin (`node`) and the Dockerfile base image (`ubi-minimal-tag` and `u
 **Bump runtime pins.** Edit the `jdk-…` or `node` version in `gradle/libs.versions.toml`. A pin must resolve on **every** supported target: vendors upload a
 release one platform at a time, so check all five URLs exist before pinning (the unit tests prove the
 URL shape, not that the file exists). The `every catalogue pin…` test checks each pin's form.
+
+**Bump the Dockerfile base image.** `ubi-minimal-tag` and `ubi-minimal-digest` in the catalogue
+move together; take the digest from the registry as the comment there says. The catalogue's two
+lines are also the second example in `renovate/ubi.json` (a reference for Renovate maintainers,
+documented in `docs/runtime-updates.md`), so keep them adjacent and in that order.
 
 **Add a JDK vendor.** Add a `JdkDistribution` entry (vendor spec, `JdkSite`, `VersionForm`, and an
 `artifact()` built from an `ArchiveName` and the vendor's `Spelling`), `jdk-<id>-<feature>` pins in the catalogue,

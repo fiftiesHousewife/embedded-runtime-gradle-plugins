@@ -89,3 +89,26 @@ Adoptium's releases; the hosted Renovate app has one already.
 
 Both stay within the release line: moving from Java 21 to 25 or Node.js 24 to 26 is a decision,
 not an update.
+
+### The container base image
+
+The Dockerfile's base image, `registry.access.redhat.com/ubi9/ubi-minimal` pinned by tag and
+digest, comes from the plugin release like the runtimes, so upgrading the plugin moves it. Teams
+that pass their own with `--build-arg BASE_IMAGE=…`, a registry mirror say, pin it themselves.
+[`renovate/ubi.json`](../renovate/ubi.json) is a reference example for whoever runs Renovate for
+your organisation, to copy into the central configuration and adapt. It shows how to:
+
+- **Find `BASE_IMAGE=<image>:<tag>@sha256:<digest>`** in CI configuration (GitHub Actions, GitLab
+  CI, Jenkins), Makefiles, shell scripts and `gradle.properties`, mirror registries included.
+- **Find a tag and digest kept as separate values,** as in a version catalogue
+  (`ubi-minimal-tag` followed by `ubi-minimal-digest`); rename the keys for your own.
+- **Move tag and digest in one pull request**: for a new minor (9.8 to 9.9), and for a rebuild of
+  the same tag, which is how Red Hat ships security fixes, under a new digest.
+- **Stay on plain `9.<minor>` tags**, ignoring `latest` and Red Hat's `9.<minor>-<build>` tags,
+  and on UBI 9: UBI 10 is a different image name, so moving to it is a decision.
+- **Leave the plugin's Dockerfile alone**: the `ARG BASE_IMAGE` default in its managed block is
+  rewritten from each plugin release, so the preset turns off Renovate's Dockerfile updates for
+  that image rather than open pull requests the next build undoes.
+
+A mirror needs the same `hostRules` credentials Renovate already uses for that registry. Check an
+adapted copy with `npx --package renovate renovate-config-validator <file>`.

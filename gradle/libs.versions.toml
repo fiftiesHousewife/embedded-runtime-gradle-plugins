@@ -96,6 +96,8 @@ node = "24.22.1"
 # and by the digest of its multi-arch index, so every build of a release starts from the same bytes.
 # Bump both together: the digest is the Docker-Content-Digest of
 #   https://registry.access.redhat.com/v2/ubi9/ubi-minimal/manifests/<tag> (pins as of 2026-10-26)
+# renovate/ubi.json uses these two lines as its example of a tag and digest kept apart: keep them
+# adjacent and in this order.
 ubi-minimal-tag = "9.8"
 ubi-minimal-digest = "sha256:2d4c4551af6831dcd26bbf86108c4385de5183ec8fe6b5868f6f9640fe47f4ed"
 

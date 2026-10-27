@@ -18,7 +18,7 @@ under the configuration cache.
 
 | Item | Notes |
 |---|---|
-| **Renovate for the UBI pin** | `ubi-minimal-tag`/`-digest` in the catalogue have no rule; add `renovate/ubi.json` (docker datasource, digest updates). Independent of the rest |
+| **Renovate reference for the base image** | `renovate/ubi.json` (2026-10-27), a reference example for Renovate maintainers, documented in `docs/runtime-updates.md`. Not yet checked with `renovate-config-validator` (blocked in the agent's sandbox): run it once |
 | **Engine** | Isolated worker (`classLoaderIsolation`, like the Sigstore verifier): rewrite-core brings Jackson, ASM, JNA, Caffeine, Micrometer and ANTLR. Custom recipes need `javaParameters = true` or their YAML options arrive as null. Strip `~~>` search markers before writing and report them as findings. Lines added to a CRLF file come out LF: normalise |
 | **Recipes to write** | Built-ins cover labels, exec-form entrypoint, `ADD` to `COPY`, non-root user. Missing: ensure an instruction (`EXPOSE`, `ENTRYPOINT`), group-0 ownership on `COPY`, ports below 1024, `/licenses`, merging labels into an existing `LABEL`. `USER` stays (numeric), since Red Hat's `RunAsNonRoot` needs it though OpenShift ignores it |
 | **Layers** | Split the single `COPY app/` into `runtime/`, `lib/` and the app, so a release doesn't re-push the 39 MB runtime; add a test that a runtime builds byte-identical twice |

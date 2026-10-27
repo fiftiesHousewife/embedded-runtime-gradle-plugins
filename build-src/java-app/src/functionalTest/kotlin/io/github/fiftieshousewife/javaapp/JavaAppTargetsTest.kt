@@ -126,6 +126,34 @@ class JavaAppTargetsTest {
     }
 
     @Test
+    fun `an RPM named with the OS and RPM CPU, in a folder per OS, is found from one pattern`() {
+        val target = Target.parse(host)
+        val repository = tmp.resolve("corporate-jdks")
+        val (feature, update) = JdkFixture.jdkVersion.substringBefore('+').split('.').let {
+            it[0] to
+                it.getOrElse(2) { "0" }
+        }
+        val named = repository.resolve(
+            "temurin/${target.os.id}/jdk${feature}_$update-64_${target.os.id}.${target.arch.rpm}.rpm",
+        )
+        named.parentFile.mkdirs()
+        JdkFixture.publishRpm(tmp.resolve("rpm"), group = "x").copyTo(named)
+        val project = javaService(
+            tmp,
+            JavaServiceOptions(
+                publishJdk = false,
+                properties = listOf(
+                    JdkSources.LOCAL_PATH to repository.absolutePath,
+                    JdkSources.LOCAL_PATTERN to "[organisation]/[os]/jdk[revision]-64_[os].[rpmArch].rpm",
+                    JdkSources.REVISION_FORMAT to "[feature]_[update]",
+                    "org.gradle.java.installations.paths" to JdkFixture.home.absolutePath,
+                ),
+            ),
+        )
+        assertEquals(TaskOutcome.SUCCESS, project.build("build").task(":appSmokeTest")?.outcome)
+    }
+
+    @Test
     fun `JDK archives are read from a shared local directory`() {
         val shared = tmp.resolve("shared-jdks")
         val project =

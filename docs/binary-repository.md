@@ -134,8 +134,21 @@ javaApp.jdk.binaryRepoPattern=jdks/[organisation]/[classifier]/[revision].[ext]
 ```
 
 A pattern can use `[organisation]` (the distribution, e.g. `temurin`, or `nodejs`), `[module]` and
-`[artifact]` (both `jdk` or `node`), `[revision]` (the version, with `+` written as `_`),
-`[classifier]` (the target, e.g. `linux-x64`) and `[ext]` (`tar.gz`, or `zip` for a Windows runtime).
+`[artifact]` (both `jdk` or `node`), `[revision]` (the version, with `+` written as `_`) and `[ext]`
+(`tar.gz`, or `zip` for a Windows runtime), and these for the target, shown for `linux-x64` and
+`linux-aarch64`:
+
+| Token | `linux-x64` | `linux-aarch64` | As named by |
+|---|---|---|---|
+| `[target]`, `[classifier]` | `linux-x64` | `linux-aarch64` | these plugins, Maven classifiers |
+| `[os]` | `linux` | `linux` | these plugins (`windows`, `mac`) |
+| `[arch]` | `x64` | `aarch64` | these plugins, most JDK vendors |
+| `[rpmArch]` | `x86_64` | `aarch64` | RPM, YUM, `uname -m` |
+| `[containerArch]` | `amd64` | `arm64` | container platforms, Debian |
+
+So one pattern names every CPU's file: `java/jdk[revision]-64_[os].[rpmArch].rpm` gives
+`java/jdk21_5-64_linux.x86_64.rpm` and `java/jdk21_5-64_linux.aarch64.rpm`. The target tokens may
+sit anywhere, across folders too, but not reach across the edge of an optional `(…)` part.
 
 When your file names spell the version differently, `javaApp.jdk.revisionFormat` sets how
 `[revision]` is written, from these tokens (shown for `21.0.5+9`): `[version]` (`21.0.5+9`),
@@ -175,8 +188,8 @@ pattern that ends in `.rpm`:
 ```properties
 # default: binaryRepo.repo.runtimes
 javaApp.jdk.binaryRepo=generic-local
-# generic-local/java/jdk21_5-64_linux.x86_64.rpm
-javaApp.jdk.binaryRepoPattern=java/jdk[revision]-64_linux.x86_64.rpm
+# generic-local/java/jdk21_5-64_linux.x86_64.rpm, and …linux.aarch64.rpm for the other CPU
+javaApp.jdk.binaryRepoPattern=java/jdk[revision]-64_[os].[rpmArch].rpm
 javaApp.jdk.revisionFormat=[feature]_[update]
 ```
 

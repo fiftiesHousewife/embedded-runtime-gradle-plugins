@@ -11,10 +11,35 @@ import java.net.URI
 data class RuntimeRepository(
     val name: String,
     val baseUrl: URI,
+    /** The pattern Ivy resolves: a curated pattern's OS and CPU tokens are folded into `[classifier]`. */
     val artifactPattern: String,
     /** The only Ivy organisation resolved from this repository, and the only one it may serve. */
     val group: String,
+    /** The stretch of a curated pattern holding [TargetTokens], each target's classifier once rendered. */
+    private val classifierTemplate: String? = null,
 ) {
+    /**
+     * An archive in a curated tree, for [target]: renamed on upload to the archive's target id by
+     * default, or named as the tree's pattern says with [TargetTokens].
+     */
+    fun curated(module: String, revision: String, target: Target): RuntimeArtifact {
+        val tokens = mapOf(
+            "organisation" to group,
+            "module" to module,
+            "artifact" to module,
+            "revision" to revision,
+            "ext" to target.archiveExtension,
+        )
+        return RuntimeArtifact(
+            group,
+            module,
+            revision,
+            artifact = module,
+            classifier = classifierTemplate?.let { TargetTokens.render(it, target, tokens) } ?: target.id,
+            extension = target.archiveExtension,
+        )
+    }
+
     /** The URL Ivy resolves for [artifact]; the JDK toolchain resolver hands this to Gradle directly. */
     fun downloadUri(artifact: RuntimeArtifact): URI {
         val tokens =
@@ -48,6 +73,12 @@ data class RuntimeRepository(
 
         fun slash(url: String): URI = URI.create(url.trimEnd('/') + "/")
 
+        /** A curated tree laid out by [pattern], which may name the OS and CPU with [TargetTokens]. */
+        fun curated(name: String, baseUrl: URI, pattern: String, group: String): RuntimeRepository {
+            val (ivyPattern, classifierTemplate) = TargetTokens.split(pattern)
+            return RuntimeRepository(name, baseUrl, ivyPattern, group, classifierTemplate)
+        }
+
         private val OPTIONAL = Regex("""\(([^()]*)\)""")
         private val TOKEN = Regex("""\[([a-z]+)]""")
     }
@@ -63,16 +94,4 @@ data class RuntimeArtifact(
     val extension: String,
 ) {
     val notation: String get() = "$group:$module:$revision"
-
-    companion object {
-        /** An archive in the curated layout, renamed on upload to the archive's own target id. */
-        fun curated(group: String, module: String, revision: String, target: Target) = RuntimeArtifact(
-            group,
-            module,
-            revision,
-            artifact = module,
-            classifier = target.id,
-            extension = target.archiveExtension,
-        )
-    }
 }

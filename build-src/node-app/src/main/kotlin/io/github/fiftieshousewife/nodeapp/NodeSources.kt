@@ -25,7 +25,7 @@ class NodeSources(private val binaryRepo: BinaryRepository?, private val overrid
                     GROUP,
                 )
             } else {
-                RuntimeRepository(
+                RuntimeRepository.curated(
                     "binaryRepoNode",
                     binaryRepo.runtimesUrl,
                     overrides.binaryRepoPattern ?: RuntimeRepository.CURATED_PATTERN,
@@ -37,7 +37,7 @@ class NodeSources(private val binaryRepo: BinaryRepository?, private val overrid
         RuntimeArtifact(GROUP, "node", version, "node", distClassifier(target), target.archiveExtension)
     } else {
         // Renamed on upload to the archive's own target ids, as for JDKs.
-        RuntimeArtifact.curated(GROUP, "node", version, target)
+        repository.curated("node", version, target)
     }
 
     val npmRegistry: URI

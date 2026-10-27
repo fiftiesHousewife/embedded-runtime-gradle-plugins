@@ -36,14 +36,12 @@ class JdkSources(
                     )
                 }
 
-                is JdkLocation.Curated -> {
-                    RuntimeRepository(
-                        name = location.name,
-                        baseUrl = location.baseUrl,
-                        artifactPattern = location.pattern ?: RuntimeRepository.CURATED_PATTERN,
-                        group = distribution.group,
-                    )
-                }
+                is JdkLocation.Curated -> RuntimeRepository.curated(
+                    location.name,
+                    location.baseUrl,
+                    location.pattern ?: RuntimeRepository.CURATED_PATTERN,
+                    distribution.group,
+                )
             }
 
     fun artifact(version: JdkVersion, target: Target): RuntimeArtifact = when (location) {
@@ -52,7 +50,7 @@ class JdkSources(
         // Renamed on upload, so the vendor's own naming is irrelevant here; the revision is spelled
         // as the tree names it.
         is JdkLocation.Curated ->
-            RuntimeArtifact.curated(distribution.group, "jdk", location.revision(version), target)
+            repository.curated("jdk", location.revision(version), target)
     }
 
     /**
@@ -69,13 +67,7 @@ class JdkSources(
      */
     fun jmodsArtifact(version: JdkVersion, target: Target): RuntimeArtifact = when (location) {
         is JdkLocation.Public -> distribution.jmodsArtifact(version, target)
-
-        is JdkLocation.Curated -> RuntimeArtifact.curated(
-            distribution.group,
-            "jmods",
-            location.revision(version),
-            target,
-        )
+        is JdkLocation.Curated -> repository.curated("jmods", location.revision(version), target)
     }
 
     fun downloadUri(version: JdkVersion, target: Target): URI = repository.downloadUri(artifact(version, target))

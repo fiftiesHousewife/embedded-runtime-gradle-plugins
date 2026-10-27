@@ -1,6 +1,7 @@
 package io.github.fiftieshousewife.javaapp
 
 import io.github.fiftieshousewife.appcore.AppWiring
+import io.github.fiftieshousewife.appcore.Os
 import io.github.fiftieshousewife.appcore.RuntimeArtifact
 import io.github.fiftieshousewife.appcore.Target
 import io.github.fiftieshousewife.appcore.setting
@@ -67,10 +68,9 @@ internal class Jdks(
      * vendor's separate jmods ([JdkDistribution.separateJmods]) are still fetched.
      */
     private fun runningJdk(target: Target, feature: Int): JdkHome? {
-        val reuse = project.providers.setting(JdkSources.REUSE_RUNNING)?.toBoolean() ?: true
-        val home = File(project.providers.systemProperty("java.home").get())
         val sources = JdkSources.from(project.providers)
-        if (target != wiring.host || !reuse || !isPinned(home, sources.distribution, feature)) return null
+        if (whyNotRunningJdk(target, sources.distribution, feature) != null) return null
+        val home = runningHome
         project.logger.info("Using the JDK running this build for ${target.id}: $home")
         val dir = project.layout.dir(project.provider { home })
         if (home.resolve(JMODS).isDirectory) return JdkHome(dir, builtBy = null)
@@ -79,11 +79,32 @@ internal class Jdks(
         return JdkHome(dir, builtBy = null, project.layout.dir(jmods.map { it.destinationDir }), jmods)
     }
 
-    /** Whether the JDK at [home] is the pinned [distribution] and version, and jlink can link from it. */
-    private fun isPinned(home: File, distribution: JdkDistribution, feature: Int): Boolean =
-        JdkTools.implementor(home) == distribution.implementor &&
-            JdkTools.isPinned(extension.jdkVersion.get(), home) &&
-            (home.resolve(JMODS).isDirectory || distribution.separateJmods(feature))
+    private val runningHome: File get() = File(project.providers.systemProperty("java.home").get())
+
+    /**
+     * Why the JDK running this build can't be [target]'s, or null when it can: it must be this
+     * machine's, be the pinned [distribution] and version, and have `jmods/` (or the vendor ships
+     * those separately), and reuse must not be turned off.
+     */
+    private fun whyNotRunningJdk(target: Target, distribution: JdkDistribution, feature: Int): String? {
+        val home = runningHome
+        val pin = extension.jdkVersion.get()
+        val implementor = JdkTools.implementor(home)
+        return when {
+            project.providers.setting(JdkSources.REUSE_RUNNING)?.toBoolean() == false ->
+                "reusing it is turned off (${JdkSources.REUSE_RUNNING}=false)"
+
+            target != wiring.host -> "it runs on ${wiring.host.id}, not ${target.id}"
+
+            implementor != distribution.implementor || !JdkTools.isPinned(pin, home) ->
+                "it is $implementor ${JdkTools.javaVersion(home)} at $home, not ${distribution.implementor} $pin"
+
+            !home.resolve(JMODS).isDirectory && !distribution.separateJmods(feature) ->
+                "it has no jmods/ to link from ($home)"
+
+            else -> null
+        }
+    }
 
     private fun jmodsArchive(sources: JdkSources, target: Target) =
         resolved(JMODS, target) { sources.jmodsArtifact(it, target) }
@@ -91,6 +112,7 @@ internal class Jdks(
     /** The pinned JDK for [target], resolved like any other dependency, with its jmods if separate. */
     private fun downloadedJdk(target: Target, feature: Int): JdkHome {
         val sources = JdkSources.from(project.providers)
+        if (sources.archivesAreRpms && target.os != Os.LINUX) throw linuxOnly(target, feature, sources)
         val yum = sources.yum
         val jdk = if (yum != null) {
             extracted(target, yumPackage(target, feature, yum), rpm = true)
@@ -102,6 +124,19 @@ internal class Jdks(
         val jmods =
             extract("extractJmods${target.taskSuffix}", jmodsArchive(sources, target), "jdk/${target.id}-$JMODS")
         return JdkHome(jdk.dir, jdk.builtBy, project.layout.dir(jmods.map { it.destinationDir }), jmods)
+    }
+
+    /**
+     * A YUM repository or `.rpm` pattern holds Linux JDKs, so another target needs its JDK by path, or
+     * the JDK running the build; this says why the latter wasn't used.
+     */
+    private fun linuxOnly(target: Target, feature: Int, sources: JdkSources): GradleException {
+        val source = if (sources.yum != null) JdkSources.YUM_REPO else "the .rpm pattern"
+        return GradleException(
+            "No JDK for ${target.id}: $source serves Linux JDKs only. The JDK running this build can't be used: " +
+                "${whyNotRunningJdk(target, sources.distribution, feature)}. Run the build with the pinned JDK, " +
+                "or set ${JdkSources.pathProperty(feature, target)} to a ${target.os.id} JDK.",
+        )
     }
 
     /** The JDK's RPM from a YUM repository, found by package name, pinned version and [target]'s CPU. */

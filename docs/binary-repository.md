@@ -16,7 +16,7 @@ Nothing is copied into a new property, and your build's own repositories are lef
 ```kotlin
 // settings.gradle.kts: what your build already has
 plugins {
-    id("io.github.fiftieshousewife.java-app.settings") version "0.0.4"
+    id("io.github.fiftieshousewife.java-app.settings") version "0.0.5"
 }
 dependencyResolutionManagement {
     repositories {
@@ -208,8 +208,14 @@ stops and lists the versions it does have.
 The package is downloaded with the binary repository's login and checked against the SHA-256 the
 repository's metadata records, then kept once per machine in Gradle's user home
 (`caches/embedded-runtime/yum/`), shared by every build. Once in place the task is up to date and
-needs no network. A target given a JDK by path (`javaApp.jdk.21.windows-x64.path`) uses that
-instead, so Windows machines keep their installed JDK.
+needs no network.
+
+A YUM repository, like an `.rpm` pattern below, serves Linux targets only. Any other target (a
+Windows or Mac machine building for itself) uses the JDK running the build when that is the pinned
+one ([The JDK running the build](java.md#the-jdk-running-the-build)), or a JDK given by path
+(`javaApp.jdk.21.windows-x64.path`). With neither, the build stops and says why the running JDK
+couldn't be used (another vendor or version, no `jmods/`, reuse turned off); it never unpacks a
+Linux RPM for another OS.
 
 RPMs in a plain file tree (a generic repository, a share) are read by file name instead, with a
 pattern that ends in `.rpm`:

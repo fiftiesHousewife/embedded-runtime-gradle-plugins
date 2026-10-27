@@ -1,5 +1,6 @@
 package io.github.fiftieshousewife.javaapp
 
+import io.github.fiftieshousewife.appcore.Target
 import io.github.fiftieshousewife.appcore.TestProject
 import org.junit.jupiter.api.Assumptions.assumeTrue
 import org.redline_rpm.Builder
@@ -8,6 +9,7 @@ import org.redline_rpm.header.Os
 import java.io.File
 import java.io.IOException
 import java.nio.file.Files
+import io.github.fiftieshousewife.appcore.Os as TargetOs
 
 /**
  * The JDK running the tests, repackaged in Adoptium's layout under [TestProject.sources]. It is the
@@ -31,6 +33,21 @@ object JdkFixture {
 
     /** The JDK running the tests, which the fixtures repackage. */
     val home: File get() = File(System.getProperty("java.home"))
+
+    private val host = Target.parse(TestProject.hostTarget())
+
+    /** The target a test of RPM sources (Linux only) builds: this machine's on Linux, else Linux on this CPU. */
+    val rpmTarget: Target = if (host.os == TargetOs.LINUX) host else Target(TargetOs.LINUX, host.arch)
+
+    /** Whether [rpmTarget] is this machine's, so its archive is started by the smoke test. */
+    val rpmTargetStarts: Boolean = rpmTarget == host
+
+    /**
+     * On a machine that isn't Linux, its own JDK by path, as a Windows desktop beside Linux servers
+     * would have it: an RPM source serves Linux targets only.
+     */
+    fun hostJdkUnlessLinux(): List<Pair<String, String>> =
+        if (rpmTargetStarts) emptyList() else listOf(JdkSources.pathProperty(javaFeature, host) to home.absolutePath)
 
     /** Publishes the test JDK as `OpenJDK<f>U-jdk_<arch>_<os>_hotspot_<v>.tar.gz` for each target id. */
     fun publish(project: TestProject, vararg targets: String = arrayOf(TestProject.hostTarget())) =

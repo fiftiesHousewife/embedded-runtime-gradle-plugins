@@ -32,7 +32,7 @@ pluginManagement {
     }
 }
 plugins {
-    id("io.github.fiftieshousewife.java-app.settings") version "0.0.4"
+    id("io.github.fiftieshousewife.java-app.settings") version "0.0.5"
 }
 rootProject.name = "orders-service"
 ```

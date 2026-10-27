@@ -139,7 +139,7 @@ you wrote it:
 
 ```dockerfile
 # >>> embedded-runtime: written by the io.github.fiftieshousewife java-app / node-app plugin, …
-ARG BASE_IMAGE=registry.access.redhat.com/ubi9/ubi-minimal:9.8@sha256:…
+ARG BASE_IMAGE=registry.access.redhat.com/ubi9/ubi-minimal:9.8-1793050346@sha256:…
 FROM ${BASE_IMAGE}
 …
 ENTRYPOINT ["/app/bin/orders", "run"]
@@ -162,11 +162,12 @@ puts it elsewhere.
 What the plugin's block holds:
 
 - **Base image by digest.** `registry.access.redhat.com/ubi9/ubi-minimal`, which needs only glibc
-  and a shell since the runtime is in the archive, pinned to the digest of its multi-arch index, so
-  every build of a plugin release starts from the same bytes. A plugin release moves the pin. To use
-  a registry mirror or another base image, pass the whole reference, digest included:
-  `--build-arg BASE_IMAGE=mirror.example.com/ubi9/ubi-minimal:9.8@sha256:…` (a mirror keeps the
-  digest).
+  and a shell since the runtime is in the archive, pinned to one rebuild's tag (`9.8-<build>`) and
+  the digest of its multi-arch index, so every build of a plugin release starts from the same bytes.
+  A plugin release moves the pin. To use a registry mirror or another base image, pass the whole
+  reference, digest included:
+  `--build-arg BASE_IMAGE=mirror.example.com/ubi9/ubi-minimal:9.8-1793050346@sha256:…` (a mirror
+  keeps the digest).
 - **OCI labels.** `title`, `version`, `revision` (the commit), `created` (the commit's time, so the
   same commit builds the same image), `source` (the `origin` remote with any credentials removed, or
   `sourceUrl`), `licenses` (`license`, default `LicenseRef-Proprietary`), and `base.name` (the base

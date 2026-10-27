@@ -57,7 +57,7 @@ class DockerfileTemplateTest {
     @Test
     fun `pins the base image by digest and copies the archive for the CPU being built`() {
         val pinned =
-            Regex("""ARG BASE_IMAGE=registry\.access\.redhat\.com/ubi9/ubi-minimal:[\d.]+@sha256:[0-9a-f]{64}\n""")
+            Regex("""ARG BASE_IMAGE=registry\.access\.redhat\.com/ubi9/ubi-minimal:\d+\.\d+-\d+@sha256:[0-9a-f]{64}\n""")
         assertAll(
             { assertTrue(pinned.containsMatchIn(rendered), rendered) },
             { assertTrue(rendered.contains("FROM \${BASE_IMAGE}\n"), rendered) },

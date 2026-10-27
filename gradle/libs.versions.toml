@@ -95,12 +95,13 @@ jdk-sapmachine-25 = "25.0.5"
 jdk-sapmachine-26 = "26.0.2"
 jdk-sapmachine-27 = "27.0.1.0.2"
 node = "24.22.1"
-# The generated Dockerfile's default base image (registry.access.redhat.com/ubi9/ubi-minimal), by tag
-# and by the digest of its multi-arch index, so every build of a release starts from the same bytes.
-# Bump both together: the digest is the Docker-Content-Digest of
-#   https://registry.access.redhat.com/v2/ubi9/ubi-minimal/manifests/<tag> (pins as of 2026-10-26)
-ubi-minimal-tag = "9.8"
-ubi-minimal-digest = "sha256:2d4c4551af6831dcd26bbf86108c4385de5183ec8fe6b5868f6f9640fe47f4ed"
+# The generated Dockerfile's default base image (registry.access.redhat.com/ubi9/ubi-minimal), by the
+# tag of one rebuild (9.<minor>-<build>; Red Hat moves plain 9.<minor> to each new one) and by the
+# digest of its multi-arch index, so every build of a release starts from the same bytes. Bump both
+# together: the digest is the Docker-Content-Digest of
+#   https://registry.access.redhat.com/v2/ubi9/ubi-minimal/manifests/<tag> (pins as of 2026-10-27)
+ubi-minimal-tag = "9.8-1793050346"
+ubi-minimal-digest = "sha256:6f3a78179e0b30b930a186e7f68a4af52e51bb82406c9653be10bddd624e40f5"
 
 [libraries]
 spring-boot-dependencies = { module = "org.springframework.boot:spring-boot-dependencies", version.ref = "spring-boot" }

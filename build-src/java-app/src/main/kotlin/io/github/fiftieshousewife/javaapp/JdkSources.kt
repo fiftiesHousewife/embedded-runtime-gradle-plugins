@@ -5,6 +5,7 @@ import io.github.fiftieshousewife.appcore.RuntimeArtifact
 import io.github.fiftieshousewife.appcore.RuntimeRepository
 import io.github.fiftieshousewife.appcore.Target
 import io.github.fiftieshousewife.appcore.setting
+import org.gradle.api.GradleException
 import org.gradle.api.provider.ProviderFactory
 import java.io.File
 import java.net.URI
@@ -17,7 +18,12 @@ import java.net.URI
  * The compile toolchain resolver and the archive's runtime both ask this class, so compilation and
  * packaging can never disagree about where a JDK comes from.
  */
-class JdkSources(val distribution: JdkDistribution, private val location: JdkLocation = JdkLocation.Public()) {
+class JdkSources(
+    val distribution: JdkDistribution,
+    private val location: JdkLocation = JdkLocation.Public(),
+    /** A YUM repository the JDK packages are installed from on servers; wins over [location]. */
+    val yum: JdkYumSource? = null,
+) {
     val repository: RuntimeRepository
         get() =
             when (location) {
@@ -54,7 +60,7 @@ class JdkSources(val distribution: JdkDistribution, private val location: JdkLoc
      * provision a compile toolchain from an RPM, so the toolchain resolver leaves those to the JDKs
      * installed on the machine, and the plugin extracts the runtime itself.
      */
-    val archivesAreRpms: Boolean get() = repository.artifactPattern.endsWith(".rpm", ignoreCase = true)
+    val archivesAreRpms: Boolean get() = yum != null || repository.artifactPattern.endsWith(".rpm", ignoreCase = true)
 
     /**
      * The separate `jmods/` archive for a release whose JDK lacks it ([JdkDistribution.separateJmods]).
@@ -100,6 +106,16 @@ class JdkSources(val distribution: JdkDistribution, private val location: JdkLoc
          */
         const val REVISION_FORMAT = "javaApp.jdk.revisionFormat"
 
+        /**
+         * A YUM repository holding the JDK as an RPM package, found by name, version and CPU in the
+         * repository's own metadata: a repository beside the binary repository's (`yum-local`, or a
+         * path in it, `yum-local/rhel/9`), or a full `https:` / `file:` URL.
+         */
+        const val YUM_REPO = "javaApp.jdk.yumRepo"
+
+        /** The package's name in [YUM_REPO]; `[feature]` is the Java release. Oracle's: `jdk-[feature]`. */
+        const val YUM_PACKAGE = "javaApp.jdk.yumPackage"
+
         /** An absolute path to a shared directory of JDK archives, laid out like the curated binary repository tree. */
         const val LOCAL_PATH = "javaApp.jdk.localPath"
         const val LOCAL_PATTERN = "javaApp.jdk.localPattern"
@@ -114,10 +130,27 @@ class JdkSources(val distribution: JdkDistribution, private val location: JdkLoc
         fun localJdk(providers: ProviderFactory, feature: Int, target: Target): File? =
             providers.setting(pathProperty(feature, target))?.let(::File)
 
-        fun from(providers: ProviderFactory) = JdkSources(
-            providers.setting(DISTRIBUTION)?.let(JdkDistribution::parse) ?: JdkDistribution.DEFAULT,
-            location(providers),
-        )
+        fun from(providers: ProviderFactory): JdkSources {
+            val distribution = providers.setting(DISTRIBUTION)?.let(JdkDistribution::parse) ?: JdkDistribution.DEFAULT
+            return JdkSources(distribution, location(providers), yum(providers, distribution))
+        }
+
+        private fun yum(providers: ProviderFactory, distribution: JdkDistribution): JdkYumSource? {
+            val repo = providers.setting(YUM_REPO) ?: return null
+            val url = if (Regex("^(https?|file):").containsMatchIn(repo)) {
+                URI.create(repo.trimEnd('/') + "/")
+            } else {
+                BinaryRepository.from(providers)?.repo(repo) ?: throw GradleException(
+                    "$YUM_REPO=$repo names a repository beside the binary repository, but none is configured: " +
+                        "set binaryRepo.repository or binaryRepo.url, or give $YUM_REPO as a full URL",
+                )
+            }
+            val name = providers.setting(YUM_PACKAGE) ?: distribution.yumPackage ?: throw GradleException(
+                "$YUM_REPO is set but not $YUM_PACKAGE, the JDK package's name in it " +
+                    "(e.g. java-[feature]-openjdk-devel)",
+            )
+            return JdkYumSource(url, name, providers.setting(REVISION_FORMAT))
+        }
 
         /** First match wins: a shared local directory, then the binary repository, then the vendor's own site. */
         private fun location(providers: ProviderFactory): JdkLocation {
@@ -177,4 +210,14 @@ sealed interface JdkLocation {
             revisionFormat,
         )
     }
+}
+
+/**
+ * A YUM repository holding the JDK as an RPM: the package [packageName] (`[feature]` filled in) at
+ * the pinned version, spelled by [versionFormat] or else the pin without its build (`21.0.5`).
+ */
+data class JdkYumSource(val repository: URI, val packageName: String, val versionFormat: String? = null) {
+    fun packageName(feature: Int): String = packageName.replace("[feature]", feature.toString())
+
+    fun version(version: JdkVersion): String = versionFormat?.let(version::format) ?: version.value.substringBefore('+')
 }

@@ -259,6 +259,7 @@ setting and its default is in the [reference](docs/reference.md).
 
 | Task | What it does | Settings |
 |---|---|---|
+| `downloadJdk<Target>` | With `javaApp.jdk.yumRepo`: finds the JDK package for the pin and the target's CPU in the YUM repository's metadata, downloads it and checks its SHA-256 | `-PjavaApp.jdk.yumRepo`, `-PjavaApp.jdk.yumPackage`, `-PjavaApp.jdk.revisionFormat` |
 | `extractJdk<Target>`, `extractJmods<Target>` | Downloads and unpacks the target's pinned JDK (and, from Java 24, its separate jmods) | `javaVersion`, `jdkVersion`; `-PjavaApp.jdk.distribution`, `-PjavaApp.jdk.<feature>`, `-PjavaApp.jdk.url`, `-PjavaApp.jdk.localPath`, `-PjavaApp.jdk.<feature>.<target>.path`, `-PbinaryRepo.repository` or `-PbinaryRepo.url` |
 | `jdeps` | Lists the JDK modules the code refers to | |
 | `jlinkFindModules` | Runs the app, adding each JDK module it turns out to need, until it is healthy | `smokeTestTimeout` |

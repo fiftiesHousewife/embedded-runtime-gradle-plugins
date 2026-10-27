@@ -79,6 +79,7 @@ nodeApp {
 | `appDockerfile` | Writes the Dockerfile: the project's own (`Dockerfile`, `src/deploy/docker/Dockerfile` or `dockerfile`) if there is one, else a generated one |
 | `appDockerContext` | Writes a container build context: that Dockerfile plus each Linux archive under `app/amd64/` or `app/arm64/` |
 | `checkRuntimeSupport` | Fails if the embedded runtime's release line has reached end of life; warns if it will within 90 days or a newer patch is out. Not part of `check`; see [Keeping the runtime patched](runtime-updates.md) |
+| `downloadJdk<Target>` | Java, with `javaApp.jdk.yumRepo`: the JDK package from the YUM repository, found in its metadata and checked against its SHA-256 |
 | `jdeps` | Java: lists the JDK modules the code uses |
 | `jlinkFindModules` | Java: finds the modules jdeps can't see, by running the app |
 | `jlinkLinuxX64`, … | Java: builds one target's trimmed runtime |
@@ -123,6 +124,8 @@ Gradle properties, set in `gradle.properties`, `~/.gradle/gradle.properties` or 
 | `binaryRepo.repo.releases`, `binaryRepo.repo.snapshots` | `libs-release-local`, `libs-snapshot-local` | |
 | `binaryRepo.repo.rpm` | `rpm-local` | Where `appPublishRpm` uploads |
 | `javaApp.jdk.binaryRepoPattern`, `nodeApp.node.binaryRepoPattern` | the layout above | Layout of an existing runtimes tree; a JDK pattern ending in `.rpm` reads JDK RPMs |
+| `javaApp.jdk.yumRepo` | | A YUM repository holding the JDK as an RPM package: a repository beside the binary repository (`yum-local`, `yum-local/rhel/9`) or a full URL; the package is found in its metadata by name, pinned version and CPU |
+| `javaApp.jdk.yumPackage` | `jdk-[feature]` for Oracle | The JDK package's name in `javaApp.jdk.yumRepo` |
 | `javaApp.jdk.binaryRepo` | `binaryRepo.repo.runtimes` | The repository holding JDKs, e.g. `yum-local` |
 | `javaApp.jdk.revisionFormat` | `[underscored]` | How a curated pattern's `[revision]` spells the version: `[feature]_[update]` gives `21_5` for 21.0.5 |
 | `binaryRepo.allowInsecureProtocol` | `false` | Allow `http://` (test instances only) |

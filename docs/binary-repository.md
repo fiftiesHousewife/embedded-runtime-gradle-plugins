@@ -144,21 +144,44 @@ When your file names spell the version differently, `javaApp.jdk.revisionFormat`
 
 ### JDKs packaged as RPMs
 
-A JDK can come as an RPM: Oracle's own (`jdk-21.0.5_linux-x64_bin.rpm`), or your organisation's
-repackaging. Give a pattern that ends in `.rpm`, and if the RPMs live in a repository of their own,
-name it with `javaApp.jdk.binaryRepo`:
+A JDK can come as an RPM: Oracle's own, or your organisation's repackaging. If the RPMs are in a
+YUM repository (an Artifactory or Nexus YUM repository, or any `createrepo` tree, the one your
+servers install from with dnf), name the repository and the package; the plugin finds the package
+in the repository's own metadata, so file names don't matter:
+
+```properties
+# a repository beside the binary repository (a path in it works too: yum-local/rhel/9), or a full URL
+javaApp.jdk.yumRepo=yum-local
+# the package name dnf shows; [feature] is the Java release. Oracle's is jdk-[feature], the default for oracle
+javaApp.jdk.yumPackage=jdk-[feature]
+```
+
+For each target it reads `repodata/repomd.xml` and the primary index it names (gzip, xz, bzip2 or
+zstd), and takes the package with that name at the pinned version for the target's CPU (`x86_64`,
+`aarch64`), at its newest release. The version is the pin without its build (`21.0.5` for
+`javaApp.jdk.21=21.0.5`); a repackaging that spells it differently sets `javaApp.jdk.revisionFormat`
+(e.g. `[feature].[interim].[update].0.0.[build]`). If the repository has no such package, the build
+stops and lists the versions it does have.
+
+The package is downloaded with the binary repository's login and checked against the SHA-256 the
+repository's metadata records, then kept once per machine in Gradle's user home
+(`caches/embedded-runtime/yum/`), shared by every build. Once in place the task is up to date and
+needs no network. A target given a JDK by path (`javaApp.jdk.21.windows-x64.path`) uses that
+instead, so Windows machines keep their installed JDK.
+
+RPMs in a plain file tree (a generic repository, a share) are read by file name instead, with a
+pattern that ends in `.rpm`:
 
 ```properties
 # default: binaryRepo.repo.runtimes
-javaApp.jdk.binaryRepo=yum-local
-# yum-local/java/jdk21_5-64_linux.x86_64.rpm
+javaApp.jdk.binaryRepo=generic-local
+# generic-local/java/jdk21_5-64_linux.x86_64.rpm
 javaApp.jdk.binaryRepoPattern=java/jdk[revision]-64_linux.x86_64.rpm
 javaApp.jdk.revisionFormat=[feature]_[update]
 ```
 
-The plugin downloads the RPM from the repository like any other dependency (cached, with your
-credentials, and nothing from the internet), unpacks it without installing it, and finds the JDK
-inside wherever the package puts it (the directory holding `release` and `bin/`; Oracle's is
+Either way the RPM is unpacked without being installed, and the JDK is found inside wherever the
+package puts it (the directory holding `release` and `bin/`; Oracle's is
 `/usr/lib/jvm/jdk-21.0.5-oracle-x64`). gzip, xz, bzip2 and zstd payloads are read, the last being
 RHEL 9's default. The JDK must include `jmods/`, as Oracle's JDK 21 RPM does.
 
@@ -178,10 +201,8 @@ binaryRepo.repository=artifactory
 javaApp.jdk.distribution=oracle
 # the exact release you have approved
 javaApp.jdk.21=21.0.5
-# Linux: the JDK RPM, from the yum-local repository beside it
-javaApp.jdk.binaryRepo=yum-local
-javaApp.jdk.binaryRepoPattern=java/jdk[revision]-64_linux.x86_64.rpm
-javaApp.jdk.revisionFormat=[feature]_[update]
+# Linux: the jdk-21 package from the yum-local repository beside it, as servers install it
+javaApp.jdk.yumRepo=yum-local
 ```
 
 ```properties

@@ -226,6 +226,9 @@ enum class JdkDistribution(
     /** Ivy organisation, and the top-level directory of the curated repository. */
     val group: String get() = id
 
+    /** The JDK's package name in a YUM repository, where the vendor fixes one: Oracle's `jdk-21`. */
+    val yumPackage: String? get() = if (this == ORACLE) "jdk-[feature]" else null
+
     /** The product's name on endoflife.date, which `checkRuntimeSupport` asks. */
     val supportProduct: String get() = when (this) {
         TEMURIN -> "eclipse-temurin"

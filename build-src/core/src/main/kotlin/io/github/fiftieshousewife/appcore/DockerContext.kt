@@ -39,7 +39,7 @@ internal class DockerContext(
                 // Not `into(...)`: inside a child spec the path already starts with it, so dropping the
                 // first segment would drop that instead of the archive's `<app>-<version>/`.
                 from(tasks.archive.flatMap { it.archiveFile }.map { archiveOps.archiveTree(it.asFile) }) {
-                    AppCopySpecs.dropTopLevelDirectory(this, replacement = "app/${platformArch(tasks.target.arch)}")
+                    AppCopySpecs.dropTopLevelDirectory(this, replacement = "app/${tasks.target.arch.container}")
                 }
             }
         }
@@ -76,14 +76,6 @@ internal class DockerContext(
         }
         .zip(wiring.gitCommitTime.orElse("")) { identity, time -> identity.copy(created = time.ifEmpty { null }) }
         .zip(extension.sourceUrl.orElse("")) { identity, url -> identity.copy(source = url.ifEmpty { null }) }
-
-    companion object {
-        /** A target's CPU as container platforms name it, which is what `TARGETARCH` holds. */
-        fun platformArch(arch: Arch) = when (arch) {
-            Arch.X64 -> "amd64"
-            Arch.AARCH64 -> "arm64"
-        }
-    }
 }
 
 /**

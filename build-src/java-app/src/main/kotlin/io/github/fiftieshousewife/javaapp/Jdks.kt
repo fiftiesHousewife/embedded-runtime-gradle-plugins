@@ -3,6 +3,7 @@ package io.github.fiftieshousewife.javaapp
 import io.github.fiftieshousewife.appcore.AppWiring
 import io.github.fiftieshousewife.appcore.RuntimeArtifact
 import io.github.fiftieshousewife.appcore.Target
+import io.github.fiftieshousewife.appcore.tasks.DownloadYumPackage
 import io.github.fiftieshousewife.appcore.tasks.ExtractRpmRuntime
 import org.gradle.api.GradleException
 import org.gradle.api.Project
@@ -61,11 +62,33 @@ internal class Jdks(
     /** The pinned JDK for [target], resolved like any other dependency, with its jmods if separate. */
     private fun downloadedJdk(target: Target, feature: Int): JdkHome {
         val sources = JdkSources.from(project.providers)
-        val jdk = extracted(target, resolved("jdk", target) { sources.artifact(it, target) }, sources.archivesAreRpms)
-        if (!sources.distribution.separateJmods(feature)) return jdk
+        val yum = sources.yum
+        val jdk = if (yum != null) {
+            extracted(target, yumPackage(target, feature, yum), rpm = true)
+        } else {
+            extracted(target, resolved("jdk", target) { sources.artifact(it, target) }, sources.archivesAreRpms)
+        }
+        // A YUM package is a whole JDK, jmods/ included.
+        if (yum != null || !sources.distribution.separateJmods(feature)) return jdk
         val archive = resolved("jmods", target) { sources.jmodsArtifact(it, target) }
         val jmods = extract("extractJmods${target.taskSuffix}", archive, "jdk/${target.id}-jmods")
         return JdkHome(jdk.dir, jdk.builtBy, project.layout.dir(jmods.map { it.destinationDir }), jmods)
+    }
+
+    /** The JDK's RPM from a YUM repository, found by package name, pinned version and [target]'s CPU. */
+    private fun yumPackage(target: Target, feature: Int, yum: JdkYumSource): Provider<File> {
+        val task = project.tasks.register("downloadJdk${target.taskSuffix}", DownloadYumPackage::class.java) {
+            group = wiring.taskGroup
+            description = "Downloads the ${target.id} JDK package from the YUM repository ${yum.repository}"
+            repositoryUrl.set(yum.repository.toString())
+            packageName.set(yum.packageName(feature))
+            version.set(extension.jdkVersion.map { yum.version(JdkVersion(it)) })
+            arch.set(target.arch.rpm)
+            wiring.binaryRepo?.let { login.set(it.login(project.providers)) }
+            cacheDir.set(project.gradle.gradleUserHomeDir.resolve("caches/embedded-runtime/yum"))
+            rpm.set(wiring.workDir.map { it.file("jdk/${target.id}.rpm") })
+        }
+        return task.flatMap { it.rpm }.map { it.asFile }
     }
 
     private fun resolved(name: String, target: Target, artifact: (JdkVersion) -> RuntimeArtifact): Provider<File> {

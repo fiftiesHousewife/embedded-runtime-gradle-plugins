@@ -9,10 +9,18 @@ enum class Os(val id: String) {
     MAC("mac"),
 }
 
-enum class Arch(val id: String) {
-    X64("x64"),
-    AARCH64("aarch64"),
+/**
+ * A CPU, with the name each ecosystem gives it: [id] in target ids and Maven classifiers (`x64`),
+ * [rpm] in RPM and YUM metadata and `uname -m` (`x86_64`), and [container] in container platforms
+ * and Docker's `TARGETARCH` (`amd64`).
+ */
+enum class Arch(val id: String, val rpm: String, val container: String) {
+    X64("x64", "x86_64", "amd64"),
+    AARCH64(ARM_64, ARM_64, "arm64"),
 }
+
+/** What Linux, RPM and the JDK call 64-bit ARM. */
+private const val ARM_64 = "aarch64"
 
 /**
  * The operating system and CPU an app archive is built for, such as `linux-x64`. The id is the Maven

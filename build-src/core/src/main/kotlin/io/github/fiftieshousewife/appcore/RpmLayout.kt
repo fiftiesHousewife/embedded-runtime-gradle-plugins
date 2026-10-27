@@ -30,10 +30,7 @@ data class RpmLayout(
     }
 
     /** The architecture name RPM and dnf use. */
-    val arch: String get() = when (target.arch) {
-        Arch.X64 -> "x86_64"
-        Arch.AARCH64 -> "aarch64"
-    }
+    val arch: String get() = target.arch.rpm
 
     /** `<name>-<version>-<release>.<arch>.rpm`, the name every RPM tool expects. */
     val fileName: String get() = "$name-$rpmVersion-$release.$arch.rpm"

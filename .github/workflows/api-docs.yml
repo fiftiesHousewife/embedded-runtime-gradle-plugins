@@ -28,12 +28,12 @@ jobs:
             17
             21
       - uses: gradle/actions/setup-gradle@v6
-      - run: ./gradlew :build-src:app-core:dokkaGeneratePublicationHtml :build-src:java-app:dokkaGeneratePublicationHtml :build-src:node-app:dokkaGeneratePublicationHtml
+      - run: ./gradlew :plugins:app-core:dokkaGeneratePublicationHtml :plugins:java-app:dokkaGeneratePublicationHtml :plugins:node-app:dokkaGeneratePublicationHtml
       - name: Assemble the site
         run: |
           mkdir -p site
-          for m in core:app-core java-app:java-app node-app:node-app; do
-            cp -R "build-src/${m%%:*}/build/dokka/html" "site/${m##*:}"
+          for m in app-core java-app node-app; do
+            cp -R "plugins/$m/build/dokka/html" "site/$m"
           done
           cat > site/index.html <<'HTML'
           <!doctype html><meta charset="utf-8"><title>Embedded runtime Gradle plugins: API</title>

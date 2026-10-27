@@ -23,6 +23,9 @@ under the configuration cache.
 | **Layers** | Split the single `COPY app/` into `runtime/`, `lib/` and the app, so a release doesn't re-push the 39 MB runtime; add a test that a runtime builds byte-identical twice |
 | **Tasks** | `appDockerfileCheck` (diff of suggestions, fails when strict) and `appDockerfileFix` |
 | **CI cross-checks** | hadolint, Red Hat `preflight check container` on the sample image, and a Testcontainers test running the image as a random UID in group 0. Versions in the catalogue with `# renovate:` comments |
+| **No `USER` instruction** | Decided 2026-10-27: OpenShift ignores `USER`, so the Dockerfile has none. Plain Docker and vanilla Kubernetes then run the image as root unless the pod sets `runAsNonRoot`/`runAsUser`, and Red Hat's `RunAsNonRoot` certification check fails: say so in the docs |
+| **OCI labels with the commit** | Keep `org.opencontainers.image.revision` and the rest of the OCI set; add `io.k8s`/`io.openshift` labels for OpenShift |
+| **OpenShift and Oracle samples** | The Docker sample on Oracle JDK (a release Oracle's NFTC lets an archive carry), with an OpenShift Dockerfile, as the corporate default example |
 | **Writable storage** | `APP_DATA_DIR`/`APP_LOG_DIR` don't exist in the image: ship them group-0 writable for the unmounted case, and document the volume and env-var contract with a sample `Deployment` |
 
 ## Shared module sets

@@ -8,7 +8,7 @@ import pathlib
 import re
 
 counts = {}
-for path in glob.glob("build-src/*/build/test-results/*/*.xml"):
+for path in glob.glob("plugins/*/build/test-results/*/*.xml"):
     text = open(path, encoding="utf-8").read()
     parts = pathlib.PurePath(path).parts
     suite = f"{parts[1]}/{parts[4]}"  # e.g. java-app/functionalTest

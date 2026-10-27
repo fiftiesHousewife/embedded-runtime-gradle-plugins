@@ -1,4 +1,4 @@
-// The top-level build owns no production code: it aggregates the plugin build in `build-src` so
+// The top-level build owns no production code: it aggregates the plugin build in `plugins` so
 // that `./gradlew build`, `check` and `publish` at the repository root do the expected thing.
 plugins {
     base
@@ -7,7 +7,7 @@ plugins {
 
 description = "Gradle plugins that package Java and Node.js apps with their runtime embedded"
 
-val pluginBuild = gradle.includedBuild("build-src")
+val pluginBuild = gradle.includedBuild("plugins")
 val modules = listOf(":app-core", ":java-app", ":node-app")
 
 tasks.named("assemble") { dependsOn(modules.map { pluginBuild.task("$it:assemble") }) }
@@ -24,14 +24,14 @@ tasks.named("clean") { dependsOn(modules.map { pluginBuild.task("$it:clean") }) 
 listOf("publish", "publishToMavenLocal").forEach { name ->
     tasks.register(name) {
         group = "publishing"
-        description = "Runs $name in every module of the build-src plugin build"
+        description = "Runs $name in every module of the plugins plugin build"
         dependsOn(modules.map { pluginBuild.task("$it:$name") })
     }
 }
 listOf("verifyMavenCentralBundle", "publishToMavenCentral").forEach { name ->
     tasks.register(name) {
         group = "publishing"
-        description = "Runs $name in the build-src plugin build: every module as one Maven Central deployment"
+        description = "Runs $name in the plugins plugin build: every module as one Maven Central deployment"
         dependsOn(pluginBuild.task(":$name"))
     }
 }
@@ -80,12 +80,12 @@ val verifyAiSkills =
 tasks.named("check") { dependsOn(verifyAiSkills) }
 
 // Renovate presets in renovate/: Renovate's own validator, on the Node.js the catalogue pins.
-// Renovate's version and lockfile are in tools/renovate-validator, where Renovate keeps them current.
+// Renovate's version and lockfile sit beside the presets, where Renovate keeps them current.
 node {
     version = libs.versions.node
     download = true
     distBaseUrl = null
-    nodeProjectDir = layout.projectDirectory.dir("tools/renovate-validator")
+    nodeProjectDir = layout.projectDirectory.dir("renovate")
     npmInstallCommand = "ci"
 }
 val validateRenovatePresets =
@@ -93,7 +93,7 @@ val validateRenovatePresets =
         group = "verification"
         description = "Checks the Renovate presets in renovate/ with Renovate's config validator"
         dependsOn(tasks.named("npmInstall"))
-        val presets = layout.projectDirectory.dir("renovate").asFileTree.matching { include("*.json") }
+        val presets = layout.projectDirectory.dir("renovate").asFileTree.matching { include("*.json").exclude("package.json", "package-lock.json") }
         inputs.files(presets)
         command = "renovate-config-validator"
         args = presets.elements.map { files -> files.map { it.asFile.absolutePath }.sorted() }

@@ -5,8 +5,8 @@ import io.github.fiftieshousewife.buildlogic.VerifyCentralBundle
 // the project. Each module publishes into a staging repository (embedded-runtime.gradle-plugin);
 // the bundle is checked here and uploaded with the Central Portal's Publisher API, which, unlike
 // the Vanniktech plugin's upload, lets the deployment be named.
-//   ./gradlew -p build-src verifyMavenCentralBundle -PreleaseVersion=1.2.0   → stage and check only
-//   ./gradlew -p build-src publishToMavenCentral   -PreleaseVersion=1.2.0   → and release
+//   ./gradlew -p plugins verifyMavenCentralBundle -PreleaseVersion=1.2.0   → stage and check only
+//   ./gradlew -p plugins publishToMavenCentral   -PreleaseVersion=1.2.0   → and release
 val stagingDir = layout.buildDirectory.dir("central-staging")
 
 val cleanStaging = tasks.register<Delete>("cleanMavenCentralStaging") { delete(stagingDir) }

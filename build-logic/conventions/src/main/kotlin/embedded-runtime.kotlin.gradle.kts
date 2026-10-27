@@ -62,7 +62,7 @@ tasks.withType<Test>().configureEach {
 
 // Quality gates, following the Clean Code plugin's standards with standard tools: ktlint through
 // Spotless for formatting (120 columns, set below to match .editorconfig), detekt for size, complexity, naming
-// and safety rules (config/detekt/detekt.yml), Forbidden APIs for unsafe JDK calls in the compiled
+// and safety rules (build-logic/detekt.yml), Forbidden APIs for unsafe JDK calls in the compiled
 // bytecode, JaCoCo for coverage, and ben-manes for dependency drift.
 val ktlintVersion = libs.findVersion("ktlint").get().requiredVersion
 val ktlintRules = mapOf("max_line_length" to "120")
@@ -88,10 +88,10 @@ tasks.withType<JacocoReport>().configureEach {
 }
 tasks.named("check") { dependsOn(tasks.withType<JacocoReport>()) }
 
-dependencies { "detektPlugins"(project(":detekt-rules")) }
+dependencies { "detektPlugins"("io.github.fiftieshousewife.build:detekt-rules") }
 detekt {
     buildUponDefaultConfig = true
-    config.setFrom(rootProject.files("config/detekt/detekt.yml"))
+    config.setFrom(rootProject.files("../build-logic/detekt.yml"))
     source.setFrom(
         files("src/main/kotlin", "src/test/kotlin", "src/testFixtures/kotlin", "src/functionalTest/kotlin")
             .filter { it.isDirectory },

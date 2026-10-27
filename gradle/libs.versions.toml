@@ -1,4 +1,4 @@
-# One catalogue for the whole repository. `build-src` reads it via
+# One catalogue for the whole repository. `plugins` reads it via
 # `from(files("../gradle/libs.versions.toml"))`, so there is a single place to bump a version.
 [versions]
 junit = "6.1.3"
@@ -116,7 +116,7 @@ bouncycastle-pg = { module = "org.bouncycastle:bcpg-jdk18on", version.ref = "bou
 sigstore-java = { module = "dev.sigstore:sigstore-java", version.ref = "sigstore" }
 junit-bom = { module = "org.junit:junit-bom", version.ref = "junit" }
 junit-jupiter-api = { module = "org.junit.jupiter:junit-jupiter-api" }
-# Gradle plugins applied from build-src/build-logic convention plugins, as ordinary dependencies.
+# Gradle plugins applied from build-logic/conventions, as ordinary dependencies.
 gradle-plugin-publish = { module = "com.gradle.plugin-publish:com.gradle.plugin-publish.gradle.plugin", version.ref = "plugin-publish" }
 gradle-maven-publish = { module = "com.vanniktech:gradle-maven-publish-plugin", version.ref = "maven-publish" }
 gradle-versions = { module = "io.github.ben-manes.versions:io.github.ben-manes.versions.gradle.plugin", version.ref = "versions" }

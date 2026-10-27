@@ -1,6 +1,6 @@
 pluginManagement {
     // Inside this repository the sample builds against the plugin source.
-    includeBuild("../../build-src")
+    includeBuild("../../plugins")
 }
 
 plugins {

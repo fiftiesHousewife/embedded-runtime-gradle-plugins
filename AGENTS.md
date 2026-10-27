@@ -8,40 +8,40 @@ that links into `docs/`.
 ## Layout
 
 ```
-build-src/                  the plugin build, included by the root build
-  build-logic/              convention plugins: embedded-runtime.kotlin, embedded-runtime.gradle-plugin
-  core/                     io.github.fiftieshousewife:app-core      package …appcore (+ app-smoke-test plugin)
+build-logic/                included build: the build's own tooling
+  conventions/              convention plugins: embedded-runtime.kotlin, .gradle-plugin, .central-release
+  detekt-rules/             the repository's own detekt rules (FileLength, CommentDensity)
+  detekt.yml                deviations from detekt's defaults only
+plugins/                    included build: what is published
+  app-core/                 io.github.fiftieshousewife:app-core      package …appcore (+ app-smoke-test plugin)
   java-app/                 io.github.fiftieshousewife:java-app      package …javaapp
   node-app/                 io.github.fiftieshousewife:node-app      package …nodeapp
-  detekt-rules/             the repository's own detekt rules (FileLength, CommentDensity); not published
-  config/detekt/detekt.yml  deviations from detekt's defaults only
-scripts/                    curate-runtimes.sh (mirrors approved runtimes into the binary repository)
-renovate/                   Renovate presets for users: temurin and nodejs pin overrides; ubi, a reference example
+samples/                    builds of their own, included by the root build; CI builds each with -p
+renovate/                   presets for users (temurin, nodejs; ubi, a reference example), and the
+                            validator validateRenovatePresets runs on them (package.json, lockfile)
 docs/                       user documentation, linked from the README; article.md is the article's home
-.github/scripts/            verify-rpm.sh: CI installs the sample's RPM in a Rocky Linux container
-.claude-plugin/             the Claude Code marketplace manifest (must stay at the root)
 ai/                         the AI assistant files the plugins ship: skills, the shared post-edit hook,
                             Copilot and Devin hook configs, the Claude plugin (see ai/README.md); ./gradlew
                             syncAiSkills updates the Claude plugin's copies; keep the skills in step with the
                             tasks and properties they name. Copilot's instructions for this repo: .github/
-gradle/init.d/              init script for machines behind a binary repository
+.github/scripts/            CI's own scripts: verify-rpm.sh installs the sample's RPM in a Rocky Linux container
+.claude-plugin/             the Claude Code marketplace manifest (must stay at the root)
 gradle/libs.versions.toml   the one version catalogue, shared by every build here
-samples/                    a Java and a Node service, built in CI end to end
-tools/renovate-validator/   Renovate's config validator (package.json and lockfile) for validateRenovatePresets
 ```
 
-The root build applies **both** settings plugins to itself, so a change that breaks consumers, or
-breaks applying both together, breaks this build.
+The root build applies **both** settings plugins to itself, so `plugins/` is an included build,
+built before the root build is configured: a change that breaks consumers, or breaks applying both
+together, breaks this build.
 
 ## Build and test
 
 ```bash
 ./gradlew check                                  # every module: ktlint, detekt (with type resolution), Forbidden APIs, JaCoCo, all tests
-./gradlew -p build-src :java-app:functionalTest  # one module's TestKit tests
+./gradlew -p plugins :java-app:functionalTest    # one module's TestKit tests
 ./gradlew -p samples/java-service build          # end to end, against the real internet
 ./gradlew -p samples/java-service build -PjavaApp.jdk.distribution=zulu
-./gradlew -p build-src spotlessApply             # fix formatting
-./gradlew -p build-src dependencyUpdates         # upgrades within the current major
+./gradlew -p plugins spotlessApply               # fix formatting
+./gradlew -p plugins dependencyUpdates           # upgrades within the current major
 ```
 
 ktlint, detekt and Forbidden APIs are blocking. Unit tests (`src/test`) cover every `internal`
@@ -200,7 +200,7 @@ the Node.js pin (`node`) and the Dockerfile base image (`ubi-minimal-tag` and `u
 `jdks.properties`, `node.properties` and `version.properties` in the jars by `jdkPins`, `nodePin` and
 `versionResource`. Outside it by necessity: the Gradle version (`gradle-wrapper.properties`), Kotlin
 (embedded in Gradle, used by `kotlin-dsl`), and CI's setup versions (`.github/workflows/ci.yml`). Renovate's own version is in
-`tools/renovate-validator/package.json` and its lockfile, which Renovate's npm support updates (a
+`renovate/package.json` and its lockfile, which Renovate's npm support updates (a
 catalogue version names no Maven module, so Renovate would not).
 
 **Bump runtime pins.** Edit the `jdk-…` or `node` version in `gradle/libs.versions.toml`. A pin must resolve on **every** supported target: vendors upload a
@@ -229,7 +229,7 @@ are published Maven classifiers: never change an existing one.
 
 **Release.** As the Clean Code plugin does: `./gradlew publishToMavenLocal -PreleaseVersion=x.y.z`
 to try it, `./gradlew verifyMavenCentralBundle -PreleaseVersion=x.y.z` to stage the release into
-`build-src/build/central-staging` and check it (every POM named "Embedded Runtime: …" with the
+`plugins/build/central-staging` and check it (every POM named "Embedded Runtime: …" with the
 metadata Central requires, every file with checksums and, when a key is set, a signature; CI runs
 it unsigned on every push), then `./gradlew publishToMavenCentral -PreleaseVersion=x.y.z`, which
 uploads that bundle through the Central Portal's Publisher API as one deployment named
@@ -247,7 +247,7 @@ Plugin Portal, with its own key and a manual review of each new plugin.
 
 The coding standards follow the Clean Code plugin ([fiftiesHousewife/Clean-Claude](https://github.com/fiftiesHousewife/Clean-Claude)),
 enforced with standard tools rather than the plugin itself; the thresholds live in
-`config/detekt/detekt.yml` and `.editorconfig`:
+`build-logic/detekt.yml` and `.editorconfig`:
 
 | Standard | Enforced by |
 |---|---|

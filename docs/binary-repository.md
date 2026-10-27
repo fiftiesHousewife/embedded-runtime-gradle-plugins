@@ -80,9 +80,23 @@ Every download then goes through the repository: libraries, Gradle plugins, JDKs
 packages. On CI, pass the credentials as `ORG_GRADLE_PROJECT_binaryRepoUsername` and
 `ORG_GRADLE_PROJECT_binaryRepoPassword`.
 
-Also copy [`gradle/init.d/embedded-runtime-binary-repo.init.gradle.kts`](../gradle/init.d) into
-`~/.gradle/init.d/`, so Gradle can download the settings plugins themselves from it, and point the
-Gradle wrapper at the repository too, so Gradle itself isn't fetched from `services.gradle.org`:
+Gradle needs the settings plugins themselves before any setting is read, so `settings.gradle.kts`
+declares where they come from. Named `binaryRepo`, the repository logs in with the same
+`binaryRepoUsername` and `binaryRepoPassword`:
+
+```kotlin
+pluginManagement {
+    repositories {
+        maven("https://repo.example.com/gradle-plugins-virtual") {
+            name = "binaryRepo"
+            credentials(PasswordCredentials::class)
+        }
+    }
+}
+```
+
+Point the Gradle wrapper at the repository too, so Gradle itself isn't fetched from
+`services.gradle.org`:
 
 ```properties
 # gradle/wrapper/gradle-wrapper.properties: a generic remote repository of https://services.gradle.org/distributions
@@ -129,13 +143,12 @@ runtimes/temurin/jdk/21.0.12.1_1/jdk-21.0.12.1_1-linux-x64.tar.gz
 runtimes/nodejs/node/24.22.1/node-24.22.1-linux-x64.tar.gz
 ```
 
-[`scripts/curate-runtimes.sh`](../scripts/curate-runtimes.sh) downloads a JDK of any supported
-distribution (`DISTRIBUTION=temurin` by default, and Temurin's separate jmods for Java 24 and
-later) or a Node.js release, checks it against the vendor's SHA-256 and uploads it there. Temurin,
-Oracle, Microsoft and SapMachine publish that checksum beside the archive; for Corretto, Zulu and
-Liberica pass it from the vendor's release page as `SHA256_<target>`, or the archive is not
-uploaded. `DRY_RUN=1` shows what would be mirrored. An existing tree with a different
-layout can be used as it is, by giving its pattern:
+Fill it by copying approved archives into that layout, or skip copying: make `runtimes` a generic
+remote repository of the vendor's download site, such as `https://download.oracle.com/java`, and give
+the vendor's own layout as the pattern. Either way the archives are ordinary Gradle dependencies, so
+[dependency verification](https://docs.gradle.org/current/userguide/dependency_verification.html)
+(`gradle/verification-metadata.xml`) checks each one's checksum. Any tree with a different layout
+can be used as it is, by giving its pattern:
 
 ```properties
 javaApp.jdk.binaryRepoPattern=jdks/[organisation]/[classifier]/[revision].[ext]

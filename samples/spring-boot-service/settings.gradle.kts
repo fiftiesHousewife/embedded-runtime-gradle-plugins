@@ -1,5 +1,4 @@
 pluginManagement {
-    // Inside this repository the sample builds against the plugin source.
     includeBuild("../../plugins")
 }
 
@@ -8,7 +7,7 @@ plugins {
 }
 
 dependencyResolutionManagement {
-    // The repository's one version catalogue, so the Spring Boot version is pinned in one place.
+    // The repository's version catalogue, for the Spring Boot version.
     versionCatalogs { create("libs") { from(files("../../gradle/libs.versions.toml")) } }
 }
 

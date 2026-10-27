@@ -20,8 +20,7 @@ gradlePlugin {
     }
 }
 
-// The AI assistant files in the repository's ai/ folder, shipped in the jar for `aiSkills` to write
-// into a project, with an index because a jar's resources cannot be listed.
+// With an index: a jar's resources can't be listed.
 val aiSource = layout.projectDirectory.dir("../../ai")
 val aiResources =
     tasks.register<Sync>("aiResources") {
@@ -47,7 +46,6 @@ val aiResources =
         }
     }
 
-// The settings plugins align project-plugin versions with their own, read from this resource.
 val versionResource =
     tasks.register<WriteProperties>("versionResource") {
         destinationFile =
@@ -67,25 +65,18 @@ sourceSets.main {
 }
 
 dependencies {
-    // The SBOM is built with the CycloneDX reference model and package-url's purl builder, so it is
-    // valid by construction rather than by hand-written JSON.
     implementation(libs.cyclonedx.core)
     implementation(libs.packageurl)
 
-    // RPMs are built by Redline, the library Nebula's ospackage plugin is built on, without the
-    // plugin itself. Redline was last released in 2021: its Ant tasks are dropped, and its
-    // compression and OpenPGP libraries are replaced by current releases of the same code.
+    // Redline (2021) without its Ant tasks, on current releases of its compression and OpenPGP libraries.
     implementation(libs.redline) {
         exclude(group = "org.apache.ant")
         exclude(group = "org.bouncycastle")
     }
     implementation(libs.bouncycastle.pg)
-    // Reading RPM-packaged runtimes: Redline parses the headers, Commons Compress the cpio payload;
-    // zstd-jni backs Commons Compress for zstd payloads, the default of RHEL 9 and later.
     implementation(libs.commons.compress)
     implementation(libs.zstd.jni)
-    // Sigstore verification runs in a worker whose classpath app-smoke-test resolves only when a
-    // signer identity is set, so builds that don't verify never download it.
+    // Resolved only when a signer identity is set, by an isolated worker.
     compileOnly(libs.sigstore.java)
     testImplementation(libs.sigstore.java)
     constraints {
@@ -93,18 +84,16 @@ dependencies {
         implementation(libs.xz) { because("Redline 1.2.10 asks for 1.4") }
     }
 
-    // TestProject: the TestKit harness both plugins' functional tests build fixture projects with.
     testFixturesApi(gradleTestKit())
     testFixturesImplementation(platform(libs.junit.bom))
     testFixturesImplementation(libs.junit.jupiter.api)
-    // RpmFile: reads back the RPMs functional tests build.
     testFixturesImplementation(libs.redline) {
         exclude(group = "org.apache.ant")
         exclude(group = "org.bouncycastle")
     }
 }
 
-// The test fixtures are for this repository's functional tests, not for consumers of app-core.
+// For this repository's functional tests, not for consumers of app-core.
 listOf("testFixturesApiElements", "testFixturesRuntimeElements").forEach { name ->
     (components["java"] as AdhocComponentWithVariants).withVariantsFromConfiguration(configurations[name]) { skip() }
 }

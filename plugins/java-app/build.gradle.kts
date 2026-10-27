@@ -6,12 +6,9 @@ description = "Packages a Java application with a pinned, jlink-trimmed embedded
 
 dependencies {
     api(project(":app-core"))
-    // The functional tests package the test JDK as an RPM, as an organisation's binary repository holds one.
     "functionalTestImplementation"(libs.redline)
 }
 
-// The JDK pins are versions in gradle/libs.versions.toml (`jdk-<distribution>-<feature>`, which the
-// catalogue spells `jdk.<distribution>.<feature>`): shipped in the jar as jdks.properties for JdkCatalog.
 val jdkPins =
     tasks.register<WriteProperties>("jdkPins") {
         destinationFile =
@@ -48,8 +45,7 @@ gradlePlugin {
     }
 }
 
-// A build holding both Java and Node apps applies both settings plugins; the functional test that
-// proves this needs node-app on the TestKit plugin classpath too.
+// The functional test of a build applying both settings plugins needs node-app on the TestKit classpath.
 val nodeAppPlugin = configurations.dependencyScope("nodeAppPlugin")
 val nodeAppPluginClasspath =
     configurations.resolvable("nodeAppPluginClasspath") {

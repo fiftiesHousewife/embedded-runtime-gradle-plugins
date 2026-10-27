@@ -2,8 +2,6 @@ import com.github.benmanes.gradle.versions.updates.DependencyUpdatesTask
 import dev.detekt.gradle.Detekt
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
-// Every published module: compiled for the JVM Gradle runs on, checked by ktlint and detekt, and
-// published with everything Maven Central requires.
 plugins {
     id("org.gradle.kotlin.kotlin-dsl")
     `maven-publish`
@@ -35,8 +33,7 @@ version = providers.gradleProperty("releaseVersion").getOrElse("1.0.0-SNAPSHOT")
 val gradleMinimumJvm = libs.findVersion("plugin-jvm").get().requiredVersion.toInt()
 
 java {
-    // No vendor constraint: any JDK 17 compiles this, unlike the runtimes that get embedded, which
-    // are pinned to one exact build of one distribution.
+    // Any JDK 17 compiles the plugins; only embedded runtimes are pinned to one build.
     toolchain { languageVersion = JavaLanguageVersion.of(gradleMinimumJvm) }
 }
 kotlin {
@@ -51,7 +48,6 @@ testing {
     }
 }
 
-// A failing test prints its whole exception, so a CI log alone explains it.
 tasks.withType<Test>().configureEach {
     testLogging {
         events("failed", "skipped")
@@ -60,10 +56,6 @@ tasks.withType<Test>().configureEach {
     }
 }
 
-// Quality gates, following the Clean Code plugin's standards with standard tools: ktlint through
-// Spotless for formatting (120 columns, set below to match .editorconfig), detekt for size, complexity, naming
-// and safety rules (build-logic/detekt.yml), Forbidden APIs for unsafe JDK calls in the compiled
-// bytecode, JaCoCo for coverage, and ben-manes for dependency drift.
 val ktlintVersion = libs.findVersion("ktlint").get().requiredVersion
 val ktlintRules = mapOf("max_line_length" to "120")
 spotless {
@@ -97,8 +89,7 @@ detekt {
             .filter { it.isDirectory },
     )
 }
-// detekt 2 runs the rules that need type resolution (LongParameterList, ForbiddenMethodCall, …) only
-// in its per-source-set tasks (detektMain, detektTest, …), so check runs those, not just `detekt`.
+// detekt 2 runs its type-resolution rules only in the per-source-set tasks.
 tasks.named("check") {
     dependsOn(tasks.withType<Detekt>().matching { it.name != "detekt" && !it.name.endsWith("SourceSet") })
 }
@@ -110,8 +101,6 @@ tasks.withType<Detekt>().configureEach {
     }
 }
 
-// Only report upgrades within the current major, so a report never suggests a jump that needs real
-// migration work.
 tasks.withType<DependencyUpdatesTask>().configureEach {
     outputFormatter = "json"
     rejectVersionIf {
@@ -119,18 +108,14 @@ tasks.withType<DependencyUpdatesTask>().configureEach {
     }
 }
 
-// The API documentation is the KDoc: Dokka renders it as HTML (dokkaGenerate) and as the javadoc
-// jar every publication carries, which `javadoc` alone would leave empty for Kotlin sources.
+// Dokka, since javadoc alone leaves the javadoc jar empty for Kotlin sources.
 dokka {
-    // In the build's own JVM, isolated by class loader, rather than a worker process of its own.
     dokkaGeneratorIsolation = ClassLoaderIsolation()
 }
 tasks.matching { it.name == "javadocJar" }.withType<Jar>().configureEach {
     from(tasks.named("dokkaGeneratePublicationJavadoc"))
 }
 
-// Maven Central requires sources and javadoc jars, a POM carrying name, description, URL, licence,
-// developer and SCM, and a detached PGP signature per artifact (signing: embedded-runtime.gradle-plugin).
 publishing.publications.withType<MavenPublication>().configureEach {
     pom {
         name = project.name
@@ -159,7 +144,6 @@ publishing.publications.withType<MavenPublication>().configureEach {
 
 publishing {
     repositories {
-        // ./gradlew publish -PreleaseVersion=1.2.0 publishes to the corporate Gradle plugin repository.
         providers.gradleProperty("binaryRepo.url").orNull?.let { base ->
             maven {
                 name = "binaryRepo"

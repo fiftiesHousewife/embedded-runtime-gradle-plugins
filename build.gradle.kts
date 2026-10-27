@@ -1,8 +1,8 @@
-// The top-level build owns no production code: it aggregates the plugin build in `plugins` so
-// that `./gradlew build`, `check` and `publish` at the repository root do the expected thing.
+// Aggregates the plugins build, so check, publish and the release tasks run from the repository root.
 plugins {
     base
     id("embedded-runtime.renovate-presets")
+    id("embedded-runtime.ai-files")
 }
 
 description = "Gradle plugins that package Java and Node.js apps with their runtime embedded"
@@ -14,67 +14,17 @@ tasks.named("assemble") { dependsOn(modules.map { pluginBuild.task("$it:assemble
 tasks.named("check") { dependsOn(modules.map { pluginBuild.task("$it:check") } + pluginBuild.task(":check")) }
 tasks.named("clean") { dependsOn(modules.map { pluginBuild.task("$it:clean") }) }
 
-// Release entry points, forwarded so the repository root is the only directory anyone needs:
-//   ./gradlew verifyMavenCentralBundle -PreleaseVersion=1.2.0   → stage the release and check it
-//   ./gradlew publishToMavenCentral    -PreleaseVersion=1.2.0   → and release it, as one deployment
-//   ./gradlew publishToMavenLocal      -PreleaseVersion=1.2.0   → ~/.m2, to try a release first
-//   ./gradlew publish                  -PreleaseVersion=1.2.0   → the staging directory, and the
-//                                                                  corporate repository when binaryRepo.url is set
-//   ./gradlew publishPlugins           -PreleaseVersion=1.2.0   → the Gradle Plugin Portal
-listOf("publish", "publishToMavenLocal").forEach { name ->
+listOf("publish", "publishToMavenLocal", "publishPlugins").forEach { name ->
     tasks.register(name) {
         group = "publishing"
-        description = "Runs $name in every module of the plugins plugin build"
+        description = "Runs $name in every module of the plugins build"
         dependsOn(modules.map { pluginBuild.task("$it:$name") })
     }
 }
 listOf("verifyMavenCentralBundle", "publishToMavenCentral").forEach { name ->
     tasks.register(name) {
         group = "publishing"
-        description = "Runs $name in the plugins plugin build: every module as one Maven Central deployment"
+        description = "Runs $name in the plugins build: every module as one Maven Central deployment"
         dependsOn(pluginBuild.task(":$name"))
     }
 }
-tasks.register("publishPlugins") {
-    group = "publishing"
-    description = "Publishes java-app, node-app and app-smoke-test (in app-core) to the Gradle Plugin Portal"
-    dependsOn(modules.map { pluginBuild.task("$it:publishPlugins") })
-}
-
-// AI assistant files: one source in ai/. The Claude Code plugin is installed from ai/claude alone, so
-// it carries its own copies of the skills and the hook; check fails while a copy differs.
-val aiCopies =
-    mapOf(
-        "ai/claude/skills" to listOf("ai/skills"),
-        "ai/claude/hooks/scripts" to listOf("ai/hooks"),
-    )
-val syncs =
-    aiCopies.map { (destination, sources) ->
-        tasks.register<Sync>("sync" + destination.split('/', '.', '-').joinToString("") { it.replaceFirstChar(Char::uppercase) }) {
-            sources.forEach { from(it) }
-            into(destination)
-        }
-    }
-tasks.register("syncAiSkills") {
-    group = "build setup"
-    description = "Copies the skills and hook in ai/ into the Claude Code plugin in ai/claude"
-    dependsOn(syncs)
-}
-val verifyAiSkills =
-    tasks.register("verifyAiSkills") {
-        group = "verification"
-        description = "Fails when a copy of the AI assistant files in ai/ is out of date"
-        val root = layout.projectDirectory.asFile
-        val dirs = aiCopies
-        inputs.files(dirs.flatMap { (d, s) -> s + d }.map { root.resolve(it) })
-        doLast {
-            // Local functions, so the task holds no reference to the build script (configuration cache).
-            fun tree(dir: File) = dir.walkTopDown().filter(File::isFile).associate { it.relativeTo(dir).invariantSeparatorsPath to it.readBytes().toList() }
-            val staleDirs = dirs.filter { (destination, sources) ->
-                sources.map { tree(root.resolve(it)) }.reduce { a, b -> a + b } != tree(root.resolve(destination))
-            }.keys
-            val stale = staleDirs
-            if (stale.isNotEmpty()) throw GradleException("Out of date: ${stale.joinToString()}. Run ./gradlew syncAiSkills")
-        }
-    }
-tasks.named("check") { dependsOn(verifyAiSkills) }

@@ -10,8 +10,7 @@ application {
 }
 
 dependencies {
-    // Spring Boot's dependency management without its Gradle plugin: the java-app plugin builds the
-    // launchers and the archive, so a fat jar is not needed.
+    // Spring Boot's dependency management without its plugin: no fat jar is needed.
     implementation(platform(libs.spring.boot.dependencies))
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.boot:spring-boot-starter-actuator")

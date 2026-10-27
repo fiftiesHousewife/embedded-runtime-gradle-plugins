@@ -15,22 +15,12 @@ application {
 
 javaApp {
     javaVersion = 21
-    // This machine (for the smoke test) and both Linux CPUs: the image uses the one matching this machine.
     targets(Target.host().id, "linux-x64", "linux-aarch64")
 }
 
-// Builds the container image from appDockerContext and proves it with Testcontainers: dockerTest
-// runs it on the Dockerfile's own base image (UBI minimal), dockerTestMicro on UBI micro (the
-// micro.BASE_IMAGE property), passed as --build-arg BASE_IMAGE. Each checks the container starts,
-// answers its probes, is labelled and stops on SIGTERM. Skipped, not failed, unless a Docker daemon
-// running Linux containers is reachable (GitHub's Windows runners run Windows containers), or
-// Colima can start one. -PdockerRequired=true runs them regardless, so a missing daemon fails the
-// build: CI's Linux job uses it to prove the image runs.
 val dockerRequired = providers.gradleProperty("dockerRequired").map(String::toBoolean).orElse(false)
 
-// On a Mac with Colima and no DOCKER_HOST, the images run in a Colima profile of their own,
-// started on demand and native to this CPU: an emulated x86_64 VM can't run UBI 9, whose glibc
-// needs x86-64-v2. -PdockerTest.colima=false uses whatever engine docker is set up for instead.
+// An emulated x86_64 Colima VM can't run UBI 9 (glibc needs x86-64-v2): start a native one.
 val colimaProfile = "docker-test"
 val useColima =
     providers.gradleProperty("dockerTest.colima").map(String::toBoolean).orElse(true).get() &&
@@ -127,7 +117,6 @@ val dockerImages =
             }
     }
 
-// Each image run through Testcontainers: started, probed, its labels read and stopped with SIGTERM.
 testing {
     suites {
         register<JvmTestSuite>("dockerTest") {
@@ -155,4 +144,6 @@ testing {
     }
 }
 
-tasks.named("check") { dependsOn(testing.suites.named<JvmTestSuite>("dockerTest").map { it.targets.map { t -> t.testTask } }) }
+tasks.named("check") {
+    dependsOn(testing.suites.named<JvmTestSuite>("dockerTest").map { it.targets.map { t -> t.testTask } })
+}

@@ -1,4 +1,3 @@
-// The published plugins. This build produces them, so it is the one build that can't apply them.
 pluginManagement {
     includeBuild("../build-logic")
     repositories {
@@ -7,7 +6,7 @@ pluginManagement {
     }
 }
 
-// Also a regular included build, so detektPlugins can depend on its detekt-rules project.
+// Also a regular included build, for the detekt-rules dependency.
 includeBuild("../build-logic")
 
 dependencyResolutionManagement {
@@ -22,5 +21,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "embedded-runtime-gradle-plugins"
 
-// Published as io.github.fiftieshousewife:app-core / java-app / node-app.
 include("app-core", "java-app", "node-app")

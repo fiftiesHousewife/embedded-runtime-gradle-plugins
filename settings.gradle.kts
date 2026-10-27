@@ -1,11 +1,6 @@
-// The plugins live in `plugins`, included here as a plugin build. Gradle builds it first, so this
-// build can consume — and self-apply — the very plugins it publishes: both settings plugins below
-// configure this build's repositories, JDK toolchain resolver and project-plugin versions exactly
-// as they do for a consuming repository. Applying both also proves a build with Java and Node apps
-// can. Dogfooding them here means a change that breaks consumers breaks this build too.
+// This build applies the plugins it publishes, as a user's build would: a change that breaks users breaks it.
 pluginManagement {
     includeBuild("plugins")
-    // The build's own tooling: here, the Renovate preset check (embedded-runtime.renovate-presets).
     includeBuild("build-logic")
 }
 
@@ -16,13 +11,10 @@ plugins {
 
 rootProject.name = "embedded-runtime-gradle-plugins"
 
-// The samples, as builds of their own the IDE and the root build both see; CI also builds each
-// with -p samples/<name>.
 listOf("java-service", "spring-boot-service", "node-service", "docker-service", "deployment-pipeline")
     .forEach { includeBuild("samples/$it") }
 
-// Node.js for validateRenovatePresets. The settings plugins prefer settings
-// repositories, so this one is declared here rather than by the Node plugin, for its one module.
+// Node.js for validateRenovatePresets, here because the settings plugins prefer settings repositories.
 dependencyResolutionManagement {
     repositories {
         exclusiveContent {

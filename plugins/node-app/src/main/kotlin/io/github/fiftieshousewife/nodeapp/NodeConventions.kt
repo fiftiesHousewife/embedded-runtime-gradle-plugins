@@ -6,7 +6,6 @@ import org.gradle.api.Project
 internal object NodeConventions {
     fun apply(project: Project, extension: NodeAppExtension) {
         val projectDir = project.layout.projectDirectory
-        extension.nodeVersion.convention(NodeCatalog.nodeVersion(project.providers))
         // src/deploy/ holds conf.defaults and the Dockerfile override, so it is not application code.
         extension.appFiles.convention(
             extension.buildScript
@@ -17,8 +16,7 @@ internal object NodeConventions {
         // Node.js has no classpath for defaults, so they ship beside the app.
         extension.configDefaults.convention(projectDir.dir("src/deploy/conf"))
         extension.testScript.convention("test")
-        extension.ignoreInstallScripts.convention(true)
         extension.nodeArgs.convention(emptyList())
-        extension.portableInstallScripts.convention(emptyList())
+        extension.installScripts.convention(emptyList())
     }
 }

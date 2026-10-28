@@ -9,31 +9,35 @@ import org.gradle.api.provider.Provider
 import java.io.File
 
 /**
- * `securityPolicyArtifact` normally comes from a binary repository, so the [RuntimePolicy] is versioned and
- * reviewed like any release; a machine's or CI agent's `-P<block>.…` property wins over the build.
+ * A `securityPolicy` is a directory or zip, or the `group:name:version` of a zip, which normally comes
+ * from a binary repository so the [RuntimePolicy] is versioned and reviewed like any release; a
+ * machine's or CI agent's `-P<block>.securityPolicy` wins over the build.
  */
 object RuntimePolicySource {
-    fun files(project: Project, path: Provider<String>, artifact: Provider<String>): FileCollection {
+    private val coordinates = Regex("""[^/\\:]+:[^/\\:]+:[^/\\:]+""")
+
+    internal fun isCoordinates(policy: String) = coordinates.matches(policy)
+
+    fun files(project: Project, policy: Provider<String>): FileCollection {
         val projectDir = project.layout.projectDirectory
         val dependencies = project.dependencies
         val configurations = project.configurations
-        // Absent properties contribute nothing, rather than failing when the collection is queried.
-        val fromPath = path.map<List<Any>> { listOf(projectDir.file(it)) }.orElse(emptyList())
-        val fromArtifact =
-            artifact.map<List<Any>> { coordinates ->
+        // An absent policy contributes nothing, rather than failing when the collection is queried.
+        val resolved = policy.map<List<Any>> {
+            if (isCoordinates(it)) {
                 listOf(
-                    configurations.detachedConfiguration(dependencies.create("$coordinates@zip")).apply {
+                    configurations.detachedConfiguration(dependencies.create("$it@zip")).apply {
                         isTransitive = false
                     },
                 )
-            }.orElse(emptyList())
-        return project.files(fromPath, fromArtifact)
+            } else {
+                listOf(projectDir.file(it))
+            }
+        }.orElse(emptyList())
+        return project.files(resolved)
     }
 
     fun load(files: Set<File>, fs: FileSystemOperations, archives: ArchiveOperations, scratch: File): RuntimePolicy? {
-        if (files.size > 1) {
-            throw GradleException("Set one of securityPolicy and securityPolicyArtifact, not both: $files")
-        }
         val source = files.singleOrNull() ?: return null
         return RuntimePolicy.load(if (source.isDirectory) source else unzipped(source, fs, archives, scratch))
     }

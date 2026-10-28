@@ -4,7 +4,6 @@ import io.github.fiftieshousewife.appcore.tasks.AppSmokeTest
 import io.github.fiftieshousewife.appcore.tasks.RunApp
 import org.gradle.api.Project
 import org.gradle.api.tasks.TaskProvider
-import java.time.Duration
 
 /**
  * `appSmokeTest` and `runApp`: the tasks that use this machine's archive, once it is known.
@@ -16,7 +15,7 @@ internal class HostTasks(private val project: Project, wiring: AppWiring) {
         project.tasks.register("appSmokeTest", AppSmokeTest::class.java) {
             group = AppWiring.VERIFICATION_GROUP
             description = "Extracts this machine's archive, starts it and waits for its healthcheck"
-            healthTimeout.set(extension.smokeTestTimeout)
+            healthTimeout.set(wiring.facts.smokeTestTimeout)
             resultFile.set(wiring.workDir.map { it.file("smoke-test.txt") })
             requiredPolicy.from(wiring.runtimePolicy)
             val enabled = extension.smokeTestEnabled
@@ -45,9 +44,5 @@ internal class HostTasks(private val project: Project, wiring: AppWiring) {
             dependsOn(hostTasks.assemble)
             appDir.set(project.layout.dir(hostTasks.assemble.map { it.destinationDir }))
         }
-    }
-
-    companion object {
-        val DEFAULT_SMOKE_TEST_TIMEOUT: Duration = Duration.ofSeconds(60)
     }
 }

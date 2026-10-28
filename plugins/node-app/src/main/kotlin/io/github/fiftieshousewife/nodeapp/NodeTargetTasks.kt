@@ -20,7 +20,7 @@ internal class NodeTargetTasks(
     private val wiring: AppWiring,
     private val node: PinnedNode,
 ) {
-    private val distributions = NodeDistributions(project, extension, wiring)
+    private val distributions = NodeDistributions(project, node.version, wiring)
     private val group = NodeAppPlugin.ECOSYSTEM.taskGroup
 
     /** The contribution for [target]: this machine's distribution is reused for its own target. */
@@ -32,7 +32,7 @@ internal class NodeTargetTasks(
         val launch = launch()
         return EcosystemSpec(
             runtimeName = "nodejs",
-            runtimeVersion = extension.nodeVersion,
+            runtimeVersion = node.version,
             launchers = Launchers.Generated(
                 launch.map(NodeLaunchCommand::posix),
                 launch.map(NodeLaunchCommand::windows),
@@ -89,7 +89,7 @@ internal class NodeTargetTasks(
             packageJson.set(project.layout.projectDirectory.file("package.json"))
             packageLock.set(project.layout.projectDirectory.file("package-lock.json"))
             val host = wiring.host
-            npmArgs.set(extension.ignoreInstallScripts.map { ProductionInstallArgs.of(it, target, host) })
+            npmArgs.set(extension.installScripts.map { ProductionInstallArgs.of(it.isEmpty(), target, host) })
             outputDir.set(wiring.workDir.map { it.dir("npm-production/${target.id}") })
         }
 
@@ -99,8 +99,8 @@ internal class NodeTargetTasks(
             description = "Checks the ${target.id} production node_modules for host-specific install-script output"
             nodeModules.set(prodModules)
             crossBuild.set(target != wiring.host)
-            ignoredScripts.set(extension.ignoreInstallScripts)
-            portable.set(extension.portableInstallScripts)
+            ignoredScripts.set(extension.installScripts.map(List<String>::isEmpty))
+            portable.set(extension.installScripts)
             reportFile.set(wiring.workDir.map { it.file("node-modules-report/${target.id}.txt") })
         }
 

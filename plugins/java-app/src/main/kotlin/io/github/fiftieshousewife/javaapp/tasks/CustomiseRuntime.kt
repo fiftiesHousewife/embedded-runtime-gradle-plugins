@@ -69,10 +69,6 @@ constructor(
 
     @get:Internal abstract val binaryRepoLogin: Property<RepositoryLogin>
 
-    @get:InputFiles
-    @get:PathSensitive(PathSensitivity.NONE)
-    abstract val propertiesFiles: ConfigurableFileCollection
-
     @get:Input abstract val properties: MapProperty<String, String>
 
     /** Security property → values to add to its comma-separated list. */
@@ -136,7 +132,6 @@ constructor(
         val file = out.resolve("conf/security/java.security").toPath()
         val policy =
             SecurityPolicy(
-                files = propertiesFiles.files.map(::load),
                 properties = properties.get(),
                 additions = appendToLists.get(),
                 lock = lockProperties.get(),
@@ -163,7 +158,7 @@ constructor(
             ?: return emptyList()
         val trusted = trustPolicyCertificates(out, policy)
         val file = out.resolve("conf/security/java.security").toPath()
-        val rules = SecurityPolicy(emptyList(), policy.set, policy.append, policy.lockProperties)
+        val rules = SecurityPolicy(policy.set, policy.append, policy.lockProperties)
         val changes = rules.changes(load(file.toFile()))
         if (changes.isNotEmpty()) {
             Files.writeString(file, SecurityPolicy.block(changes, RECORD_NAME), StandardOpenOption.APPEND)

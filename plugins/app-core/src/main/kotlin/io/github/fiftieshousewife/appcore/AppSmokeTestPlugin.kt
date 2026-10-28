@@ -44,11 +44,7 @@ abstract class AppSmokeTestPlugin : Plugin<Project> {
         trustedRoot.set(extension.sigstoreTrustedRoot)
         healthTimeout.convention(extension.healthTimeout)
         requiredPolicy.from(
-            RuntimePolicySource.files(
-                project,
-                property(project, "securityPolicy").orElse(extension.securityPolicy),
-                property(project, "securityPolicyArtifact").orElse(extension.securityPolicyArtifact),
-            ),
+            RuntimePolicySource.files(project, property(project, "securityPolicy").orElse(extension.securityPolicy)),
         )
         resultFile.set(project.layout.buildDirectory.file("app-smoke-test/result.txt"))
     }

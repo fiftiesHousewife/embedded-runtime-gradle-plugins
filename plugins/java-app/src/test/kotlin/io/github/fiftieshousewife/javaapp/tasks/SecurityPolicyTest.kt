@@ -12,15 +12,10 @@ class SecurityPolicyTest {
             setProperty("networkaddress.cache.ttl", "-1")
         }
 
-    private fun properties(vararg entries: Pair<String, String>) = Properties().apply {
-        entries.forEach { (k, v) -> setProperty(k, v) }
-    }
-
     @Test
     fun `adds to a disabled-algorithm list without losing the JDK's own entries or repeating any`() {
         val policy =
             SecurityPolicy(
-                emptyList(),
                 emptyMap(),
                 mapOf("jdk.tls.disabledAlgorithms" to listOf("TLS_RSA_X", "RC4")),
                 false,
@@ -29,11 +24,10 @@ class SecurityPolicyTest {
     }
 
     @Test
-    fun `applies files, then single properties, then the lock, later ones winning`() {
+    fun `applies the properties, then the lock`() {
         val policy =
             SecurityPolicy(
-                files = listOf(properties("networkaddress.cache.ttl" to "30", "jdk.serialFilter" to "!*")),
-                properties = mapOf("networkaddress.cache.ttl" to "60"),
+                properties = mapOf("networkaddress.cache.ttl" to "60", "jdk.serialFilter" to "!*"),
                 additions = emptyMap(),
                 lock = true,
             )
@@ -46,11 +40,10 @@ class SecurityPolicyTest {
     }
 
     @Test
-    fun `an addition builds on a list a policy file already set`() {
+    fun `an addition builds on a list a property already set`() {
         val policy =
             SecurityPolicy(
-                files = listOf(properties("jdk.tls.disabledAlgorithms" to "SSLv3")),
-                properties = emptyMap(),
+                properties = mapOf("jdk.tls.disabledAlgorithms" to "SSLv3"),
                 additions = mapOf("jdk.tls.disabledAlgorithms" to listOf("TLS_RSA_X")),
                 lock = false,
             )
@@ -61,7 +54,7 @@ class SecurityPolicyTest {
     fun `changes nothing when the policy is empty`() {
         assertEquals(
             emptyMap<String, String>(),
-            SecurityPolicy(emptyList(), emptyMap(), mapOf("x" to emptyList()), false).changes(original),
+            SecurityPolicy(emptyMap(), mapOf("x" to emptyList()), false).changes(original),
         )
     }
 

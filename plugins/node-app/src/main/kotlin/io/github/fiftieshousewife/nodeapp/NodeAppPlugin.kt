@@ -28,17 +28,18 @@ constructor(
         val extension = project.extensions.create(ECOSYSTEM.extensionName, NodeAppExtension::class.java)
         val wiring = AppWiring(project, ECOSYSTEM, extension, AppServices(archives, components))
         wiring.applyConventions()
+        val version = NodeCatalog.nodeVersion(project.providers)
         wiring.registerRuntimeSupportCheck(
-            extension.nodeVersion.map { EmbeddedRuntime("nodejs", it.substringBefore('.'), it) },
+            version.map { EmbeddedRuntime("nodejs", it.substringBefore('.'), it) },
         )
         NodeConventions.apply(project, extension)
 
         val sources = NodeSources.from(project.providers)
-        val extracted = NodeDistributions(project, extension, wiring).forTarget(wiring.host)
+        val extracted = NodeDistributions(project, version, wiring).forTarget(wiring.host)
         val node =
             PinnedNode(
                 home = project.layout.dir(extracted.map { it.destinationDir }),
-                version = extension.nodeVersion,
+                version = version,
                 extracted = extracted,
                 npmrc = NpmTasks.npmrc(project, wiring, sources),
             )

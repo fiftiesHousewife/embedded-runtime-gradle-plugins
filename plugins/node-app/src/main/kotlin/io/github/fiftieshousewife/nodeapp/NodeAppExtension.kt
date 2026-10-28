@@ -9,9 +9,6 @@ import org.gradle.api.tasks.Nested
 
 /** `nodeApp {}`: the Node.js application archive and the Node runtime inside it. */
 abstract class NodeAppExtension : AppExtension() {
-    /** Exact Node.js version bundled and used for `npm` at build time. Defaults to the catalogue pin. */
-    abstract val nodeVersion: Property<String>
-
     /** Files copied into `app/`. Defaults to `src/` except `src/deploy/` (or `dist/` when [buildScript] is set). */
     abstract val appFiles: ConfigurableFileCollection
 
@@ -24,18 +21,17 @@ abstract class NodeAppExtension : AppExtension() {
     /** `package.json` script run by `check` when present. Defaults to `test`. */
     abstract val testScript: Property<String>
 
-    /** Pass `--ignore-scripts` to the production install. Default true; disable only for vetted install scripts. */
-    abstract val ignoreInstallScripts: Property<Boolean>
-
     /** Fixed Node options baked into the launcher, before `$APP_NODE_OPTS`. */
     abstract val nodeArgs: ListProperty<String>
 
     /**
-     * Packages whose install scripts are known not to produce host-specific output (for example
-     * esbuild, whose postinstall only validates the platform package npm already selected), so they
-     * do not block cross builds. Review before adding: the check exists because most do.
+     * Packages whose install scripts have been vetted, such as esbuild, whose postinstall only checks
+     * the platform package npm already chose. Empty (the default), the production install passes
+     * `--ignore-scripts`. Naming any runs install scripts, since npm can't run some and skip others,
+     * and the named packages no longer block cross builds; any other package with an install
+     * script still does, as its output is usually built for the build machine.
      */
-    abstract val portableInstallScripts: ListProperty<String>
+    abstract val installScripts: ListProperty<String>
 
     /** Trusted CAs and TLS settings for the embedded Node.js; see [NodeRuntimeSecurity]. */
     @get:Nested

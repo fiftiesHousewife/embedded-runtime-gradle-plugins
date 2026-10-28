@@ -46,10 +46,10 @@ class ContainerContextTest {
             javaService(
                 tmp,
                 JavaServiceOptions(
-                    javaApp = "$FIXTURE_MODULES\ntargets(\"$linuxForThisCpu\")\nlicense = \"Apache-2.0\"\n" +
-                        "sourceUrl = \"$source\"",
+                    javaApp = "$FIXTURE_MODULES\ntargets(\"$linuxForThisCpu\")\nlicense = \"Apache-2.0\"",
                 ),
             )
+        withOrigin(project, "https://ci:token@git.example.com/team/svc")
         JdkFixture.publish(project, linuxForThisCpu)
         project.build("appDockerContextFile")
         val dockerfile = project.project.resolve("Dockerfile").readText()
@@ -78,5 +78,10 @@ class ContainerContextTest {
             { assertTrue(updated.contains("EXPOSE 8080") && !updated.contains("EXPOSE 9999"), updated) },
             { assertTrue(updated.endsWith("# <<< embedded-runtime\nLABEL team=\"orders\"\n"), updated) },
         )
+    }
+
+    private fun withOrigin(project: TestProject, remote: String) {
+        TestProject.run("git", "-C", project.project.path, "init", "-q")
+        TestProject.run("git", "-C", project.project.path, "remote", "add", "origin", remote)
     }
 }

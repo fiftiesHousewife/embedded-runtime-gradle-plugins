@@ -6,8 +6,12 @@ import org.gradle.api.provider.Provider
 import org.gradle.jvm.toolchain.JavaLanguageVersion
 import java.io.File
 
-/** The defaults behind `javaApp {}`, and the compile toolchain they imply. */
-internal class JavaConventions(private val project: Project, private val extension: JavaAppExtension) {
+/** The defaults behind `javaApp {}`, the values derived from it, and the compile toolchain they imply. */
+internal class JavaConventions(
+    private val project: Project,
+    private val extension: JavaAppExtension,
+    detectedModules: Provider<List<String>>,
+) {
     val sources = JdkSources.from(project.providers)
 
     /**
@@ -16,28 +20,21 @@ internal class JavaConventions(private val project: Project, private val extensi
      */
     private val javaFeature = extension.javaVersion.map(JdkCatalog::requireSupported)
 
-    fun apply(detectedModules: Provider<List<String>>) {
+    /** The JDK linked into the archive: `javaApp.jdk.<feature>`, else the catalogue pin. */
+    val jdkVersion: Provider<String> = JdkCatalog.jdkVersion(project.providers, sources.distribution, javaFeature)
+
+    /** What the app needs: jdeps' modules and [JavaAppExtension.additionalModules]. */
+    val appModules: Provider<List<String>> =
+        detectedModules.zip(extension.additionalModules) { detected, extra -> (detected + extra).distinct() }
+
+    val jlinkOptions: Provider<List<String>> = javaFeature.map(::jlinkOptions)
+
+    fun apply() {
         extension.javaVersion.convention(JdkCatalog.defaultJavaFeature)
-        extension.jdkVersion.convention(JdkCatalog.jdkVersion(project.providers, sources.distribution, javaFeature))
         extension.additionalModules.convention(emptyList())
-        extension.jlinkModules.convention(
-            detectedModules.zip(extension.additionalModules) { detected, extra -> (detected + extra).distinct() },
-        )
-        extension.sharedModuleSets.convention(
-            project.providers.gradleProperty(ModuleSets.ENABLED_PROPERTY).map(String::toBoolean).orElse(true),
-        )
         extension.moduleSets.convention(javaFeature.map(ModuleSets::defaults))
-        extension.jlinkOptions.convention(javaFeature.map(::jlinkOptions))
         extension.jvmArgs.convention(emptyList())
-        JavaRuntimeDefaults.Settings().let { default ->
-            with(extension.runtimeDefaults) {
-                enabled.convention(default.enabled)
-                maxRamPercentage.convention(default.maxRamPercentage)
-                exitOnOutOfMemory.convention(default.exitOnOutOfMemory)
-                heapDumpOnOutOfMemory.convention(default.heapDumpOnOutOfMemory)
-                disableAttach.convention(default.disableAttach)
-            }
-        }
+        extension.runtimeDefaults.convention(true)
         val overlay = project.layout.projectDirectory.dir("src/deploy/runtime").asFile
         extension.runtimeOverlay.convention(project.layout.dir(project.provider { overlay.takeIf(File::isDirectory) }))
         security()
@@ -48,9 +45,7 @@ internal class JavaConventions(private val project: Project, private val extensi
         replaceDefaultTrust.convention(false)
         trustedCertificateUris.convention(emptyMap())
         properties.convention(emptyMap())
-        disabledTlsAlgorithms.convention(emptyList())
-        disabledCertPathAlgorithms.convention(emptyList())
-        disabledJarAlgorithms.convention(emptyList())
+        disabledAlgorithms.convention(emptyMap())
         lockProperties.convention(false)
         forbiddenModules.convention(listOf("jdk.jdwp.agent"))
     }

@@ -49,7 +49,7 @@ internal class DockerContext(
                 description =
                     "Creates the project's Dockerfile if missing, and keeps its embedded-runtime block up to date"
                 managedBlock.set(identity().map { DockerfileTemplate.render(template, it) })
-                this.dockerfile.set(extension.dockerfile)
+                this.dockerfile.set(project.layout.projectDirectory.file("Dockerfile"))
             }
         val forContext =
             project.tasks.register("appDockerContextFile", WriteTextFile::class.java) {
@@ -70,11 +70,11 @@ internal class DockerContext(
 
     private fun identity() = extension.appName
         .zip(extension.license) { name, license -> ImageIdentity(name, license) }
-        .zip(extension.sourceUrl.orElse("")) { identity, url -> identity.copy(source = url.ifEmpty { null }) }
+        .zip(wiring.facts.sourceUrl.orElse("")) { identity, url -> identity.copy(source = url.ifEmpty { null }) }
 
     private fun buildArguments() = wiring.version
         .zip(wiring.gitCommit) { version, commit -> mapOf("APP_VERSION" to version, "GIT_COMMIT" to commit) }
-        .zip(wiring.gitCommitTime.orElse("")) { values, time ->
+        .zip(wiring.facts.gitCommitTime.orElse("")) { values, time ->
             if (time.isEmpty()) values else values + ("CREATED" to time)
         }
 }

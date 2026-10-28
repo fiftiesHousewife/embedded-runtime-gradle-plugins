@@ -6,6 +6,7 @@ import io.github.fiftieshousewife.javaapp.tasks.CustomiseRuntime
 import org.gradle.api.Project
 import org.gradle.api.artifacts.component.ModuleComponentIdentifier
 import org.gradle.api.artifacts.result.ResolvedArtifactResult
+import org.gradle.api.provider.Provider
 import org.gradle.api.tasks.TaskProvider
 import org.gradle.api.tasks.bundling.Jar
 
@@ -13,14 +14,14 @@ import org.gradle.api.tasks.bundling.Jar
  * What a Java app puts in its archive: the customised runtime in `runtime/`, and the application jar
  * with its dependencies in `lib/`, as the `application` plugin lays them out.
  */
-internal class JavaEcosystem(private val project: Project, private val extension: JavaAppExtension) {
+internal class JavaEcosystem(private val project: Project, private val jdkVersion: Provider<String>) {
     private val jar = project.tasks.named("jar", Jar::class.java)
     private val runtimeClasspath = project.configurations.named("runtimeClasspath")
     private val resolvedArtifacts = runtimeClasspath.flatMap { it.incoming.artifacts.resolvedArtifacts }
 
     fun spec(runtime: TaskProvider<CustomiseRuntime>): EcosystemSpec = EcosystemSpec(
         runtimeName = JdkSources.from(project.providers).distribution.id,
-        runtimeVersion = extension.jdkVersion,
+        runtimeVersion = jdkVersion,
         launchers = Launchers.StartScripts(project.tasks.named("startScripts")),
         contents = {
             into("runtime") { from(runtime) }

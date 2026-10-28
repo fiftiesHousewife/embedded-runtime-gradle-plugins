@@ -30,9 +30,11 @@ class RuntimePolicyTest {
     @Test
     fun `the policy has the last word over the project's own security settings`() {
         val weakening =
-            "$FIXTURE_MODULES\nruntimeOptions(\"locked\")\n" +
-                "security { properties.put(\"networkaddress.cache.ttl\", \"-1\") }"
-        val project = javaService(tmp, JavaServiceOptions(javaApp = weakening))
+            "$FIXTURE_MODULES\nsecurity { properties.put(\"networkaddress.cache.ttl\", \"-1\") }"
+        val project = javaService(
+            tmp,
+            JavaServiceOptions(javaApp = weakening, properties = listOf("javaApp.runtimeOptions" to "locked")),
+        )
         project.build("appArchive", policyProperty)
         val runtime = project.project.resolve("build/app/${TestProject.hostTarget()}/svc-2.0.0/runtime")
         val effective = Properties().apply {

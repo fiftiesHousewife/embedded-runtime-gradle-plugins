@@ -31,52 +31,43 @@ constructor(
         val wiring = AppWiring(project, ECOSYSTEM, extension, AppServices(archives, components))
         wiring.applyConventions()
         val detectedModules = project.objects.listProperty(String::class.java)
-        val conventions = JavaConventions(project, extension).also { it.apply(detectedModules) }
+        val conventions = JavaConventions(project, extension, detectedModules).also { it.apply() }
 
         // Keeping the application plugin's distributions would publish two different ways to run the same app.
         listOf("distTar", "distZip").forEach { name -> project.tasks.named(name) { enabled = false } }
-        useEmbeddedRuntimeScripts(project, extension)
+        useEmbeddedRuntimeScripts(project, extension, wiring)
 
         // Targets and the JDK release are final only once the build script has run.
-        val runtimeTasks = JavaRuntimeTasks(project, extension, wiring)
+        val runtimeTasks = JavaRuntimeTasks(project, extension, conventions, wiring)
         project.afterEvaluate {
             detectedModules.set(runtimeTasks.jdeps().flatMap { it.outputFile }.map { JdepsModules.read(it.asFile) })
             runtimeTasks.findModules()
         }
         val distribution = conventions.sources.distribution
         wiring.registerRuntimeSupportCheck(
-            extension.javaVersion.zip(extension.jdkVersion) { feature, version ->
+            extension.javaVersion.zip(conventions.jdkVersion) { feature, version ->
                 EmbeddedRuntime(distribution.supportProduct, feature.toString(), version)
             },
         )
-        val ecosystem = JavaEcosystem(project, extension)
+        val ecosystem = JavaEcosystem(project, conventions.jdkVersion)
         wiring.register { target -> ecosystem.spec(runtimeTasks.customise(target, runtimeTasks.jlink(target))) }
         project.tasks.named("appSmokeTest", AppSmokeTest::class.java) {
             failureHint.set("If the app is missing a JDK module, ./gradlew jlinkFindModules finds which.")
         }
     }
 
-    /** Configured on creation, so a build's own `startScripts { … }` wins and `runtimeOptions` is final. */
-    private fun useEmbeddedRuntimeScripts(project: Project, extension: JavaAppExtension) {
+    /** Configured on creation, so a build's own `startScripts { … }` wins. */
+    private fun useEmbeddedRuntimeScripts(project: Project, extension: JavaAppExtension, wiring: AppWiring) {
         val application = project.extensions.getByType(JavaApplication::class.java)
         project.tasks.named("startScripts", CreateStartScripts::class.java) {
-            val locked = extension.runtimeOptions.get() == RuntimeOptions.LOCKED
-            val defaults = runtimeDefaults(extension.runtimeDefaults)
+            val locked = wiring.facts.runtimeOptions.get() == RuntimeOptions.LOCKED
+            val defaults = extension.runtimeDefaults.get()
             val projectOptions = application.applicationDefaultJvmArgs.toList() + extension.jvmArgs.get()
-            unixStartScriptGenerator = EmbeddedRuntimeScriptGenerator(false, locked, defaults.logDirFiles)
-            windowsStartScriptGenerator = EmbeddedRuntimeScriptGenerator(true, locked, defaults.logDirFiles)
-            defaultJvmOpts = JavaRuntimeDefaults.fixedOptions(defaults, projectOptions) + projectOptions
+            unixStartScriptGenerator = EmbeddedRuntimeScriptGenerator(false, locked, defaults)
+            windowsStartScriptGenerator = EmbeddedRuntimeScriptGenerator(true, locked, defaults)
+            defaultJvmOpts = (if (defaults) JavaRuntimeDefaults.OPTIONS else emptyList()) + projectOptions
         }
     }
-
-    private fun runtimeDefaults(defaults: JavaRuntimeDefaults) = JavaRuntimeDefaults.Settings(
-        enabled = defaults.enabled.get(),
-        maxRamPercentage = defaults.maxRamPercentage.get(),
-        exitOnOutOfMemory = defaults.exitOnOutOfMemory.get(),
-        heapDumpOnOutOfMemory = defaults.heapDumpOnOutOfMemory.get(),
-        garbageCollector = defaults.garbageCollector.orNull,
-        disableAttach = defaults.disableAttach.get(),
-    )
 
     companion object {
         val ECOSYSTEM =

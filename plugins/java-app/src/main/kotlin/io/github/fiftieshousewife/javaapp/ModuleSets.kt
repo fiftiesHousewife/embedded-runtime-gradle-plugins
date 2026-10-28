@@ -7,8 +7,6 @@ import java.util.Properties
  * and pull once; linking exactly each app's modules would give every app its own layer.
  */
 internal object ModuleSets {
-    const val ENABLED_PROPERTY = "javaApp.sharedModuleSets"
-
     private const val RESOURCE = "module-sets.properties"
     private const val SET = "set."
     private const val LAST_FEATURE = "lastFeature."

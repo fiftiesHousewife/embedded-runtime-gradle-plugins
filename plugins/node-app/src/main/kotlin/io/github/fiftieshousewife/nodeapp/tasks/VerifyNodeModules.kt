@@ -69,5 +69,5 @@ internal object InstallScripts {
 
     fun skippedWarning(packages: List<String>) =
         "Install scripts were skipped (--ignore-scripts) for: ${packages.joinToString()}. If they are needed at " +
-            "runtime, set nodeApp.ignoreInstallScripts = false after vetting them."
+            "runtime, vet them and name them in nodeApp.installScripts."
 }

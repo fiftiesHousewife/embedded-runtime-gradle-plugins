@@ -47,21 +47,13 @@ class AppWiring(
     val taskGroup: String get() = ecosystem.taskGroup
     val version: Provider<String> = providers.provider { project.version.toString() }
 
-    val gitCommit: Provider<String> = extension.gitCommit
-
-    /** The commit's time, the image's `created` label, so rebuilding a commit gives the same image. */
-    val gitCommitTime: Provider<String> = Git(project).output("log", "-1", "--format=%cI")
+    val facts = BuildFacts(project, ecosystem)
+    val gitCommit: Provider<String> = facts.gitCommit
 
     private val rpmPackages by lazy { RpmPackages(project, this) }
 
     val runtimePolicy: FileCollection =
-        RuntimePolicySource.files(
-            project,
-            providers.gradleProperty(ecosystem.property("securityPolicy")).orElse(extension.securityPolicy),
-            providers.gradleProperty(
-                ecosystem.property("securityPolicyArtifact"),
-            ).orElse(extension.securityPolicyArtifact),
-        )
+        RuntimePolicySource.files(project, facts.property("securityPolicy").orElse(extension.securityPolicy))
 
     fun applyConventions() {
         AppSettings.requireApplied(project, ecosystem.settingsPluginId)
@@ -69,33 +61,10 @@ class AppWiring(
         extension.targets.convention(
             providers.gradleProperty(ecosystem.property("targets")).map(Target::parseList).orElse(listOf(host)),
         )
-        val projectDir = layout.projectDirectory
-        // The project's root Dockerfile; one an older project keeps in src/deploy/docker/ is still used.
-        val legacy = projectDir.file("src/deploy/docker/Dockerfile")
-        extension.dockerfile.convention(
-            layout.file(
-                providers.provider {
-                    legacy.asFile.takeIf { it.isFile && !projectDir.file("Dockerfile").asFile.isFile }
-                        ?: projectDir.file("Dockerfile").asFile
-                },
-            ),
-        )
-        ExtensionConventions(project, ecosystem).apply(extension)
-        // Unset, each target gets the format native to it: ArchiveFormat.nativeTo.
-        extension.archiveFormat.convention(setting("archiveFormat", ArchiveFormat::parse))
-        extension.runtimeOptions.convention(
-            setting("runtimeOptions", RuntimeOptions::parse).orElse(RuntimeOptions.OPEN),
-        )
+        extension.license.convention("LicenseRef-Proprietary")
         rpmPackages.applyConventions()
         extension.smokeTestEnabled.convention(true)
-        extension.smokeTestTimeout.convention(HostTasks.DEFAULT_SMOKE_TEST_TIMEOUT)
-        extension.allowUntestedPublish.convention(
-            providers.gradleProperty(ecosystem.property("allowUntestedPublish")).map(String::toBoolean).orElse(false),
-        )
     }
-
-    private fun <T : Any> setting(name: String, parse: (String) -> T): Provider<T> =
-        providers.gradleProperty(ecosystem.property(name)).map(parse)
 
     /** A resolvable configuration holding exactly one runtime archive. */
     fun runtimeArchive(
@@ -139,7 +108,7 @@ class AppWiring(
         configuration.flatMap { it.elements }.map { it.single().asFile }
 
     fun registerRuntimeSupportCheck(runtime: Provider<EmbeddedRuntime>) =
-        CheckRuntimeSupport.register(project, runtime, extension.runtimeSupport)
+        CheckRuntimeSupport.register(project, runtime, facts)
 
     /** Registers the pipeline; [contribute] registers each target's ecosystem tasks once targets are known. */
     fun register(contribute: (Target) -> EcosystemSpec) {
@@ -156,14 +125,15 @@ class AppWiring(
             }
         val hostTasks = HostTasks(project, this)
         val smoke = hostTasks.smoke
-        tasks.register("aiSkills", InstallAiSkills::class.java) {
-            group = "help"
-            description =
-                "Writes the plugins' skills and hooks for Copilot and Devin into .agents/, .github/ and .devin/"
-            projectDirectory.set(layout.projectDirectory)
-        }
+        val aiSkills =
+            tasks.register("aiSkills", InstallAiSkills::class.java) {
+                description = "Installs the plugins' AI assistant skills and hooks in the project, as part of assemble"
+                projectDirectory.set(project.rootProject.layout.projectDirectory)
+                val enabled = project.providers.gradleProperty(ecosystem.property("aiSkills"))
+                onlyIf("${ecosystem.property("aiSkills")} is not false") { enabled.orNull?.toBoolean() != false }
+            }
         val publishing = AppPublishing(project, this, services.components).apply { register(smoke) }
-        tasks.named("assemble") { dependsOn(allArchives) }
+        tasks.named("assemble") { dependsOn(allArchives, aiSkills) }
         tasks.named("check") { dependsOn(smoke) }
         // Every archive feeding the app, its jar included, must be byte-reproducible.
         tasks.withType(AbstractArchiveTask::class.java).configureEach {
@@ -175,7 +145,6 @@ class AppWiring(
 
     private fun registerTargets(lifecycle: Lifecycle, contribute: (Target) -> EcosystemSpec) {
         extension.targets.finalizeValue()
-        extension.archiveFormat.finalizeValue()
         val targets = extension.targets.get()
         if (targets.isEmpty()) throw GradleException("${ecosystem.extensionName}.targets is empty; name at least one")
         val pipeline = TargetPipeline(project, this)

@@ -79,7 +79,6 @@ class NodeAppPluginTest {
     fun `checkRuntimeSupport fails for a Node release past its end of life`() {
         val project = webApp()
         val major = NodeFixture.nodeVersion.substringBefore('.')
-        // A copy of endoflife.date's data, as an air-gapped site would keep one.
         project.file(
             "eol/products/nodejs",
             """{"result": {"releases": [{"name": "$major", "isEol": true, "eolFrom": "2026-04-30", "latest": null},
@@ -87,14 +86,7 @@ class NodeAppPluginTest {
         )
         val url = "-PnodeApp.runtimeSupportUrl=${project.project.resolve("eol/products").toURI()}"
         val failed = project.buildAndFail("checkRuntimeSupport", url)
-        // The same, set in the build script instead.
-        project.file(
-            "build.gradle.kts",
-            project.project.resolve("build.gradle.kts").readText() +
-                "\nnodeApp.runtimeSupport {\n    url = \"${project.project.resolve("eol/products").toURI()}\"\n" +
-                "    allowEndOfLife = true\n}\n",
-        )
-        val allowed = project.build("checkRuntimeSupport")
+        val allowed = project.build("checkRuntimeSupport", url, "-PnodeApp.allowEndOfLife=true")
         assertAll(
             { assertTrue(failed.output.contains("nodejs $major reached end of life on 2026-04-30"), failed.output) },
             { assertTrue(failed.output.contains("move to a supported release (99)"), failed.output) },

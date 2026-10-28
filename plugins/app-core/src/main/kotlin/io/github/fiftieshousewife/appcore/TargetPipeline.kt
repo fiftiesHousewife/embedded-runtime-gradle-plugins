@@ -99,12 +99,11 @@ internal class TargetPipeline(private val project: Project, private val wiring: 
     }
 
     /**
-     * The archive of [archiveFormat][AppExtension.archiveFormat], else the one native to [target],
-     * named `<app>-<version>-<target>.<ext>` in `build/distributions`, the classifier the Maven
-     * publication uses; the other format's task is disabled.
+     * The archive native to [target] (zip for Windows, else tar.gz), named `<app>-<version>-<target>.<ext>`
+     * in `build/distributions`, the classifier the Maven publication uses; the other format's task is disabled.
      */
     private fun archiveTask(name: String, target: Target): TaskProvider<out AbstractArchiveTask> {
-        val format = extension.archiveFormat.orNull ?: ArchiveFormat.nativeTo(target)
+        val format = ArchiveFormat.nativeTo(target)
         val tar = tasks.named("${name}DistTar", Tar::class.java) {
             enabled = format != ArchiveFormat.ZIP
             compression = if (format == ArchiveFormat.TAR_GZ) Compression.GZIP else Compression.NONE
@@ -156,7 +155,7 @@ internal class TargetPipeline(private val project: Project, private val wiring: 
                 windows.set(target.isWindows)
                 posixExec.set(launchers.posixExec)
                 windowsExec.set(launchers.windowsExec)
-                lockedOptions.set(extension.runtimeOptions.map { it == RuntimeOptions.LOCKED })
+                lockedOptions.set(wiring.facts.runtimeOptions.map { it == RuntimeOptions.LOCKED })
                 outputDir.set(workDir.map { it.dir("launchers/${target.id}") })
             }
     }

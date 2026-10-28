@@ -23,18 +23,6 @@ class JavaAppPackagingTest {
         """publishing { repositories { maven { name = "local"; url = uri(layout.buildDirectory.dir("repo")) } } }"""
 
     @Test
-    fun `a zip archive is smoke-tested and published like a tarball`() {
-        val project = javaService(tmp, JavaServiceOptions("$FIXTURE_MODULES\narchiveFormat(\"zip\")", localRepo))
-        val built = project.build("publish")
-        val gmm = project.project.resolve("build/repo/com/example/test/svc/2.0.0/svc-2.0.0.module").readText()
-        assertAll(
-            { assertEquals(TaskOutcome.SUCCESS, built.task(":appSmokeTest")?.outcome) },
-            { assertTrue(project.project.resolve("build/distributions/svc-2.0.0-$host.zip").isFile) },
-            { assertTrue(gmm.contains(""""url": "svc-2.0.0-$host.zip""""), gmm) },
-        )
-    }
-
-    @Test
     fun `a project's own SBOM replaces the built-in one in the archive and the publication`() {
         val own = "{\"bomFormat\":\"CycloneDX\",\"specVersion\":\"1.6\",\"metadata\":{\"tools\":[{\"name\":\"ours\"}]}}"
         val project =
@@ -94,9 +82,10 @@ class JavaAppPackagingTest {
     @Test
     fun `publish uploads each RPM to the YUM repository with the publishing credentials`() {
         val requests = RecordingRepository().use { server ->
-            val project = javaService(tmp, rpmService("repositoryUrl = uri(\"${server.url}/rpm-local\")"))
+            val project = javaService(tmp, rpmService())
             project.build(
                 "publish",
+                "-PjavaApp.rpmRepositoryUrl=${server.url}/rpm-local",
                 "-PjavaApp.allowUntestedPublish=true",
                 "-PbinaryRepoUsername=ci",
                 "-PbinaryRepoPassword=secret",
@@ -109,8 +98,8 @@ class JavaAppPackagingTest {
         )
     }
 
-    private fun rpmService(rpm: String = "") = JavaServiceOptions(
-        javaApp = "$FIXTURE_MODULES\ntargets(\"$host\", \"linux-aarch64\")\nrpm {\n    enabled = true\n    $rpm\n}",
+    private fun rpmService() = JavaServiceOptions(
+        javaApp = "$FIXTURE_MODULES\ntargets(\"$host\", \"linux-aarch64\")\nrpm { enabled = true }",
         build = localRepo,
     )
 

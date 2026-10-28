@@ -39,9 +39,6 @@ abstract class GenerateRpm : DefaultTask() {
     @get:Input abstract val license: Property<String>
 
     @get:Input @get:Optional
-    abstract val vendor: Property<String>
-
-    @get:Input @get:Optional
     abstract val url: Property<String>
 
     @get:Input abstract val systemd: Property<Boolean>
@@ -80,7 +77,6 @@ abstract class GenerateRpm : DefaultTask() {
         setGroup("Applications/System")
         // Not the build machine's name, which would make every build differ.
         setBuildHost("localhost")
-        vendor.orNull?.let(::setVendor)
         url.orNull?.let(::setUrl)
         buildTime.orNull?.let { addHeaderEntry(Header.HeaderTag.BUILDTIME, it.toInt()) }
     }

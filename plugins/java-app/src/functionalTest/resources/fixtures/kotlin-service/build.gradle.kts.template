@@ -6,6 +6,6 @@ version = "1.0.0"
 application { mainClass = "test.MainKt" }
 javaApp {
     javaVersion = @FEATURE@
-    jlinkModules = listOf("java.base", "jdk.httpserver")
+    additionalModules.add("jdk.httpserver")
 }
 java { toolchain { vendor = JvmVendorSpec.matching("") } }

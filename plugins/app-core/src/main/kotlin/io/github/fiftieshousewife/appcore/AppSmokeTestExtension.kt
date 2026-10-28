@@ -22,13 +22,10 @@ abstract class AppSmokeTestExtension {
     abstract val sigstoreTrustedRoot: RegularFileProperty
 
     /**
-     * The runtime policy every archive must comply with, a directory or zip; the
-     * `-PappSmokeTest.securityPolicy` property, set per machine, wins over this.
+     * The runtime policy every archive must comply with: a directory or zip, or the `group:name:version`
+     * of a zip. The `-PappSmokeTest.securityPolicy` property, set per machine, wins over this.
      */
     abstract val securityPolicy: Property<String>
-
-    /** The policy as the `group:name:version` of a zip; `-PappSmokeTest.securityPolicyArtifact` wins. */
-    abstract val securityPolicyArtifact: Property<String>
 
     /** How long a started archive may take to report healthy. Default 60 seconds. */
     abstract val healthTimeout: Property<Duration>

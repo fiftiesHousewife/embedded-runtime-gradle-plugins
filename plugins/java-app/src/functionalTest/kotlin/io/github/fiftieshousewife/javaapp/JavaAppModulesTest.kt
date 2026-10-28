@@ -15,7 +15,7 @@ class JavaAppModulesTest {
     lateinit var tmp: File
 
     @Test
-    fun `without jlinkModules the runtime gets what jdeps finds`() {
+    fun `the runtime gets what jdeps finds`() {
         val project = javaService(tmp, JavaServiceOptions(javaApp = ""))
         val result = project.build("build")
         val detected = project.project.resolve("build/app-work/jdeps/modules.txt").readText()
@@ -27,15 +27,17 @@ class JavaAppModulesTest {
 
     @Test
     fun `jlinkFindModules adds the modules a failing app turns out to need`() {
-        val project = javaService(
-            tmp,
-            JavaServiceOptions(javaApp = "jlinkModules = listOf(\"java.base\")\nsharedModuleSets = false"),
+        val project = javaService(tmp, JavaServiceOptions(javaApp = "moduleSets.set(emptyMap())"))
+        project.file(
+            "src/main/java/test/Main.java",
+            fixture("java-service/Main.java")
+                .replace("server.start();", "Class.forName(\"java.sql.DriverManager\");\n        server.start();"),
         )
         val failed = project.buildAndFail("build")
         val found = project.build("jlinkFindModules")
         assertAll(
             { assertTrue(failed.output.contains("./gradlew jlinkFindModules"), failed.output) },
-            { assertTrue(found.output.contains("""additionalModules.addAll("jdk.httpserver")"""), found.output) },
+            { assertTrue(found.output.contains("""additionalModules.addAll("java.sql")"""), found.output) },
         )
     }
 
@@ -54,7 +56,7 @@ class JavaAppModulesTest {
     fun `without shared sets the runtime holds exactly the app's modules`() {
         val project = javaService(
             tmp,
-            JavaServiceOptions(javaApp = "additionalModules.add(\"java.sql\")\nsharedModuleSets = false"),
+            JavaServiceOptions(javaApp = "additionalModules.add(\"java.sql\")\nmoduleSets.set(emptyMap())"),
         )
         project.build("assemble")
         val modules = linkedModules(project.project)

@@ -1,5 +1,6 @@
 package io.github.fiftieshousewife.javaapp
 
+import org.gradle.api.GradleException
 import org.gradle.api.file.ConfigurableFileCollection
 import org.gradle.api.provider.ListProperty
 import org.gradle.api.provider.MapProperty
@@ -35,22 +36,25 @@ abstract class JavaRuntimeSecurity {
     abstract val replaceDefaultTrust: Property<Boolean>
 
     /**
-     * Properties files applied over the runtime's `conf/security/java.security`, in order: the
-     * organisation's security policy, taken from wherever it is published.
+     * Security properties set in the runtime's `conf/security/java.security`, e.g.
+     * `"networkaddress.cache.ttl" to "30"`; a file's worth is `properties.putAll(…)`.
      */
-    abstract val propertiesFiles: ConfigurableFileCollection
-
-    /** Security properties set after [propertiesFiles], e.g. `"networkaddress.cache.ttl" to "30"`. */
     abstract val properties: MapProperty<String, String>
 
-    /** Added to `jdk.tls.disabledAlgorithms`, keeping the JDK's own list: weak cipher suites, protocols, key sizes. */
-    abstract val disabledTlsAlgorithms: ListProperty<String>
+    /** The algorithms added with [disableAlgorithms], by the `java.security` list they go in. */
+    abstract val disabledAlgorithms: MapProperty<String, List<String>>
 
-    /** Added to `jdk.certpath.disabledAlgorithms`: algorithms and key sizes refused in certificate chains. */
-    abstract val disabledCertPathAlgorithms: ListProperty<String>
-
-    /** Added to `jdk.jar.disabledAlgorithms`: algorithms refused for signed jars. */
-    abstract val disabledJarAlgorithms: ListProperty<String>
+    /**
+     * Adds to one of the JDK's disabled-algorithm lists, keeping the JDK's own entries: `tls`
+     * (`jdk.tls.disabledAlgorithms`: cipher suites, protocols, key sizes), `certpath` (refused in
+     * certificate chains) or `jar` (refused for signed jars).
+     * `disableAlgorithms("tls", "TLSv1.1", "RSA keySize < 3072")`.
+     */
+    fun disableAlgorithms(kind: String, vararg algorithms: String) {
+        val list = DISABLED_ALGORITHM_LISTS[kind.lowercase()]
+            ?: throw GradleException("disableAlgorithms takes ${DISABLED_ALGORITHM_LISTS.keys}, not '$kind'")
+        disabledAlgorithms.put(list, disabledAlgorithms.get()[list].orEmpty() + algorithms)
+    }
 
     /**
      * Sets `security.overridePropertiesFile=false`, so the policy cannot be loosened at runtime with
@@ -63,4 +67,8 @@ abstract class JavaRuntimeSecurity {
      * `jdk.jdwp.agent`, the remote debugger.
      */
     abstract val forbiddenModules: ListProperty<String>
+
+    private companion object {
+        val DISABLED_ALGORITHM_LISTS = listOf("tls", "certpath", "jar").associateWith { "jdk.$it.disabledAlgorithms" }
+    }
 }

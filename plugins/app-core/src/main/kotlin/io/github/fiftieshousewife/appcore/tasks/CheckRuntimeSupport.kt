@@ -1,9 +1,9 @@
 package io.github.fiftieshousewife.appcore.tasks
 
+import io.github.fiftieshousewife.appcore.BuildFacts
 import io.github.fiftieshousewife.appcore.EmbeddedRuntime
 import io.github.fiftieshousewife.appcore.ProxySettings
 import io.github.fiftieshousewife.appcore.RuntimeSupport
-import io.github.fiftieshousewife.appcore.RuntimeSupportSettings
 import org.gradle.api.DefaultTask
 import org.gradle.api.GradleException
 import org.gradle.api.Project
@@ -78,16 +78,16 @@ abstract class CheckRuntimeSupport : DefaultTask() {
     }
 
     companion object {
-        /** Registers `checkRuntimeSupport` for [embedded], judged as [settings] say. */
-        fun register(project: Project, embedded: Provider<EmbeddedRuntime>, settings: RuntimeSupportSettings) {
+        /** Registers `checkRuntimeSupport` for [embedded], judged as the build's properties say. */
+        internal fun register(project: Project, embedded: Provider<EmbeddedRuntime>, facts: BuildFacts) {
             project.tasks.register("checkRuntimeSupport", CheckRuntimeSupport::class.java) {
                 group = "verification"
                 description =
                     "Fails if the embedded runtime has reached end of life; warns if it soon will or is behind"
                 runtime.set(embedded)
-                apiUrl.set(settings.url)
-                warningDays.set(settings.warningDays)
-                allowEndOfLife.set(settings.allowEndOfLife)
+                apiUrl.set(facts.runtimeSupportUrl)
+                warningDays.set(facts.endOfLifeWarningDays)
+                allowEndOfLife.set(facts.allowEndOfLife)
             }
         }
 

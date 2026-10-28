@@ -3,8 +3,8 @@ package io.github.fiftieshousewife.javaapp
 import io.github.fiftieshousewife.appcore.TestProject
 import java.io.File
 
-/** The modules the fixture app needs: it serves HTTP with the JDK's own server. */
-const val FIXTURE_MODULES = """jlinkModules = listOf("java.base", "jdk.httpserver")"""
+/** The module the fixture app serves HTTP with, which jdeps also finds: named so the tests don't depend on it. */
+const val FIXTURE_MODULES = """additionalModules.add("jdk.httpserver")"""
 
 /** How a test's fixture differs from the default: the `javaApp {}` body, extra build script, JDK sources. */
 data class JavaServiceOptions(

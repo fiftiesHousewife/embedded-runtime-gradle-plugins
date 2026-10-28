@@ -23,8 +23,8 @@ class JavaAppSecurityTest {
         $FIXTURE_MODULES
         security {
             trustedCertificates.from("certs")
-            propertiesFiles.from("security/policy.properties")
-            disabledTlsAlgorithms.addAll("TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA384", "TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA384")
+            properties.putAll(mapOf("networkaddress.cache.ttl" to "30", "jdk.serialFilter" to "!*"))
+            disableAlgorithms("tls", "TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA384", "TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA384")
             lockProperties = true
         }
         """
@@ -79,7 +79,7 @@ class JavaAppSecurityTest {
             javaService(
                 tmp,
                 JavaServiceOptions(
-                    javaApp = """jlinkModules = listOf("java.base", "jdk.httpserver", "jdk.jdwp.agent")""",
+                    javaApp = """additionalModules.add("jdk.jdwp.agent")""",
                 ),
             )
         val failed = project.buildAndFail("appArchive")
@@ -97,7 +97,7 @@ class JavaAppSecurityTest {
         val locked =
             javaService(
                 tmp.resolve("locked"),
-                JavaServiceOptions(javaApp = "$FIXTURE_MODULES\nruntimeOptions(\"locked\")"),
+                JavaServiceOptions(properties = listOf("javaApp.runtimeOptions" to "locked")),
             )
         locked.build(Target.parse(TestProject.hostTarget()).installTaskName)
         val emptyConf = tmp.resolve("empty-conf").apply { mkdirs() }
@@ -124,7 +124,6 @@ class JavaAppSecurityTest {
 
     private fun securedService() = javaService(tmp, JavaServiceOptions(javaApp = security)).apply {
         file("certs/acme-root.pem", fixture("certificates/acme-root.pem"))
-        file("security/policy.properties", "networkaddress.cache.ttl=30\njdk.serialFilter=!*")
         file("src/deploy/runtime/conf/acme/README.txt", "added by the overlay")
     }
 

@@ -2,9 +2,8 @@ package io.github.fiftieshousewife.javaapp.tasks
 
 import java.util.Properties
 
-/** Applied in order: properties files, single properties, additions to comma-separated lists, then the lock. */
+/** Applied in order: single properties, additions to comma-separated lists, then the lock. */
 internal data class SecurityPolicy(
-    val files: List<Properties>,
     val properties: Map<String, String>,
     /** Security property → values to add to its comma-separated list, keeping what is already there. */
     val additions: Map<String, List<String>>,
@@ -12,7 +11,6 @@ internal data class SecurityPolicy(
 ) {
     fun changes(original: Properties): Map<String, String> {
         val changes = LinkedHashMap<String, String>()
-        files.flatMap { it.entries }.forEach { (k, v) -> changes[k.toString()] = v.toString() }
         changes.putAll(properties)
         additions
             .filterValues { it.isNotEmpty() }

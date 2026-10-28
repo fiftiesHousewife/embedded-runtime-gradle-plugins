@@ -36,6 +36,7 @@ internal class JdkHome(
 internal class Jdks(
     private val project: Project,
     private val extension: JavaAppExtension,
+    private val jdkVersion: Provider<String>,
     private val wiring: AppWiring,
 ) {
     private val homes = mutableMapOf<Target, JdkHome>()
@@ -88,7 +89,7 @@ internal class Jdks(
         }
         if (target != wiring.host) return "it runs on ${wiring.host.id}, not ${target.id}"
         val home = toolchainHome.getOrElse { return "Gradle could not resolve it: ${it.message}" }
-        val pin = extension.jdkVersion.get()
+        val pin = jdkVersion.get()
         val implementor = JdkTools.implementor(home)
         return when {
             implementor != distribution.implementor || !JdkTools.isPinned(pin, home) ->
@@ -136,7 +137,7 @@ internal class Jdks(
             description = "Downloads the ${target.id} JDK package from the YUM repository ${yum.repository}"
             repositoryUrl.set(yum.repository.toString())
             packageName.set(yum.packageName(feature))
-            version.set(extension.jdkVersion.map { yum.version(JdkVersion(it)) })
+            version.set(jdkVersion.map { yum.version(JdkVersion(it)) })
             arch.set(target.arch.rpm)
             wiring.binaryRepo?.let { login.set(it.login(project.providers)) }
             cacheDir.set(project.gradle.gradleUserHomeDir.resolve("caches/embedded-runtime/yum"))
@@ -147,7 +148,7 @@ internal class Jdks(
 
     private fun resolved(name: String, target: Target, artifact: (JdkVersion) -> RuntimeArtifact): Provider<File> {
         val configuration =
-            wiring.runtimeArchive("$name${target.taskSuffix}", extension.jdkVersion.map { artifact(JdkVersion(it)) })
+            wiring.runtimeArchive("$name${target.taskSuffix}", jdkVersion.map { artifact(JdkVersion(it)) })
         return wiring.singleFile(configuration)
     }
 

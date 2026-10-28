@@ -5,6 +5,7 @@ plugins {
 
 group = "io.github.fiftieshousewife.samples"
 version = "1.0.0"
+description = "Sample HTTP service with its own Java runtime"
 
 application {
     mainClass = "io.github.fiftieshousewife.samples.HelloService"
@@ -13,10 +14,7 @@ application {
 javaApp {
     javaVersion = 21
     jvmArgs = listOf("-XX:+UseSerialGC", "-Xss512k")
-    rpm {
-        enabled = true
-        summary = "Sample HTTP service with its own Java runtime"
-    }
+    rpm { enabled = true }
 }
 
 // -PsigstoreSign=true signs with Sigstore, keyless, as CI does; elsewhere that opens a browser.

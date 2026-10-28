@@ -17,9 +17,10 @@ import org.gradle.api.tasks.bundling.Jar
 internal class JavaRuntimeTasks(
     private val project: Project,
     private val extension: JavaAppExtension,
+    private val conventions: JavaConventions,
     private val wiring: AppWiring,
 ) {
-    private val jdks = Jdks(project, extension, wiring)
+    private val jdks = Jdks(project, extension, conventions.jdkVersion, wiring)
 
     /**
      * This machine's JDK, which runs jdeps and jlink. Each task asks for it before it is registered:
@@ -32,14 +33,11 @@ internal class JavaRuntimeTasks(
      * What jlink links: the app's modules, or the smallest shared set holding them ([ModuleSets]).
      * `jlinkFindModules` keeps the app's own modules, so it still finds what the app needs.
      */
-    private val linkedModules: Provider<List<String>> = extension.sharedModuleSets.flatMap { shared ->
-        if (!shared) return@flatMap extension.jlinkModules
-        extension.jlinkModules
-            .zip(extension.moduleSets) { needed, sets -> needed to sets }
-            .zip(extension.security.forbiddenModules) { (needed, sets), forbidden ->
-                ModuleSets.choose(needed, sets, forbidden)
-            }
-    }
+    private val linkedModules: Provider<List<String>> = conventions.appModules
+        .zip(extension.moduleSets) { needed, sets -> needed to sets }
+        .zip(extension.security.forbiddenModules) { (needed, sets), forbidden ->
+            ModuleSets.choose(needed, sets, forbidden)
+        }
 
     /** Links [target]'s trimmed runtime with this machine's jlink, from [target]'s JDK. */
     fun jlink(target: Target): TaskProvider<JlinkRuntime> {
@@ -52,11 +50,11 @@ internal class JavaRuntimeTasks(
             targetJdk.set(targetHome.dir)
             targetHome.jmods?.let(targetJmods::set)
             dependsOn(toolHome.tasks + targetHome.tasks)
-            jdkVersion.set(extension.jdkVersion)
+            jdkVersion.set(conventions.jdkVersion)
             host.set(wiring.host)
             this.target.set(target)
             modules.set(linkedModules)
-            options.set(extension.jlinkOptions)
+            options.set(conventions.jlinkOptions)
             outputDir.set(wiring.workDir.map { it.dir("jlink/${target.id}") })
         }
     }
@@ -75,11 +73,8 @@ internal class JavaRuntimeTasks(
                 binaryRepoServer.set(it.baseUrl)
                 binaryRepoLogin.set(it.login(project.providers))
             }
-            propertiesFiles.from(security.propertiesFiles)
             properties.set(security.properties)
-            appendToLists.put("jdk.tls.disabledAlgorithms", security.disabledTlsAlgorithms)
-            appendToLists.put("jdk.certpath.disabledAlgorithms", security.disabledCertPathAlgorithms)
-            appendToLists.put("jdk.jar.disabledAlgorithms", security.disabledJarAlgorithms)
+            appendToLists.set(security.disabledAlgorithms)
             lockProperties.set(security.lockProperties)
             forbiddenModules.set(security.forbiddenModules)
             policy.from(wiring.runtimePolicy)
@@ -90,11 +85,10 @@ internal class JavaRuntimeTasks(
     fun jdeps(): TaskProvider<JdepsModules> {
         val home = hostJdk
         return project.tasks.register("jdeps", JdepsModules::class.java) {
-            group = this@JavaRuntimeTasks.group
             description = "Finds the JDK modules the app and its dependencies use, with jdeps"
             jdk.set(home.dir)
             home.builtBy?.let { dependsOn(it) }
-            jdkVersion.set(extension.jdkVersion)
+            jdkVersion.set(conventions.jdkVersion)
             javaFeature.set(extension.javaVersion)
             appJar.from(project.tasks.named("jar", Jar::class.java))
             classpath.from(project.configurations.named("runtimeClasspath"))
@@ -114,9 +108,9 @@ internal class JavaRuntimeTasks(
             appName.set(extension.appName)
             expectedVersion.set(project.provider { project.version.toString() })
             windows.set(wiring.host.isWindows)
-            modules.set(extension.jlinkModules)
-            options.set(extension.jlinkOptions)
-            healthTimeout.set(extension.smokeTestTimeout)
+            modules.set(conventions.appModules)
+            options.set(conventions.jlinkOptions)
+            healthTimeout.set(wiring.facts.smokeTestTimeout)
             maxAttempts.set(MAX_FIND_ATTEMPTS)
             reportFile.set(project.layout.buildDirectory.file("app-work/jlink-find-modules.txt"))
         }

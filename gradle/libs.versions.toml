@@ -23,6 +23,7 @@ sigstore = "2.3.0"
 
 # Used by samples/spring-boot-service only.
 spring-boot = "4.1.2"
+testcontainers = "2.0.5"
 
 # The build's own tools.
 # Runs Renovate's config validator on renovate/ (validateRenovatePresets, part of check), with the
@@ -55,6 +56,7 @@ ubi-minimal-digest = "sha256:6f3a78179e0b30b930a186e7f68a4af52e51bb82406c9653be1
 
 [libraries]
 spring-boot-dependencies = { module = "org.springframework.boot:spring-boot-dependencies", version.ref = "spring-boot" }
+testcontainers-junit-jupiter = { module = "org.testcontainers:testcontainers-junit-jupiter", version.ref = "testcontainers" }
 cyclonedx-core = { module = "org.cyclonedx:cyclonedx-core-java", version.ref = "cyclonedx" }
 packageurl = { module = "com.github.package-url:packageurl-java", version.ref = "packageurl" }
 # Redline writes RPMs in plain Java; its own dependencies are old, so the build pins current ones.

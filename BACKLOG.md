@@ -20,13 +20,12 @@ under the configuration cache.
 |---|---|
 | **Engine** | Isolated worker (`classLoaderIsolation`, like the Sigstore verifier): rewrite-core brings Jackson, ASM, JNA, Caffeine, Micrometer and ANTLR. Custom recipes need `javaParameters = true` or their YAML options arrive as null. Strip `~~>` search markers before writing and report them as findings. Lines added to a CRLF file come out LF: normalise |
 | **Recipes to write** | Built-ins cover labels, exec-form entrypoint, `ADD` to `COPY`, non-root user. Missing: ensure an instruction (`EXPOSE`, `ENTRYPOINT`), group-0 ownership on `COPY`, ports below 1024, `/licenses`, merging labels into an existing `LABEL` |
-| **Layers** | Split the single `COPY app/` into `runtime/`, `lib/` and the app, so a release doesn't re-push the 39 MB runtime; add a test that a runtime builds byte-identical twice |
 | **Tasks** | `appDockerfileCheck` (diff of suggestions, fails when strict) and `appDockerfileFix` |
 | **CI cross-checks** | hadolint, Red Hat `preflight check container` on the sample image, and a Testcontainers test running the image as a random UID in group 0. Versions in the catalogue with `# renovate:` comments |
-| **No `USER` instruction** | Decided 2026-10-27: OpenShift ignores `USER`, so the Dockerfile has none. Plain Docker and vanilla Kubernetes then run the image as root unless the pod sets `runAsNonRoot`/`runAsUser`, and Red Hat's `RunAsNonRoot` certification check fails: say so in the docs |
+| **`USER` per platform** | Decided 2026-10-28: the default Dockerfile keeps `USER 1001`, so plain Docker and Kubernetes don't run it as root and Red Hat's `RunAsNonRoot` check passes; `Dockerfile.openshift` has none, as OpenShift assigns the user |
 | **OCI labels with the commit** | Keep `org.opencontainers.image.revision` and the rest of the OCI set; add `io.k8s`/`io.openshift` labels for OpenShift |
-| **OpenShift and Oracle samples** | The Docker sample on Oracle JDK (a release Oracle's NFTC lets an archive carry), with an OpenShift Dockerfile, as the corporate default example |
-| **Writable storage** | `APP_DATA_DIR`/`APP_LOG_DIR` don't exist in the image: ship them group-0 writable for the unmounted case, and document the volume and env-var contract with a sample `Deployment` |
+| **Writable storage** | `APP_DATA_DIR`/`APP_LOG_DIR` don't exist in the plugin's Dockerfile (the sample's `Dockerfile.openshift` creates them group-0 writable): do the same in the template, and document the volume and env-var contract with a sample `Deployment` |
+| **Variants from the engine** | `Dockerfile.openshift` and `Dockerfile.micro` are hand-written in the Spring Boot sample; the engine's `openshift` and `redhat-certified` standards should write them, so they follow plugin releases as the managed block does |
 
 ## Shared module sets
 

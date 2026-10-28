@@ -236,8 +236,8 @@ for (const signal of ['SIGTERM', 'SIGINT']) {
 }
 ```
 
-Alternatively run the container with `docker run --init`. The Docker sample in
-[`samples/docker-service`](../samples/docker-service) is built in CI and tested with
-[Testcontainers](https://testcontainers.com) (a `dockerTest` suite): started, probed with both
-modes, checked for its labels and stopped with SIGTERM. Its arm64 image is built on an x64 machine.
-The same suite is a starting point for testing your own image.
+Alternatively run the container with `docker run --init`. The
+[Spring Boot sample](../samples/spring-boot-service) builds an image from each of its Dockerfiles
+and tests it with [Testcontainers](https://testcontainers.com) in CI: started, probed with both
+modes, checked for its labels and stopped with SIGTERM; see
+[Testing the container image](container-testing.md).

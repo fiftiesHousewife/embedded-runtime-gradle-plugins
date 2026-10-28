@@ -11,7 +11,7 @@ plugins {
 
 rootProject.name = "embedded-runtime-gradle-plugins"
 
-listOf("java-service", "spring-boot-service", "node-service", "docker-service", "deployment-pipeline")
+listOf("java-service", "spring-boot-service", "node-service", "deployment-pipeline")
     .forEach { includeBuild("samples/$it") }
 
 // Node.js for validateRenovatePresets, here because the settings plugins prefer settings repositories.

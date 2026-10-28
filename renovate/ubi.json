@@ -31,14 +31,18 @@
       "versioning": "regex:^(?<major>\\d+)\\.(?<minor>\\d+)-(?<patch>\\d+)$"
     },
     {
-      "description": "The ARG BASE_IMAGE default in a java-app or node-app Dockerfile is rewritten by each plugin release: update the plugin, not the line.",
+      "description": "The ARG BASE_IMAGE default in the Dockerfile a java-app or node-app plugin manages is rewritten by each plugin release: update the plugin, not the line. A project's own Dockerfile.<name> is left to Renovate.",
       "matchManagers": [
         "dockerfile"
       ],
       "matchPackageNames": [
         "/(^|/)ubi9/ubi-(minimal|micro)$/"
       ],
-      "enabled": false
+      "enabled": false,
+      "matchFileNames": [
+        "Dockerfile",
+        "**/Dockerfile"
+      ]
     }
   ]
 }

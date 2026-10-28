@@ -10,6 +10,8 @@ ARG CREATED
 
 LABEL @LABELS@
 
+# The runtime first, in a layer of its own: a new release of the app leaves it alone.
+COPY --chown=1001:0 runtime/${TARGETARCH}/ /app/runtime/
 COPY --chown=1001:0 app/${TARGETARCH}/ /app/
 
 ENV APP_ROOT=/var/lib/app \

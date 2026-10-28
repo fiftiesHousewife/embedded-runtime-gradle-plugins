@@ -7,16 +7,17 @@ make identical, and how to choose settings that keep it that way.
 
 ## What an image is made of
 
-The Dockerfile the plugins write has two layers that matter:
+The Dockerfile the plugins write has three layers that matter:
 
 | Layer | Contents | Changes when |
 |---|---|---|
 | Base image | `ubi9/ubi-minimal`, pinned to one rebuild's tag and digest | A plugin release moves the pin |
-| `COPY app/<cpu>/ /app/` | The launcher, the app and its libraries (`lib/`), and the runtime (`runtime/`) | Anything in the app changes |
+| `COPY runtime/<cpu>/ /app/runtime/` | The runtime: the linked JDK or Node.js, 30 to 70 MB | The JDK or Node.js release, or the app's modules, change |
+| `COPY app/<cpu>/ /app/` | The launcher, the app and its libraries (`lib/`) | Anything in the app changes |
 
-The base layer is shared by every app built with the same plugin release, on every node. The app
-layer is one layer today: a release that changes only the app's own jar still produces a new layer
-holding the runtime too, roughly 30 to 70 MB depending on its modules.
+The base layer is shared by every app built with the same plugin release, on every node. A release
+that changes only the app pushes and pulls only the app layer. The runtime layer is shared too, by
+every app on the same runtime and [module set](#shared-module-sets).
 
 ## What is reproducible
 

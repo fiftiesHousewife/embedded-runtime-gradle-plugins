@@ -3,6 +3,7 @@ package io.github.fiftieshousewife.javaapp
 import io.github.fiftieshousewife.appcore.TestProject
 import org.junit.jupiter.api.Assertions.assertAll
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
@@ -25,12 +26,15 @@ class ContainerContextTest {
             )
         JdkFixture.publish(project, "linux-x64", "linux-aarch64")
         project.file("Dockerfile", "# the project's own\nFROM scratch")
+        project.file("Dockerfile.openshift", "FROM scratch\nARG APP_VERSION")
         project.build("appDockerContext")
         val context = project.project.resolve("build/docker-context")
         assertAll(
             { assertEquals("# the project's own\nFROM scratch\n", context.resolve("Dockerfile").readText()) },
+            { assertTrue(context.resolve("Dockerfile.openshift").readText().contains("ARG APP_VERSION=\"2.0.0\"")) },
             { assertTrue(context.resolve("app/amd64/bin/svc").isFile) },
-            { assertTrue(context.resolve("app/arm64/bin/svc").isFile) },
+            { assertTrue(context.resolve("runtime/arm64/release").isFile) },
+            { assertFalse(context.resolve("app/arm64/runtime").exists()) },
             {
                 assertTrue(
                     context.resolve("app/arm64/META-INF/app.json").readText().contains(""""target": "linux-aarch64""""),

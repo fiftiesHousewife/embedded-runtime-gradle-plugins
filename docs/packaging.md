@@ -145,11 +145,24 @@ USER 1001
 Commit it. Nothing in it changes from one build to the next: the release, its commit and that
 commit's time are `ARG`s (`APP_VERSION`, `GIT_COMMIT`, `CREATED`), which `appDockerContext` fills in
 for each build in the copy it writes to `build/docker-context/`, beside every Linux archive, one per
-CPU under `app/amd64/` and `app/arm64/` (the names container platforms use). A Dockerfile without
-the markers is entirely yours and is used as written; copy the app in it with
-`COPY app/${TARGETARCH}/ /app/` after `ARG TARGETARCH`, which BuildKit, Buildah and Podman set to the
-CPU being built (Docker's legacy builder, `DOCKER_BUILDKIT=0`, does not). A Dockerfile that still
-copies all of `app/` is refused, since its image would have no `/app/bin`.
+CPU (`amd64`, `arm64`, the names container platforms use), split in two: the runtime under
+`runtime/<cpu>/` and the rest under `app/<cpu>/`, so the runtime is a layer of its own. A Dockerfile
+without the markers is entirely yours and is used as written; copy the app in it after
+`ARG TARGETARCH`, which BuildKit, Buildah and Podman set to the CPU being built (Docker's legacy
+builder, `DOCKER_BUILDKIT=0`, does not):
+
+```dockerfile
+COPY runtime/${TARGETARCH}/ /app/runtime/
+COPY app/${TARGETARCH}/ /app/
+```
+
+A Dockerfile that copies all of `app/`, or the app without its runtime, is refused, since its image
+would fail when it starts.
+
+Other images of the same app, such as one for OpenShift or one on UBI micro, go beside it as
+`Dockerfile.<name>` (`Dockerfile.openshift`, `Dockerfile.micro`). They are yours, and
+`appDockerContext` copies each into the context with this build's values filled in, so
+`docker build --file build/docker-context/Dockerfile.openshift build/docker-context` builds one.
 
 What the plugin's block holds:
 

@@ -57,8 +57,9 @@ smoke test fails on a missing JDK class, use the `embedded-runtime-jlink-modules
   `nodeApp.node.pattern` when the file names differ from that layout.
 - `appDockerfile` creates the project's root `Dockerfile` and keeps the block between
   `# >>> embedded-runtime` and `# <<< embedded-runtime` up to date; commit it, and add instructions
-  after the block, never inside it. A Dockerfile without the block is the project's own; its `COPY`
-  should take the archive for the CPU being built: `app/${TARGETARCH}/`.
+  after the block, never inside it. A Dockerfile without the block is the project's own; it copies
+  the CPU being built in two layers: `COPY runtime/${TARGETARCH}/ /app/runtime/`, then
+  `COPY app/${TARGETARCH}/ /app/`. Other images of the app go in `Dockerfile.<name>` beside it.
 
 ## 5. Done when
 

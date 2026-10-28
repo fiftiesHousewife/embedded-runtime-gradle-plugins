@@ -24,7 +24,7 @@ under the configuration cache.
 | **CI cross-checks** | hadolint, Red Hat `preflight check container` on the sample image, and a Testcontainers test running the image as a random UID in group 0. Versions in the catalogue with `# renovate:` comments |
 | **`USER` per platform** | Decided 2026-10-28: the default Dockerfile keeps `USER 1001`, so plain Docker and Kubernetes don't run it as root and Red Hat's `RunAsNonRoot` check passes; `Dockerfile.openshift` has none, as OpenShift assigns the user |
 | **OCI labels with the commit** | Keep `org.opencontainers.image.revision` and the rest of the OCI set; add `io.k8s`/`io.openshift` labels for OpenShift |
-| **Writable storage** | `APP_DATA_DIR`/`APP_LOG_DIR` don't exist in the plugin's Dockerfile (the sample's `Dockerfile.openshift` creates them group-0 writable): do the same in the template, and document the volume and env-var contract with a sample `Deployment` |
+| **Volume contract** | The image creates `/var/lib/app/data` and `/logs` writable by user 1001 and group 0; document the volume and env-var contract with a sample `Deployment` |
 | **Variants from the engine** | `Dockerfile.openshift` and `Dockerfile.micro` are hand-written in the Spring Boot sample; the engine's `openshift` and `redhat-certified` standards should write them, so they follow plugin releases as the managed block does |
 
 ## Shared module sets

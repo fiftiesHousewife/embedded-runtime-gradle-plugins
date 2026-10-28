@@ -181,7 +181,9 @@ What the plugin's block holds:
   builds (Podman's and Buildah's default) drop it and Kubernetes ignores it, so give Kubernetes
   probes of its own (below).
 - **Runs as user 1001** in group 0, logs to standard output and reads its configuration from
-  `/config`, as OpenShift's restricted policy expects.
+  `/config`. It writes data and logs under `/var/lib/app/`, which the image creates writable by its
+  user and by group 0, so it works with nothing mounted there, and when OpenShift runs it as an
+  arbitrary user in group 0. Mount volumes there to keep what it writes.
 
 ```kotlin
 javaApp {                                    // or nodeApp

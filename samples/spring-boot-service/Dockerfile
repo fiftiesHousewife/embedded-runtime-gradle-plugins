@@ -18,6 +18,9 @@ LABEL org.opencontainers.image.title="spring-boot-service" \
       org.opencontainers.image.created="${CREATED}" \
       org.opencontainers.image.base.name="${BASE_IMAGE}"
 
+# Where the app writes when nothing is mounted there; group 0 as well, for OpenShift's arbitrary user.
+RUN mkdir -p /var/lib/app/data /var/lib/app/logs && chown -R 1001:0 /var/lib/app && chmod -R g=u /var/lib/app
+
 # The runtime first, in a layer of its own: a new release of the app leaves it alone.
 COPY --chown=1001:0 runtime/${TARGETARCH}/ /app/runtime/
 COPY --chown=1001:0 app/${TARGETARCH}/ /app/

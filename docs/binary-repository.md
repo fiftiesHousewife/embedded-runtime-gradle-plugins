@@ -6,7 +6,7 @@ repository names; use your own with the `binaryRepo.repo.*` properties.
 There are two ways to point the plugins at it. Pick the first if your build already declares the
 repository, as most corporate builds do. Every property on this page can also be set in
 `settings.gradle.kts`, in an `embeddedRuntime {}` block ([Reference](reference.md)), which wins over
-the property: `embeddedRuntime { binaryRepository { repository = "artifactory" }; jdk { yumRepo = "yum-local" } }`.
+the property: `embeddedRuntime { binaryRepository { repository = "artifactory" }; jdk { source = "yum:yum-local" } }`.
 
 ## Your build already declares the repository
 
@@ -52,12 +52,11 @@ set with `binaryRepo.url` instead.
 
 The plugins add only the repositories for the runtime archives, on the same server as the named
 one, beside it: `https://acme.jfrog.io/artifactory/runtimes/` with the layout below, or the
-repository and layout you set (see [JDKs packaged as RPMs](#jdks-packaged-as-rpms)):
+repository you set (see [Where JDKs and Node.js come from](#where-jdks-and-nodejs-come-from)):
 
 ```properties
-# → https://acme.jfrog.io/artifactory/yum-local/
-javaApp.jdk.binaryRepo=yum-local
-javaApp.jdk.binaryRepoPattern=java/jdk[revision]-64_linux.x86_64.rpm
+# → https://acme.jfrog.io/artifactory/jdks-local/
+javaApp.jdk.source=jdks-local
 ```
 
 The same login is used for compile JDKs, npm (`binaryRepo.repo.npm`, beside it too), publishing
@@ -143,18 +142,43 @@ runtimes/oracle/jdk/25.0.3/jdk-25.0.3-linux-x64.tar.gz
 runtimes/nodejs/node/24.22.1/node-24.22.1-linux-x64.tar.gz
 ```
 
-Fill it by copying approved archives into that layout, or skip copying: make `runtimes` a generic
-remote repository of the vendor's download site, such as `https://download.oracle.com/java`, and give
-the vendor's own layout as the pattern. Either way the archives are ordinary Gradle dependencies, so
+Fill it by copying approved archives into that layout. The archives are ordinary Gradle
+dependencies, so
 [dependency verification](https://docs.gradle.org/current/userguide/dependency_verification.html)
-(`gradle/verification-metadata.xml`) checks each one's checksum. Any tree with a different layout
-can be used as it is, by giving its pattern:
+(`gradle/verification-metadata.xml`) checks each one's checksum, wherever they come from.
+
+### Where JDKs and Node.js come from
+
+`javaApp.jdk.source` (`nodeApp.node.source` for Node.js) says where the runtimes are, and
+`javaApp.jdk.pattern` (`nodeApp.node.pattern`) names the files there:
+
+| `source` | Reads | Example |
+|---|---|---|
+| unset | The `runtimes` repository above, or the vendor's site when no binary repository is configured | |
+| A repository name | A repository beside the binary repository's, in the layout above | `jdks-local` |
+| An absolute path | A directory in the layout above | `/srv/jdks`, `C:/jdks` |
+| An `https:` or `file:` URL | A mirror of the vendor's site, in the vendor's own layout | `https://acme.jfrog.io/artifactory/oracle-jdk-remote` |
+| `yum:` and a repository name or URL (JDKs only) | A YUM repository ([JDKs packaged as RPMs](#jdks-packaged-as-rpms)) | `yum:yum-local/rhel/9` |
+
+With a binary repository configured, every source but a directory is read with its login. To skip copying, make a
+generic remote repository of the vendor's download site, such as `https://download.oracle.com/java`,
+and give its URL; the vendor's file names are kept:
 
 ```properties
-javaApp.jdk.binaryRepoPattern=jdks/[organisation]/[classifier]/[revision].[ext]
+javaApp.jdk.distribution=oracle
+javaApp.jdk.source=https://acme.jfrog.io/artifactory/oracle-jdk-remote
 ```
 
-A pattern can use `[organisation]` (the distribution, e.g. `oracle`, or `nodejs`), `[module]` and
+A tree with a different layout can be used as it is, by giving its pattern:
+
+```properties
+javaApp.jdk.source=jdks-local
+javaApp.jdk.pattern=jdks/[organisation]/[classifier]/[revision].[ext]
+```
+
+With a URL as the source, a pattern replaces the vendor's own and uses only Ivy's tokens, filled in
+as the vendor names its files. With a repository name or a directory, a pattern can use
+`[organisation]` (the distribution, e.g. `oracle`, or `nodejs`), `[module]` and
 `[artifact]` (both `jdk` or `node`), `[revision]` (the version, with `+` written as `_`) and `[ext]`
 (`tar.gz`, or `zip` for a Windows runtime), and these for the target, shown for `linux-x64` and
 `linux-aarch64`:
@@ -167,35 +191,15 @@ A pattern can use `[organisation]` (the distribution, e.g. `oracle`, or `nodejs`
 | `[rpmArch]` | `x86_64` | `aarch64` | RPM, YUM, `uname -m` |
 | `[containerArch]` | `amd64` | `arm64` | container platforms, Debian |
 
-So one pattern names every CPU's file: `java/jdk[revision]-64_[os].[rpmArch].rpm` gives
-`java/jdk21_5-64_linux.x86_64.rpm` and `java/jdk21_5-64_linux.aarch64.rpm`.
+A JDK pattern can also use the version's parts, shown for `21.0.5+9`: `[version]` (`21.0.5+9`),
+`[underscored]` (`21.0.5_9`), `[feature]` (`21`), `[interim]` (`0`), `[update]` (`5`), `[patch]` (`0`)
+and `[build]` (`9`); a Node.js pattern can use `[version]`. So one pattern names every CPU's file:
+`java/jdk[feature]_[update]-64_[os].[rpmArch].rpm` gives `java/jdk21_5-64_linux.x86_64.rpm` and
+`java/jdk21_5-64_linux.aarch64.rpm`.
 
-A JDK pattern can also use the version's parts directly, without `revisionFormat`: `[version]`
-(`21.0.5+9`), `[underscored]` (`21.0.5_9`), `[feature]` (`21`), `[interim]` (`0`), `[update]` (`5`),
-`[patch]` (`0`) and `[build]` (`9`); a Node.js pattern can use `[version]`. So
-`java/[feature]/jdk[feature]_[update]-64_[os].[rpmArch].rpm` needs nothing else.
-
-Where your tree spells a platform its own way, define a token, with a value per OS or per target
-(a target's own value wins over its OS's):
-
-```properties
-# [plat] is l64 on Linux, w64 on Windows, and la64 on 64-bit ARM Linux
-javaApp.jdk.token.plat.linux=l64
-javaApp.jdk.token.plat.windows=w64
-javaApp.jdk.token.plat.linux-aarch64=la64
-javaApp.jdk.binaryRepoPattern=java/jdk-[feature].[interim].[update]_[plat]_bin.[ext]
-```
-
-or in `settings.gradle.kts`: `embeddedRuntime { jdk { token("plat", mapOf("linux" to "l64", "windows"
-to "w64")) } }`. Node.js tokens are `nodeApp.node.token.<name>.<os or target>`. A pattern naming a
-token with no value for some target stops the build and lists the tokens there are. These tokens may
-sit anywhere in a pattern, across folders too, but not reach across the edge of an optional `(…)`
-part.
-
-When your file names spell the version differently, `javaApp.jdk.revisionFormat` sets how
-`[revision]` is written, from these tokens (shown for `21.0.5+9`): `[version]` (`21.0.5+9`),
-`[underscored]` (`21.0.5_9`, the default), `[feature]` (`21`), `[interim]` (`0`), `[update]` (`5`),
-`[patch]` (`0`) and `[build]` (`9`).
+A pattern naming a token with no value for some target stops the build and lists the tokens there
+are. These tokens may sit anywhere in a pattern, across folders too, but not reach across the edge of
+an optional `(…)` part.
 
 ### JDKs packaged as RPMs
 
@@ -205,18 +209,18 @@ servers install from with dnf), name the repository and the package; the plugin 
 in the repository's own metadata, so file names don't matter:
 
 ```properties
-# a repository beside the binary repository (a path in it works too: yum-local/rhel/9), or a full URL
-javaApp.jdk.yumRepo=yum-local
+# a repository beside the binary repository, here the RHEL 9 folder of yum-local,
+# or yum: and a full URL, such as yum:https://repo.example.com/yum-local/rhel/9
+javaApp.jdk.source=yum:yum-local/rhel/9
 # the package name dnf shows; [feature] is the Java release. Oracle's is jdk-[feature], the default for oracle
-javaApp.jdk.yumPackage=jdk-[feature]
+javaApp.jdk.pattern=jdk-[feature]
 ```
 
 For each target it reads `repodata/repomd.xml` and the primary index it names (gzip, xz, bzip2 or
 zstd), and takes the package with that name at the pinned version for the target's CPU (`x86_64`,
 `aarch64`), at its newest release. The version is the pin without its build (`21.0.5` for
-`javaApp.jdk.21=21.0.5`); a repackaging that spells it differently sets `javaApp.jdk.revisionFormat`
-(e.g. `[feature].[interim].[update].0.0.[build]`). If the repository has no such package, the build
-stops and lists the versions it does have.
+`javaApp.jdk.21=21.0.5`). If the repository has no such package, the build stops and lists the
+versions it does have.
 
 The package is downloaded with the binary repository's login and checked against the SHA-256 the
 repository's metadata records, then kept once per machine in Gradle's user home
@@ -234,11 +238,10 @@ RPMs in a plain file tree (a generic repository, a share) are read by file name 
 pattern that ends in `.rpm`:
 
 ```properties
-# default: binaryRepo.repo.runtimes
-javaApp.jdk.binaryRepo=generic-local
+# a repository beside the binary repository
+javaApp.jdk.source=generic-local
 # generic-local/java/jdk21_5-64_linux.x86_64.rpm, and …linux.aarch64.rpm for the other CPU
-javaApp.jdk.binaryRepoPattern=java/jdk[revision]-64_[os].[rpmArch].rpm
-javaApp.jdk.revisionFormat=[feature]_[update]
+javaApp.jdk.pattern=java/jdk[feature]_[update]-64_[os].[rpmArch].rpm
 ```
 
 Either way the RPM is unpacked without being installed, on Linux, macOS and Windows alike: each
@@ -266,7 +269,7 @@ javaApp.jdk.distribution=oracle
 # the exact release you have approved
 javaApp.jdk.21=21.0.5
 # Linux: the jdk-21 package from the yum-local repository beside it, as servers install it
-javaApp.jdk.yumRepo=yum-local
+javaApp.jdk.source=yum:yum-local/rhel/9
 ```
 
 ```properties

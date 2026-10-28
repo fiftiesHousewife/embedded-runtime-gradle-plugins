@@ -83,14 +83,14 @@ launcher points `NODE_EXTRA_CA_CERTS` at it, so these CAs are trusted as well as
 settings become `--tls-min-v1.3` and `--tls-cipher-list=…`, placed before `nodeArgs` and
 `APP_NODE_OPTS`. The smoke test starts the app with all of them in place.
 
-`runtimeOptions("locked")` makes the launcher refuse to start while `NODE_OPTIONS`, `APP_NODE_OPTS`
+`-PnodeApp.runtimeOptions=locked` makes the launcher refuse to start while `NODE_OPTIONS`, `APP_NODE_OPTS`
 or `NODE_TLS_REJECT_UNAUTHORIZED` is set, rather than let them load a script or turn off
 certificate checks.
 
 ### The organisation's runtime policy
 
 The same runtime policy as Java's ([java.md](java.md#an-organisation-wide-runtime-policy)) covers
-Node.js apps, set per machine with `nodeApp.securityPolicy` or `nodeApp.securityPolicyArtifact`.
+Node.js apps, set per machine with `nodeApp.securityPolicy` (a directory, a zip, or a zip's `group:name:version`).
 One policy can hold both ecosystems' keys; these are the ones that apply to Node.js:
 
 ```properties

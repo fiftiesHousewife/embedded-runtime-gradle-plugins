@@ -44,12 +44,17 @@ smoke test fails on a missing JDK class, use the `embedded-runtime-jlink-modules
 ## 4. Targets, packaging and the corporate network
 
 - Every OS/CPU deployed to: `targets("linux-x64", "linux-aarch64", "windows-x64")`.
-- An RPM for Linux servers: `rpm { enabled = true }`; a zip instead of tar.gz: `archiveFormat("zip")`.
+- An RPM for Linux servers: `rpm { enabled = true }`. Archives are zip for Windows targets and
+  tar.gz for Linux and macOS.
 - Behind a corporate binary repository (Artifactory, Nexus): if `settings.gradle.kts` already
   declares the repository, set `binaryRepo.repository=<its name>` in the project's
   `gradle.properties`; its URL and credentials are reused, whatever the credential properties are
   called, so don't copy them anywhere. Otherwise set `binaryRepo.url` (and `binaryRepoUsername` /
   `binaryRepoPassword`) once per machine in `~/.gradle/gradle.properties`, never in the project.
+  JDKs and Node.js then come from the binary repository's runtimes repository. If they live
+  elsewhere, set `javaApp.jdk.source` / `nodeApp.node.source` to a mirror URL, an absolute path or
+  a repository name beside the binary repository's, with `javaApp.jdk.pattern` /
+  `nodeApp.node.pattern` when the file names differ from that layout.
 - `appDockerfile` creates the project's root `Dockerfile` and keeps the block between
   `# >>> embedded-runtime` and `# <<< embedded-runtime` up to date; commit it, and add instructions
   after the block, never inside it. A Dockerfile without the block is the project's own; its `COPY`

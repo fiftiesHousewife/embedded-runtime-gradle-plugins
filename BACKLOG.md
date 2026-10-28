@@ -3,55 +3,7 @@
 Work that has been asked for and not yet done, newest decisions first. Move an item to the commit
 log, not to a "done" list, when it lands.
 
-Last updated 2026-10-27.
-
-## Consolidation: proposals awaiting the owner's approval
-
-Proposed 2026-10-27, nothing changed yet. Today: 14 public tasks for a Java app, 69 extension
-options, 41 Gradle properties. Each row is keep, merge or drop, with what a user would change.
-
-**Tasks** (a Java app; node-app has the same shape)
-
-| Task | Proposal | Why, and what users change |
-|---|---|---|
-| `appArchive`, `appSmokeTest`, `runApp`, `jlinkFindModules`, `checkRuntimeSupport` | Keep | The jobs people run |
-| `appDockerContext` | Keep | The image entry point; the Dockerfile engine and the container smoke test hang off it |
-| `appDockerfile` | Keep as the engine's write task | With the engine it writes a Dockerfile and its variants; `check` reports drift |
-| `appDockerContextFile`, `appVerifyPublishable`, `jdeps` | Make internal (no group) | Steps of other tasks; nobody calls them |
-| `appRpm` | Keep | Only present with `rpm { enabled = true }` |
-| `appPublishRpm` | Merge into `publish` | One publish; the RPM goes up when RPMs are enabled |
-| `aiSkills` | Drop from the plugins | Unrelated to packaging; the AI files ship through `ai/` and the Claude plugin |
-
-**`javaApp {}` / `nodeApp {}`**
-
-| Option | Proposal | Why, and what users change |
-|---|---|---|
-| `appName`, `targets`, `license`, `configDefaults`, `jvmArgs`, `nodeArgs`, `entryPoint`, `appFiles`, `buildScript`, `testScript`, `runtimeOverlay`, `sbom` | Keep | Each is a real choice per app |
-| `sourceUrl`, `gitCommit` | Derive only | From the `origin` remote and `HEAD`; nobody sets them |
-| `dockerfile` | Drop | Always the project root's `Dockerfile` (and its variants) |
-| `archiveFormat` | Drop | Each target gets its OS's format (tar.gz, zip on Windows) |
-| `jdkVersion`, `nodeVersion` | Drop the DSL | One way to set a version: `javaApp.jdk.<feature>` / `nodeApp.node.version` |
-| `jlinkModules` | Drop | `additionalModules` adds to jdeps' list, `moduleSets` shares them; full control is rare |
-| `sharedModuleSets` | Merge into `moduleSets` | An empty `moduleSets` turns sharing off |
-| `jlinkOptions` | Drop | The defaults (strip, compress) are right for servers |
-| `runtimeDefaults { 6 }` | Collapse to `runtimeDefaults = true/false` | Heap share, OOM handling and GC are `jvmArgs` when someone needs them |
-| `runtimeOptions` | Drop the DSL | Locking is an organisation's decision: the runtime policy keeps it |
-| `securityPolicy`, `securityPolicyArtifact` | Merge | One `securityPolicy`: a path, or `group:name:version` |
-| `security { disabledTlsAlgorithms, disabledCertPathAlgorithms, disabledJarAlgorithms }` | Merge | One `disableAlgorithms(kind, …)`; the policy file already does it in one place |
-| `security { propertiesFiles, properties }` | Merge | `properties` only; a file's content is `properties.putAll(…)` |
-| `rpm { 10 }` | Collapse to `enabled`, `user`, `systemd` | Summary, licence and URL come from the project; release and vendor are dropped |
-| `smokeTestTimeout`, `allowUntestedPublish` | Properties only | Machine or CI choices, not the app's |
-| `runtimeSupport { url, warningDays, allowEndOfLife }` | Properties only | Machine-wide already; the DSL block duplicates them |
-| `ignoreInstallScripts`, `portableInstallScripts` | Merge | One `installScripts` list: none, or the portable ones named |
-
-**Gradle properties**
-
-| Property | Proposal | Why |
-|---|---|---|
-| `binaryRepo.url`, `.repository`, login | Keep | The two ways to reach a binary repository |
-| `binaryRepo.repo.*` (7 names) | Keep, documented as rarely needed | Defaults match Artifactory's usual names |
-| `javaApp.jdk.url`, `.pattern`, `.binaryRepo`, `.binaryRepoPattern`, `.localPath`, `.localPattern`, `.yumRepo`, `.yumPackage`, `.revisionFormat`, `.token.*` | Merge into `javaApp.jdk.source` + `javaApp.jdk.pattern` | Eleven ways to say where a JDK is: one URL (`https:`, `file:`, or a YUM repository) and one pattern |
-| `nodeApp.node.url`, `.pattern`, `.binaryRepoPattern`, `.token.*` | Same merge | As for the JDK |
+Last updated 2026-10-28.
 
 ## Next: Dockerfiles parsed and rewritten with OpenRewrite
 
@@ -67,7 +19,7 @@ under the configuration cache.
 | Item | Notes |
 |---|---|
 | **Engine** | Isolated worker (`classLoaderIsolation`, like the Sigstore verifier): rewrite-core brings Jackson, ASM, JNA, Caffeine, Micrometer and ANTLR. Custom recipes need `javaParameters = true` or their YAML options arrive as null. Strip `~~>` search markers before writing and report them as findings. Lines added to a CRLF file come out LF: normalise |
-| **Recipes to write** | Built-ins cover labels, exec-form entrypoint, `ADD` to `COPY`, non-root user. Missing: ensure an instruction (`EXPOSE`, `ENTRYPOINT`), group-0 ownership on `COPY`, ports below 1024, `/licenses`, merging labels into an existing `LABEL`. `USER` stays (numeric), since Red Hat's `RunAsNonRoot` needs it though OpenShift ignores it |
+| **Recipes to write** | Built-ins cover labels, exec-form entrypoint, `ADD` to `COPY`, non-root user. Missing: ensure an instruction (`EXPOSE`, `ENTRYPOINT`), group-0 ownership on `COPY`, ports below 1024, `/licenses`, merging labels into an existing `LABEL` |
 | **Layers** | Split the single `COPY app/` into `runtime/`, `lib/` and the app, so a release doesn't re-push the 39 MB runtime; add a test that a runtime builds byte-identical twice |
 | **Tasks** | `appDockerfileCheck` (diff of suggestions, fails when strict) and `appDockerfileFix` |
 | **CI cross-checks** | hadolint, Red Hat `preflight check container` on the sample image, and a Testcontainers test running the image as a random UID in group 0. Versions in the catalogue with `# renovate:` comments |
@@ -87,7 +39,7 @@ under the configuration cache.
 
 | Item | Notes |
 |---|---|
-| **`.claude/settings.json`** | Sandbox blocks writing it; the snippet that auto-suggests the marketplace to collaborators is in the conversation of 2026-10-25. Owner to add |
+| **This repository's `.claude/settings.json`** | Builds using the plugins now get the marketplace entry from `aiSkills`; this repository's own file (the sandbox blocks writing it) still needs the same `extraKnownMarketplaces` and `enabledPlugins` lines. Owner to add |
 | **Unverified hook details** | Researched 2026-10-25 from GitHub's and Devin's hook docs: Copilot runs hooks in its CLI and cloud agent only (none documented for VS Code, Visual Studio or JetBrains); Devin's edit tools are `write`, `edit`, `apply_patch` and its PostToolUse feedback is `hookSpecificOutput.additionalContext`, both now used. Still undocumented anywhere: the file-path argument names of Copilot's `edit`/`create` and Devin's `write`/`edit`, and the shape of Devin's `apply_patch` input (the script tries `file_path`, `path` and `*** Update File:` lines), and whether Devin's cloud sessions run hooks. Settle by logging one real payload from each agent |
 
 ## Code quality
@@ -101,6 +53,7 @@ under the configuration cache.
 | Item | Notes |
 |---|---|
 | Windows functional tests | One functional test now runs on Windows: an installed JDK given by `javaApp.jdk.<feature>.windows-x64.path`, built, zipped and smoke-tested through the `.bat` launcher. The rest still skip there, because the fixtures build fake download sites with the system `tar` and `sh`; porting them means Windows-layout JDK and Node zips (commons-compress is already a dependency) |
+| Functional test not run here | `JdkSourceTest`'s "a JDK packaged as an RPM, named the organisation's way" could not reach its TestKit daemon in the sandbox on 2026-10-28; its pattern now spells `[feature]_[update]` instead of `revisionFormat`. Run it locally |
 | GitHub API access for the agent | Unauthenticated API calls hit the rate limit; `gh` config is unreadable in the sandbox |
 
 ## Older open items

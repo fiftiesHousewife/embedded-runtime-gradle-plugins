@@ -21,9 +21,11 @@ samples/                    builds of their own, included by the root build; CI 
 renovate/                   presets for users: temurin, nodejs; ubi, a reference example
 docs/                       user documentation, linked from the README; article.md is the article's home
 ai/                         the AI assistant files the plugins ship: skills, the shared post-edit hook,
-                            Copilot and Devin hook configs, the Claude plugin (see ai/README.md); ./gradlew
-                            syncAiSkills updates the Claude plugin's copies; keep the skills in step with the
-                            tasks and properties they name. Copilot's instructions for this repo: .github/
+                            Copilot and Devin hook configs, the Claude plugin (see ai/README.md); every
+                            consuming build installs them (aiSkills runs with assemble), the samples opt out
+                            (the sources are here); ./gradlew syncAiSkills updates the Claude plugin's copies;
+                            keep the skills in step with the tasks and properties they name. Copilot's
+                            instructions for this repo: .github/
 .github/scripts/            CI's own scripts: verify-rpm.sh installs the sample's RPM in a Rocky Linux container
 .claude-plugin/             the Claude Code marketplace manifest (must stay at the root)
 gradle/libs.versions.toml   the one version catalogue, shared by every build here
@@ -55,14 +57,19 @@ Where things are tested:
 
 - `JavaAppPluginTest`: the archive's contents and reproducibility, re-extracting a JDK with
   read-only files, launchers from Gradle's `startScripts` (and a build's own generator winning).
-- `JavaAppTargetsTest`: several targets in one build and one publication, the container context,
-  JDKs from a directory and from a shared local path, and the `app-smoke-test` consumer plugin
-  (`ConsumerPluginsTest`, including its runtime policy check).
-- `JavaAppModulesTest`: the jdeps default and `jlinkFindModules` fixing a missing module.
+- `JavaAppTargetsTest`: several targets in one build and one publication, and refusing to publish
+  untested archives; `ContainerContextTest` the container context and the Dockerfile's block;
+  `ConsumerPluginsTest` the `app-smoke-test` consumer plugin, including its runtime policy check.
+- `JdkSourceTest` and `YumJdkTest`: where a JDK comes from (by path, a local directory, an RPM found
+  by pattern, settings code, a YUM repository) and reusing the toolchain's JDK.
+- `JavaAppModulesTest`: jdeps' modules, `jlinkFindModules` fixing a missing module, and shared sets.
 - `JavaAppSecurityTest`: certificates, policy and ciphers seen by the running JVM (a probe program run
   on the built runtime), the customisation record and overlay, and the forbidden-module guard.
-- `JavaAppPackagingTest`: the zip format end to end, the RPM's header and file list (read back by
-  `RpmFile` in the test fixtures), and the RPM upload to a `RecordingRepository`.
+- `JavaAppPackagingTest`: a project's own SBOM, the RPM's header and file list (read back by
+  `RpmFile` in the test fixtures), and `publish` uploading the RPMs to a `RecordingRepository`.
+  Zip is only the Windows target's format, so no functional test builds one.
+- `AiSkillsTest`: the files for Copilot, Devin and Claude Code, written by `assemble` only when they
+  differ, and nothing when turned off.
 - `KotlinAppTest`, `NodeAppPluginTest`, the settings plugin tests, and the URL unit tests.
 
 Known test caveats:
@@ -86,7 +93,7 @@ startScripts (Java) / appLaunchers<T> (Node) ─┐
 appManifest<T>, appSbom<T>                     ─┼─► distribution <target> ─┬─► <target>DistTar/Zip ──► publish
 runtime/ (customiseRuntime<T> or Node)          ─┘    (Gradle's plugin)      └─► install<Target>Dist (build/app/<target>)
                                                          appVerifyPolicy<T> ─┘   checked before any archive
-                     install<Target>Dist ──► appRpm<T> (Linux, rpm enabled) ──► appPublishRpm
+                     install<Target>Dist ──► appRpm<T> (Linux, rpm enabled) ──► publish (uploads to YUM)
                      this machine's      ──► appSmokeTest, runApp (HostTasks), jlinkFindModules
                      a Linux one         ──► appDockerContext (DockerContext)
 ```
@@ -122,9 +129,15 @@ to Gradle's toolchain provisioning.
 **One pin, two consumers.** `JdkCatalog.pinnedJdk` (a `javaApp.jdk.<feature>` override, else the
 catalogue in `jdks.properties`, generated from `gradle/libs.versions.toml`) is read by both `JdkToolchainResolver` (compile JDK) and
 `JavaAppPlugin` (embedded runtime), from the same `JdkSources`, so they can never differ.
-`JdkSources` holds a `JdkLocation`: the vendor's site (`Public`) or a renamed tree (`Curated`, for
-a binary repository or a local directory). A JDK configured by path for one release and target bypasses all
-of that (`Jdks` in `JavaAppPlugin` uses a directory as it is and extracts an archive); the resolver
+Where a runtime comes from is one source and one pattern (`javaApp.jdk.source`/`pattern`,
+`nodeApp.node.source`/`pattern`), parsed into app-core's `RuntimeSource` so both plugins read the
+forms alike: unset, a URL (a mirror in the vendor's layout), an absolute path, a repository name
+beside the binary repository's, or (JDK only) `yum:`. `JdkSources` turns it into a `JdkLocation`:
+the vendor's site or a mirror (`Public`) or a renamed tree (`Curated`, for a binary repository or a
+local directory), or a `JdkYumSource`. A pattern spells the version and target with tokens Ivy
+doesn't know (`[feature]`, `[os]`, `[rpmArch]`…), so `TargetTokens` hands that stretch to Ivy as
+one `[classifier]` and renders it per artifact. A JDK configured by path for one release and
+target bypasses all of that (`Jdks` in `JavaAppPlugin` uses a directory as it is and extracts an archive); the resolver
 can serve such an archive but must leave a directory to Gradle's installation detection.
 `JdkTools.link` refuses a tool JDK and target JDK of different releases.
 
@@ -136,8 +149,8 @@ are opaque strings that start with the feature release; each vendor validates it
 can't be started on the host, so only the host's archive is smoke-tested and `appVerifyPublishable`
 blocks `publish` while any archive is untested, unless explicitly allowed.
 
-**Archives** are `.tar.gz` by default (Windows 10+ has `tar.exe`), or `.tar`/`.zip`
-(`ArchiveFormat`; the task type is chosen when targets are registered), with one top-level
+**Archives** are each target's native format (`ArchiveFormat.nativeTo`): `.zip` for Windows,
+`.tar.gz` for the rest, the task type chosen when targets are registered. Each has one top-level
 directory, reproducible ordering and timestamps, and exec bits set explicitly
 (`AppCopySpecs.executables`), since a Windows checkout or Windows jlink run carries none. Anything
 that reads an archive back goes through `archiveTree`, which handles every format.
@@ -166,7 +179,8 @@ intact; disabled-algorithm lists are extended, never replaced), copies the overl
 app's modules rather than exactly those, so apps on one set share a byte-identical runtime layer.
 The sets are data, in java-app's `module-sets.properties` (`set.<name>`, and `lastFeature.<module>`
 for a module later releases no longer have); keep each to modules every supported release has.
-`jlinkModules` stays the app's own need, which `jlinkFindModules` and the fallback use.
+The app's own need is `JavaConventions.appModules` (jdeps' plus `additionalModules`), which
+`jlinkFindModules` and the fallback use; `moduleSets` empty links exactly those.
 
 **SBOMs and image labels come from standard libraries and specs:** `CycloneDx` builds the SBOM with
 the CycloneDX reference model and package-url's purl builder (no timestamp, so rebuilds are
@@ -179,7 +193,10 @@ values are recorded in `SettingsInCode`, which `ProviderFactory.setting()` consu
 property, so every reader, the toolchain resolver included, sees them; the settings plugins
 therefore configure repositories in `settingsEvaluated`, not when applied. Project-level settings
 are extension properties whose conventions are the properties (the runtime policy is the
-exception: its machine-wide property wins over the build).
+exception: its machine-wide property wins over the build). What belongs to the checkout or the
+machine rather than the app has no DSL: `BuildFacts` in app-core reads it from git (`gitCommit`,
+`sourceUrl` from the `origin` remote) and from `<javaApp|nodeApp>.` properties (`runtimeOptions`,
+`smokeTestTimeout`, `allowUntestedPublish`, runtime support).
 
 **Binary repository credentials** come one of two ways. With `binaryRepo.repository`, the settings
 plugins wait for the settings script (`AppSettings.withBinaryRepository`), find that repository,

@@ -6,7 +6,7 @@ version, with the target as the classifier:
 ```
 com/example/orders-service/1.4.2/orders-service-1.4.2-linux-x64.tar.gz
 com/example/orders-service/1.4.2/orders-service-1.4.2-linux-x64-cyclonedx.json
-com/example/orders-service/1.4.2/orders-service-1.4.2-windows-x64.zip      # zip for Windows, unless archiveFormat says otherwise
+com/example/orders-service/1.4.2/orders-service-1.4.2-windows-x64.zip      # zip for Windows
 …
 ```
 

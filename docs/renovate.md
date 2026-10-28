@@ -6,8 +6,8 @@ how those move: Renovate's own Gradle support already opens that pull request. T
 
 | Preset | Updates | From |
 |---|---|---|
-| [`temurin`](../renovate/temurin.json) | `javaApp.jdk.<feature>=…` in `gradle.properties`, `jdkVersion = "…"` in a build script | Adoptium's releases on GitHub |
-| [`nodejs`](../renovate/nodejs.json) | `nodeApp.node.version=…` in `gradle.properties`, `nodeVersion = "…"` in a build script | nodejs.org |
+| [`temurin`](../renovate/temurin.json) | `javaApp.jdk.<feature>=…` in `gradle.properties` | Adoptium's releases on GitHub |
+| [`nodejs`](../renovate/nodejs.json) | `nodeApp.node.version=…` in `gradle.properties` | nodejs.org |
 | [`ubi`](../renovate/ubi.json) | `BASE_IMAGE=<image>:<tag>@sha256:<digest>` overrides of the Dockerfile's base image | The image's registry |
 
 ## The runtime presets

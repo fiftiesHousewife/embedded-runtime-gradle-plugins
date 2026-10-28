@@ -6,23 +6,15 @@ archive can become a container image. Which conventions each format follows, and
 
 | Format | For | How |
 |---|---|---|
-| `.tar.gz` | Linux and macOS targets, by default | Always built |
-| `.zip` | Windows targets, by default: Explorer opens it | Always built |
-| `.tar` | Pipelines that compress or layer the archive themselves | `archiveFormat("tar")` |
+| `.tar.gz` | Linux and macOS targets | Always built |
+| `.zip` | Windows targets: Explorer opens it | Always built |
 | `.rpm` | Red Hat family servers managed with dnf | `rpm { enabled = true }` |
 | Container image | Kubernetes, ECS, any OCI runtime | `appDockerContext`, then `docker build` |
 
 ## Archives
 
-```kotlin
-javaApp {                       // or nodeApp
-    archiveFormat("zip")        // or -PjavaApp.archiveFormat=zip
-}
-```
-
-By default each target gets the format its own OS opens without a separate tool: `zip` for
-Windows, `tar.gz` for Linux and macOS. Setting `archiveFormat` uses that one format for every
-target. Whatever the format, an archive holds one directory
+Each target gets the format its own OS opens without a separate tool: `zip` for Windows, `tar.gz`
+for Linux and macOS. Whatever the format, an archive holds one directory
 `<app>-<version>-<target>/`, keeps Unix permissions, is smoke-tested and published the same way, and a
 consuming build that resolves by Gradle Module Metadata needs no change.
 
@@ -32,13 +24,11 @@ from it on a Mac; see [Packaging standards](packaging-standards.md#the-macos-arc
 ## RPM
 
 ```kotlin
+description = "Order management service"   // the RPM's summary
+
 javaApp {
     targets("linux-x64", "linux-aarch64")
-    rpm {
-        enabled = true
-        summary = "Order management service"
-        vendor = "Example Ltd"
-    }
+    rpm { enabled = true }
 }
 ```
 
@@ -52,7 +42,8 @@ javaApp {
 /usr/lib/systemd/system/orders-service.service
 ```
 
-and creates the `orders-service` system account. On the server:
+and creates the `orders-service` system account (`user` names another). The package is named
+after the app, its licence is the app's `license`, and its URL is the `origin` remote. On the server:
 
 ```bash
 sudo dnf install orders-service            # from your YUM repository, or a path to the .rpm
@@ -69,11 +60,13 @@ without systemd.
 
 With a binary repository configured, `./gradlew publish` also uploads each RPM to the RPM repository
 `binaryRepo.repo.rpm` (default `rpm-local`) using the same credentials, and the repository (Artifactory, Nexus) rebuilds the
-repository's `repodata/`. Any other repository that accepts an HTTP PUT works too:
+repository's `repodata/`. Any other YUM repository that accepts an HTTP PUT works too:
 
-```kotlin
-rpm { repositoryUrl = uri("https://nexus.example.com/repository/yum-hosted") }
+```bash
+./gradlew publish -PjavaApp.rpmRepositoryUrl=https://nexus.example.com/repository/yum-hosted
 ```
+
+`nodeApp.rpmRepositoryUrl` does the same for a Node.js app, and either can go in `gradle.properties`.
 
 Servers then need a `.repo` file pointing dnf at it, such as `/etc/yum.repos.d/apps.repo`:
 
@@ -91,7 +84,7 @@ gpgcheck=0
 
 RPM signatures are PGP by design, so this is where an RPM install is checked: the repository's key
 vouches for the metadata, which holds every package's checksum. To sign the packages themselves as
-well, run `rpm --addsign` in CI before `appPublishRpm` and set `gpgcheck=1`.
+well, run `rpm --addsign` in CI before `publish` uploads them, and set `gpgcheck=1`.
 
 Two caveats. RPMs are not byte-reproducible, unlike the archives. The RPM is built from the same
 directory as this target's archive, but only the archive for the build machine is smoke-tested;
@@ -105,7 +98,7 @@ named after it, so it has the distribution plugin's usual tasks:
 | Task | Does |
 |---|---|
 | `install<Target>Dist`, e.g. `installLinuxX64Dist` | Lays the app out in `build/app/<target>/<app>-<version>/` |
-| `<target>DistTar` / `<target>DistZip` | The archive, `build/distributions/<app>-<version>-<target>.tar.gz` (`.zip` for Windows); only the `archiveFormat` one is enabled |
+| `<target>DistTar` / `<target>DistZip` | The archive, `build/distributions/<app>-<version>-<target>.tar.gz` (`.zip` for Windows); only the one for the target's OS is enabled |
 | `appArchive` | Every target's archive |
 | `installDist` | Gradle's usual task: this machine's app with its runtime, in `build/install/<app>` |
 
@@ -156,8 +149,7 @@ CPU under `app/amd64/` and `app/arm64/` (the names container platforms use). A D
 the markers is entirely yours and is used as written; copy the app in it with
 `COPY app/${TARGETARCH}/ /app/` after `ARG TARGETARCH`, which BuildKit, Buildah and Podman set to the
 CPU being built (Docker's legacy builder, `DOCKER_BUILDKIT=0`, does not). A Dockerfile that still
-copies all of `app/` is refused, since its image would have no `/app/bin`. `dockerfile = file(…)`
-puts it elsewhere.
+copies all of `app/` is refused, since its image would have no `/app/bin`.
 
 What the plugin's block holds:
 
@@ -169,8 +161,8 @@ What the plugin's block holds:
   `--build-arg BASE_IMAGE=mirror.example.com/ubi9/ubi-minimal:9.8-1793050346@sha256:…` (a mirror
   keeps the digest).
 - **OCI labels.** `title`, `version`, `revision` (the commit), `created` (the commit's time, so the
-  same commit builds the same image), `source` (the `origin` remote with any credentials removed, or
-  `sourceUrl`), `licenses` (`license`, default `LicenseRef-Proprietary`), and `base.name` (the base
+  same commit builds the same image), `source` (the `origin` remote with any credentials removed),
+  `licenses` (`license`, default `LicenseRef-Proprietary`), and `base.name` (the base
   image actually used, digest included).
 - **Health checks.** `HEALTHCHECK` runs `bin/<app> healthcheck ready`. Docker uses it; OCI-format
   builds (Podman's and Buildah's default) drop it and Kubernetes ignores it, so give Kubernetes
@@ -182,7 +174,6 @@ What the plugin's block holds:
 javaApp {                                    // or nodeApp
     targets("linux-x64", "linux-aarch64")
     license = "Apache-2.0"
-    sourceUrl = "https://github.com/example/orders"   // default: the origin remote
 }
 ```
 

@@ -49,7 +49,8 @@ Version forms differ by distribution (`javaApp.jdk.distribution`): temurin `21.0
 `21.0.13.0.10`, zulu `21.54.107-ca-jdk21.0.13`, liberica `21.0.13+11`, oracle, microsoft and
 sapmachine `21.0.13`. A wrong form is rejected before download. Vendors publish a release one
 platform at a time over several days: confirm the build exists for every target in
-`javaApp.targets` before pinning it. Remove the override once a plugin release includes the patch.
+`javaApp.targets` before pinning it, in the source the build downloads from (`javaApp.jdk.source` /
+`nodeApp.node.source` when set). Remove the override once a plugin release includes the patch.
 
 ## 4. Raising the Java release
 

@@ -72,32 +72,29 @@ a JDK trimmed to what the app uses, the organisation's CAs and TLS rules, an RPM
 
 ```kotlin
 // build.gradle.kts
-import java.time.Duration
-
 plugins {
     id("io.github.fiftieshousewife.java-app")
 }
 
 group = "com.example"
 version = "1.4.2"
+description = "Order service"                  // the RPM's summary
 
 application {
     mainClass = "com.example.orders.Main"
 }
 
 javaApp {
-    appName = "orders-service"                 // launcher and archive name; default: the project name
+    appName = "orders-service"                 // launcher, archive and RPM name; default: the project name
 
-    // Target platforms: one archive each. A Mac or Windows machine builds the Linux ones directly,
-    // with no containers. Only this machine's archive can be started, so only it is smoke-tested.
+    // Target platforms: one archive each, zip for Windows and tar.gz for Linux. A Mac or Windows
+    // machine builds the Linux ones directly, with no containers. Only this machine's archive can be
+    // started, so only it is smoke-tested.
     targets("linux-x64", "linux-aarch64", "windows-x64")
-    // Archives: zip for Windows, tar.gz for Linux and macOS, unless archiveFormat("…") picks one for all
-    allowUntestedPublish = true                // publish the targets this machine couldn't start
 
-    // The runtime: an exact JDK, compiled with and embedded. The vendor is a Gradle property
-    // (javaApp.jdk.distribution=oracle, temurin, corretto, zulu, liberica, microsoft, sapmachine).
+    // The runtime: compiled with and embedded. The vendor and exact version are Gradle properties,
+    // below; the plugin pins a version only for Temurin's LTS releases.
     javaVersion = 25                           // 11 to 27
-    jdkVersion = "25.0.3"                      // pinned by the plugin only for Temurin's LTS releases
 
     // jlink links only the modules jdeps finds, plus these, which code loads by name at runtime
     // (`./gradlew jlinkFindModules` finds them by running the app).
@@ -105,38 +102,29 @@ javaApp {
 
     // How the JVM starts. By default it gets 75% of the machine's or container's memory, exits on
     // OutOfMemoryError and leaves a heap dump and crash logs in $APP_LOG_DIR; jvmArgs come after
-    // these. With runtimeOptions("locked") the launcher refuses to start while JAVA_TOOL_OPTIONS,
-    // APP_JAVA_OPTS or a jvm.options file would add options of their own.
-    runtimeDefaults {
-        garbageCollector = "G1"                // unset by default: the JVM chooses
-        disableAttach = true                   // no jcmd or agents attaching to the running service
-    }
-    jvmArgs = listOf("-Xss512k")
-    runtimeOptions("locked")
+    // these, so they win.
+    jvmArgs = listOf("-Xss512k", "-XX:+UseG1GC", "-XX:+DisableAttachMechanism")
 
     // CAs and encryption, applied to every target's runtime after jlink.
     security {
         trustedCertificates.from("security/certs")                    // PEM or DER, added to cacerts
         trustedCertificate(uri("https://pki.example.com/root-ca.pem"), sha256 = "9f86d081884c7d65…")
-        disabledTlsAlgorithms.addAll(                                 // added to the JDK's own list
+        disableAlgorithms(                                            // added to the JDK's own list
+            "tls",
             "TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA384",
             "TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA384",
         )
         properties.put("networkaddress.cache.ttl", "30")              // any java.security property
-        propertiesFiles.from("security/java.security")                // or a whole policy file
         lockProperties = true                                         // no -Djava.security.properties
     }
 
     // Packaging beyond the archive.
+    license = "LicenseRef-Proprietary"         // SPDX: the image label and the RPM's licence
     configDefaults = file("src/deploy/conf")   // shipped as conf.defaults/ and an RPM's /etc/<name>/
     rpm {
         enabled = true                         // an RPM per Linux target, installed under /opt
-        vendor = "Example Ltd"
-        license = "LicenseRef-Proprietary"
         systemd = true                         // a hardened systemd unit, run as its own user
     }
-
-    smokeTestTimeout = Duration.ofSeconds(90)  // how long the started archive may take to get healthy
 }
 ```
 
@@ -151,7 +139,14 @@ javaApp.jdk.25=25.0.3
 # runtimes, npm and publishing (see "Behind a corporate binary repository")
 binaryRepo.repository=artifactory
 # the organisation's runtime policy
-javaApp.securityPolicyArtifact=com.example.platform:java-runtime-policy:7
+javaApp.securityPolicy=com.example.platform:java-runtime-policy:7
+# the launcher refuses to start while JAVA_TOOL_OPTIONS, APP_JAVA_OPTS or a jvm.options file
+# would add options of their own
+javaApp.runtimeOptions=locked
+# publish the targets this machine couldn't start
+javaApp.allowUntestedPublish=true
+# how long, in seconds, the started archive may take to get healthy
+javaApp.smokeTestTimeout=90
 ```
 
 `./gradlew build` then gives three archives in `build/distributions/` and two RPMs. `publish` uploads
@@ -178,14 +173,11 @@ nodeApp {
     entryPoint = "server.mjs"                  // under app/; started by `bin/<app> run`
     buildScript = "build"                      // npm script run before packaging (then dist/ is packaged)
     testScript = "test"                        // npm script run by `check`
-    nodeVersion = "24.22.1"                    // default: the plugin's pin
 
     targets("linux-x64", "linux-aarch64")
-    ignoreInstallScripts = true                // npm --ignore-scripts for production dependencies
-    portableInstallScripts = listOf("esbuild") // packages whose install scripts don't block cross builds
+    installScripts = listOf("esbuild")         // vetted packages whose install scripts run; default: none
 
     nodeArgs = listOf("--enable-source-maps", "--max-old-space-size=512")
-    runtimeOptions("locked")                   // also refuses NODE_OPTIONS and NODE_TLS_REJECT_UNAUTHORIZED
 
     // CAs and encryption: the CAs go into security/trusted-cas.pem, which the launcher passes to
     // Node as NODE_EXTRA_CA_CERTS; the TLS settings become node options.
@@ -197,7 +189,9 @@ nodeApp {
 }
 ```
 
-See [What your app needs to do](docs/your-app.md#nodejs-trusted-cas-and-tls) and
+The Node.js version is `nodeApp.node.version` (default: the plugin's pin), and
+`nodeApp.runtimeOptions=locked` also refuses `NODE_OPTIONS` and `NODE_TLS_REJECT_UNAUTHORIZED`. See
+[What your app needs to do](docs/your-app.md#nodejs-trusted-cas-and-tls) and
 [Behind a corporate binary repository](docs/binary-repository.md) for npm registries and CAs.
 
 ### How big the archive is
@@ -237,62 +231,59 @@ setting and its default is in the [reference](docs/reference.md).
 
 | Task | What it does | Settings |
 |---|---|---|
-| `appArchive` | Builds every target's archive into `build/distributions/`; part of `assemble` | `targets(…)`, `archiveFormat(…)`, `appName`; `-PjavaApp.targets`, `-PjavaApp.archiveFormat` |
-| `<target>DistTar`, `<target>DistZip` | One target's archive, `<app>-<version>-<target>.tar.gz` (or `.tar`, `.zip`) | as above; `configDefaults` (shipped as `conf.defaults/`) |
+| `appArchive` | Builds every target's archive into `build/distributions/`; part of `assemble` | `targets(…)`, `appName`; `-PjavaApp.targets` |
+| `<target>DistTar`, `<target>DistZip` | One target's archive, `<app>-<version>-<target>.tar.gz` (`.zip` for Windows) | as above; `configDefaults` (shipped as `conf.defaults/`) |
 | `installDist` | Lays out this machine's app with its runtime in `build/install/<app>` | as above |
 | `install<Target>Dist` | The same for one target, e.g. `installLinuxX64Dist` | as above |
-| `startScripts` | Java: writes `bin/<app>` and `bin/<app>.bat`, which start the embedded runtime | `runtimeDefaults { … }`, `jvmArgs`, `application { applicationDefaultJvmArgs }`, `runtimeOptions("locked")`; `-PjavaApp.runtimeOptions` |
-| `appLaunchers<Target>` | Node: writes the target's launcher | `entryPoint`, `nodeArgs`, `security { tlsMinVersion, tlsCipherList }`, `runtimeOptions("locked")`; `-PnodeApp.runtimeOptions` |
+| `startScripts` | Java: writes `bin/<app>` and `bin/<app>.bat`, which start the embedded runtime | `runtimeDefaults`, `jvmArgs`, `application { applicationDefaultJvmArgs }`; `-PjavaApp.runtimeOptions` |
+| `appLaunchers<Target>` | Node: writes the target's launcher | `entryPoint`, `nodeArgs`, `security { tlsMinVersion, tlsCipherList }`; `-PnodeApp.runtimeOptions` |
 | `appManifest<Target>` | Writes `META-INF/app.json`: name, version, target, runtime, git commit | `appName` |
 | `appSbom<Target>` | Writes `META-INF/sbom.cdx.json`, a CycloneDX SBOM including the runtime; skipped when you supply your own | `sbom = …` (your own SBOM instead) |
-| `appVerifyPolicy<Target>` | Checks the assembled app against the organisation's runtime policy; every archive depends on it, and it is skipped when no policy is set | `-PjavaApp.securityPolicy` or `-PjavaApp.securityPolicyArtifact` (`nodeApp.…` for Node) |
+| `appVerifyPolicy<Target>` | Checks the assembled app against the organisation's runtime policy; every archive depends on it, and it is skipped when no policy is set | `securityPolicy`; `-PjavaApp.securityPolicy` (`nodeApp.…` for Node) |
 
 ### Running and checking it
 
 | Task | What it does | Settings |
 |---|---|---|
-| `appSmokeTest` | Unpacks this machine's archive, checks `version`, starts the app on a free port and waits for its health check; part of `check` | `smokeTestEnabled`, `smokeTestTimeout` |
+| `appSmokeTest` | Unpacks this machine's archive, checks `version`, starts the app on a free port and waits for its health check; part of `check` | `smokeTestEnabled`; `-PjavaApp.smokeTestTimeout` |
 | `runApp` | Runs this machine's packaged app in the foreground | `-Pargs="…"` (arguments for the app) |
 | `checkRuntimeSupport` | Fails if the embedded runtime's release line has reached end of life; warns if it soon will or a newer patch is out. Run it on a schedule; not part of `check` | `-PjavaApp.runtimeSupportUrl`, `-PjavaApp.endOfLifeWarningDays`, `-PjavaApp.allowEndOfLife` (`nodeApp.…` for Node) |
-| `appVerifyPublishable` | Stops `publish` for archives that were never started on this machine | `allowUntestedPublish`; `-PjavaApp.allowUntestedPublish` |
 
 ### Java runtime
 
 | Task | What it does | Settings |
 |---|---|---|
-| `downloadJdk<Target>` | With `javaApp.jdk.yumRepo`: finds the JDK package for the pin and the target's CPU in the YUM repository's metadata, downloads it and checks its SHA-256 | `-PjavaApp.jdk.yumRepo`, `-PjavaApp.jdk.yumPackage`, `-PjavaApp.jdk.revisionFormat` |
-| `extractJdk<Target>`, `extractJmods<Target>` | Downloads and unpacks the target's pinned JDK (and, from Java 24, its separate jmods) | `javaVersion`, `jdkVersion`; `-PjavaApp.jdk.distribution`, `-PjavaApp.jdk.<feature>`, `-PjavaApp.jdk.url`, `-PjavaApp.jdk.localPath`, `-PjavaApp.jdk.<feature>.<target>.path`, `-PbinaryRepo.repository` or `-PbinaryRepo.url` |
-| `jdeps` | Lists the JDK modules the code refers to | |
-| `jlinkFindModules` | Runs the app, adding each JDK module it turns out to need, until it is healthy | `smokeTestTimeout` |
-| `jlink<Target>` | Links the target's trimmed runtime | `additionalModules`, `jlinkModules`, `sharedModuleSets`, `moduleSets`, `jlinkOptions` |
-| `customiseRuntime<Target>` | Applies trusted certificates, security properties, the overlay and the runtime policy to it | `security { … }`, `runtimeOverlay`; `-PjavaApp.securityPolicy[Artifact]` |
+| `downloadJdk<Target>` | With `javaApp.jdk.source=yum:…`: finds the JDK package for the pin and the target's CPU in the YUM repository's metadata, downloads it and checks its SHA-256 | `-PjavaApp.jdk.source`, `-PjavaApp.jdk.pattern` |
+| `extractJdk<Target>`, `extractJmods<Target>` | Downloads and unpacks the target's pinned JDK (and, from Java 24, its separate jmods) | `javaVersion`; `-PjavaApp.jdk.distribution`, `-PjavaApp.jdk.<feature>`, `-PjavaApp.jdk.source`, `-PjavaApp.jdk.pattern`, `-PjavaApp.jdk.<feature>.<target>.path`, `-PbinaryRepo.repository` or `-PbinaryRepo.url` |
+| `jlinkFindModules` | Runs the app, adding each JDK module it turns out to need, until it is healthy, and reports what to add to `additionalModules` | `-PjavaApp.smokeTestTimeout` |
+| `jlink<Target>` | Links the target's trimmed runtime | `additionalModules`, `moduleSets` |
+| `customiseRuntime<Target>` | Applies trusted certificates, security properties, the overlay and the runtime policy to it | `security { … }`, `runtimeOverlay`, `securityPolicy`; `-PjavaApp.securityPolicy` |
 
 ### Node.js
 
 | Task | What it does | Settings |
 |---|---|---|
-| `extractNode<Target>`, `nodeRuntime<Target>` | Downloads the target's pinned Node.js and selects its `node` binary and licence | `nodeVersion`; `-PnodeApp.node.version`, `-PnodeApp.node.url`, `-PbinaryRepo.repository` or `-PbinaryRepo.url` |
+| `extractNode<Target>`, `nodeRuntime<Target>` | Downloads the target's pinned Node.js and selects its `node` binary and licence | `-PnodeApp.node.version`, `-PnodeApp.node.source`, `-PnodeApp.node.pattern`, `-PbinaryRepo.repository` or `-PbinaryRepo.url` |
 | `npmrc` | Writes the npm configuration for the registry | `-PnodeApp.npm.registry`, `-PnodeApp.npm.caFile`, `-PbinaryRepo.repo.npm` |
 | `npmInstall`, `npmBuild`, `npmTest` | `npm ci`, your build script, your test script (`npmTest` is part of `check`) | `buildScript`, `testScript` |
-| `npmInstallProduction<Target>` | `npm ci --omit=dev` for one target, away from the working tree | `ignoreInstallScripts`, `portableInstallScripts` |
-| `verifyNodeModules<Target>` | Fails if a dependency's install script left output for the build machine in another target's `node_modules` | `ignoreInstallScripts`, `portableInstallScripts` |
+| `npmInstallProduction<Target>` | `npm ci --omit=dev` for one target, away from the working tree | `installScripts` |
+| `verifyNodeModules<Target>` | Fails if a dependency's install script left output for the build machine in another target's `node_modules` | `installScripts` |
 | `nodeTrustedCertificates` | Bundles trusted CAs and the policy's into `security/trusted-cas.pem` | `security { trustedCertificates }` |
 
 ### RPMs, containers and publishing
 
 | Task | What it does | Settings |
 |---|---|---|
-| `appRpm`, `appRpm<Target>` | Builds an RPM for each Linux target; part of `assemble` when enabled | `rpm { enabled, packageName, release, summary, license, vendor, url, user, systemd }`; `-PjavaApp.rpm` |
-| `appPublishRpm` | Uploads the RPMs to a YUM repository; part of `publish` when one is set | `rpm { repositoryUrl }`; `-PbinaryRepo.repo.rpm`; the binary repository's login |
-| `appDockerfile` | Creates the project's `Dockerfile` if missing and keeps the plugin's block of it up to date | `dockerfile` |
-| `appDockerContext` | Writes a container build context: the Dockerfile plus each Linux archive, by CPU | `dockerfile`, `targets(…)`, `license`, `sourceUrl` |
-| `publish` | Gradle's own: publishes every target's archive under one version, with the target as the classifier | `-PbinaryRepo.repository` or `-PbinaryRepo.url`, `-PbinaryRepo.repo.releases`, `-PbinaryRepo.repo.snapshots` |
-| `aiSkills` | Writes the AI assistant skills and the build-check hook into the project | |
+| `appRpm`, `appRpm<Target>` | Builds an RPM for each Linux target; part of `assemble` when enabled | `rpm { enabled, user, systemd }`, `appName`, `license`, the project's `description`; `-PjavaApp.rpm` |
+| `appDockerfile` | Creates the project's root `Dockerfile` if missing and keeps the plugin's block of it up to date | |
+| `appDockerContext` | Writes a container build context: the Dockerfile plus each Linux archive, by CPU | `targets(…)`, `license` |
+| `publish` | Gradle's own: publishes every target's archive under one version, with the target as the classifier, and uploads the RPMs when there is a YUM repository. Stops for archives never started on this machine | `-PbinaryRepo.repository` or `-PbinaryRepo.url`, `-PbinaryRepo.repo.releases`, `-PbinaryRepo.repo.snapshots`, `-PbinaryRepo.repo.rpm` or `-PjavaApp.rpmRepositoryUrl`, `-PjavaApp.allowUntestedPublish` |
+| `aiSkills` | Writes the AI assistant skills and the build-check hook into the project, and adds the Claude Code plugin to `.claude/settings.json`; part of `assemble` | `-PjavaApp.aiSkills` |
 
 In a deployment pipeline, the `app-smoke-test` plugin adds its own `appSmokeTest`, which smoke-tests
 a published release declared as `smokeTest("com.example:orders-service:1.4.2")`, picking the archive
-built for the machine it runs on. It takes `-PappSmokeTest.securityPolicy` or
-`-PappSmokeTest.securityPolicyArtifact` to refuse an archive that breaks the runtime policy.
+built for the machine it runs on. It takes `-PappSmokeTest.securityPolicy` to refuse an
+archive that breaks the runtime policy.
 
 ## Documentation
 
@@ -301,7 +292,7 @@ built for the machine it runs on. It takes `-PappSmokeTest.securityPolicy` or
 | [What your app needs to do](docs/your-app.md) | The launcher, environment, configuration, what's in the archive, the SBOM |
 | [Building for Linux, Mac and Windows](docs/targets.md) | Several targets from one build, and which ones are tested |
 | [Java: modules, hardening and JDKs](docs/java.md) | jdeps and jlink, certificates and security policy, choosing a JDK distribution |
-| [Packaging and deploying](docs/packaging.md) | tar.gz, tar, zip, RPM and container images; Gradle distributions and launchers |
+| [Packaging and deploying](docs/packaging.md) | tar.gz, zip, RPM and container images; Gradle distributions and launchers |
 | [Performance tuning](docs/performance.md) | Java Flight Recorder on the embedded runtime, heap, GC and startup |
 | [Keeping the runtime patched](docs/runtime-updates.md) | When runtime fixes come out, `checkRuntimeSupport` |
 | [Renovate presets](docs/renovate.md) | Pull requests for runtime pin overrides and a base image you pin yourself |
@@ -316,14 +307,20 @@ built for the machine it runs on. It takes `-PappSmokeTest.securityPolicy` or
 ### AI assistant skills
 
 Skills that adopt the plugins in a project, find the JDK modules for jlink, upgrade dependencies and
-runtimes, and tune performance with Java Flight Recorder, plus a hook that checks the build still configures after the agent edits a build file:
+runtimes, and tune performance with Java Flight Recorder, plus a hook that checks the build still configures after the agent edits a build file.
 
-- **GitHub Copilot** (agent mode in VS Code, Visual Studio and JetBrains IDEs, the Copilot app and
-  CLI, the cloud agent) **and Devin**: `./gradlew aiSkills` writes them into your project.
-- **Claude Code**: install the plugin:
-  ```
-  /plugin install embedded-runtime --marketplace fiftiesHousewife/embedded-runtime-gradle-plugins
-  ```
+Every build installs them, as part of `assemble`, for **GitHub Copilot** (agent mode in VS Code,
+Visual Studio and JetBrains IDEs, the Copilot app and CLI, the cloud agent), **Devin** and **Claude
+Code**: the skills go in `.agents/skills/`, the hook in `.github/hooks/`, and the Claude Code plugin is
+added to `.claude/settings.json`, so Claude Code offers it to everyone who opens the project. Files
+are written only when they change; commit them. To turn this off, set `javaApp.aiSkills=false` (or
+`nodeApp.aiSkills=false`) in `gradle.properties`.
+
+Claude Code users in a project without the plugins can install the plugin themselves:
+
+```
+/plugin install embedded-runtime --marketplace fiftiesHousewife/embedded-runtime-gradle-plugins
+```
 
 API documentation: https://fiftieshousewife.github.io/embedded-runtime-gradle-plugins/ (from each
 plugin's KDoc; also in the javadoc jar of every publication).

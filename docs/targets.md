@@ -13,7 +13,7 @@ default is the machine you build on. A Mac or Windows laptop can build Linux arc
 containers or WSL.
 
 Only the archive for the machine you build on can be started there, so only that one is
-smoke-tested. `publish` refuses archives that were never started unless you set
-`allowUntestedPublish = true` (or pass `-PjavaApp.allowUntestedPublish=true`). The safest setup
+smoke-tested. `publish` refuses archives that were never started unless you pass
+`-PjavaApp.allowUntestedPublish=true` (`nodeApp.` for Node.js). The safest setup
 publishes each target from a CI job running on it; [smoke-testing the published app](publishing.md#smoke-testing-a-published-app)
 on each target afterwards is the alternative.

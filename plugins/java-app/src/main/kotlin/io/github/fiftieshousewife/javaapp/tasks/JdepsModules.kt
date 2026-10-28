@@ -20,7 +20,7 @@ import javax.inject.Inject
 
 /**
  * Runs `jdeps --print-module-deps` over the app jar and its runtime classpath, writing the JDK
- * modules they use as one comma-separated line: the default for `javaApp.jlinkModules`.
+ * modules they use as one comma-separated line, to which `javaApp.additionalModules` is added.
  *
  * jdeps sees only static references. Modules loaded by name at runtime (TLS providers, JNDI,
  * locale data) need `javaApp.additionalModules`; `jlinkFindModules` finds them.

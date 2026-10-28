@@ -27,7 +27,7 @@ always-on recording that keeps the last hour and writes it out when the app stop
 -XX:StartFlightRecording=maxage=1h,maxsize=200m,dumponexit=true,filename=/var/log/orders-service/app.jfr
 ```
 
-With `runtimeOptions("locked")` the operator can't add these; put the recording in `jvmArgs` for a
+With `-PjavaApp.runtimeOptions=locked` the operator can't add these; put the recording in `jvmArgs` for a
 build meant for profiling instead.
 
 Recordings can contain environment variables and system properties: treat them like a heap dump.
@@ -52,8 +52,8 @@ timelines.
 
 | Symptom in the recording | Change |
 |---|---|
-| Frequent or long GC pauses, heap near its limit | Raise the heap share: `runtimeDefaults { maxRamPercentage = 85 }` (75% by default; the JVM's own default is 25%) |
-| Pauses from the Serial collector | The JVM picks Serial with fewer than 2 CPUs or under about 1792 MB. Give the container 2 CPUs, or choose a collector: `runtimeDefaults { garbageCollector = "G1" }` (the usual default), `"Parallel"` for batch throughput, `"Z"` for low latency on large heaps |
+| Frequent or long GC pauses, heap near its limit | Raise the heap share: `jvmArgs.add("-XX:MaxRAMPercentage=85")` (75% by default; the JVM's own default is 25%) |
+| Pauses from the Serial collector | The JVM picks Serial with fewer than 2 CPUs or under about 1792 MB. Give the container 2 CPUs, or choose a collector in `jvmArgs`: `-XX:+UseG1GC` (the usual default), `-XX:+UseParallelGC` for batch throughput, `-XX:+UseZGC` for low latency on large heaps |
 | Slow startup, class loading at the top | A class-data sharing archive built on the target: `-XX:+AutoCreateSharedArchive -XX:SharedArchiveFile=/var/lib/orders-service/app.jsa` (JDK 19+; a full path, because `jvmArgs` are not expanded). On JDK 25, an ahead-of-time cache with `-XX:AOTCacheOutput` goes further. Both are built by running on the target itself |
 | Allocation dominated by a few classes | Fix the code; no flag helps |
 

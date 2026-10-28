@@ -15,7 +15,7 @@ import org.gradle.api.provider.Property
  *
  * `dnf install`, `dnf upgrade` and `dnf history undo` then install, upgrade and roll back the app.
  * The package is named after the app, its summary is the project's description, its licence and URL
- * the app's `license` and `sourceUrl`, and its release `1`.
+ * the app's `license` and the `origin` git remote, and its release `1`.
  */
 abstract class RpmPackaging {
     /** Build `appRpm<Target>` for every Linux target. Default false, or `-PjavaApp.rpm=true`. */

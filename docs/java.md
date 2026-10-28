@@ -2,8 +2,8 @@
 
 ## Which JDK modules go in
 
-The embedded runtime holds only the JDK modules your app uses. By default these are what `jdeps`
-finds in your code and its dependencies. jdeps can't see modules loaded by name at runtime, such as
+The embedded runtime holds only the JDK modules your app uses: what `jdeps` finds in your code and
+its dependencies, plus `additionalModules`. jdeps can't see modules loaded by name at runtime, such as
 `jdk.crypto.ec` for TLS, `java.naming` for JNDI or LDAP, or `jdk.localedata` for other locales.
 If one is missing, the smoke test fails and says so. Then run:
 
@@ -17,8 +17,6 @@ the app is healthy, then prints what to add:
 ```kotlin
 javaApp { additionalModules.addAll("jdk.crypto.ec") }
 ```
-
-To choose the modules yourself instead, set `jlinkModules = listOf(...)`.
 
 ### Shared module sets
 
@@ -43,19 +41,15 @@ Add or replace sets, or turn them off:
 ```kotlin
 javaApp {
     moduleSets.put("batch", listOf("java.base", "java.sql", "java.logging", "jdk.unsupported"))
-    sharedModuleSets = false        // exactly the app's modules; or -PjavaApp.sharedModuleSets=false
 }
 ```
 
-`moduleSets.set(mapOf(...))` replaces the plugin's sets with your own. Choose them from the runtimes
+`moduleSets.set(mapOf(...))` replaces the plugin's sets with your own, and
+`moduleSets.set(emptyMap())` links exactly the app's modules. Choose sets from the runtimes
 you actually ship: each archive's `runtime/release` file lists its modules on its `MODULES=` line.
 [Image layers and caching](caching.md) has heuristics for choosing them.
 
-`jlinkOptions` passes options straight to `jlink`. Besides the defaults (no debug information, man
-pages or headers; compressed), some are worth knowing: `--include-locales=en,de` keeps only the
-locales you need when `jdk.localedata` is linked, `--dedup-legal-notices=error-if-not-same-content`
-removes duplicate licence files, and on Java 21 and later `--generate-cds-archive` speeds up startup
-for an archive built on its own target.
+Every runtime is linked without debug information, man pages or headers, and compressed.
 
 ## Hardening the runtime
 
@@ -67,9 +61,8 @@ javaApp {
     security {
         trustedCertificates.from("security/certs")          // approved CAs, added to cacerts
         trustedCertificate(uri("https://pki.example.com/root-ca.pem"), sha256 = "9f86d0…")  // fetched, pinned
-        propertiesFiles.from("security/java.security")      // your policy, applied over the JDK's
-        properties.put("networkaddress.cache.ttl", "30")
-        disabledTlsAlgorithms.addAll("TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA384", "TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA384")
+        properties.put("networkaddress.cache.ttl", "30")      // applied over the JDK's java.security
+        disableAlgorithms("tls", "TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA384", "TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA384")
         lockProperties = true                                // no -Djava.security.properties at runtime
     }
 }
@@ -80,8 +73,8 @@ javaApp {
 | `trustedCertificates` | PEM or DER files (or directories of them) added to the runtime's `cacerts` |
 | `trustedCertificate(uri, sha256)` | A certificate fetched by URI (`https:` or `file:`), refused unless its SHA-256 matches the pin; repository credentials are sent only to URIs under `binaryRepo.url` |
 | `replaceDefaultTrust` | Trust only those certificates, instead of adding them to the JDK's own CAs |
-| `propertiesFiles`, `properties` | Security properties set in `conf/security/java.security`, files first |
-| `disabledTlsAlgorithms`, `disabledCertPathAlgorithms`, `disabledJarAlgorithms` | Added to the JDK's own lists, never replacing them |
+| `properties` | Security properties set in `conf/security/java.security`; `properties.putAll(…)` sets many at once |
+| `disableAlgorithms("tls" \| "certpath" \| "jar", …)` | Added to the JDK's `jdk.tls`, `jdk.certpath` or `jdk.jar.disabledAlgorithms` list, never replacing it |
 | `lockProperties` | Sets `security.overridePropertiesFile=false` |
 | `forbiddenModules` | Modules the runtime must never contain; default `jdk.jdwp.agent`, the remote debugger |
 
@@ -89,12 +82,12 @@ The example drops two CBC-mode suites, the kind a policy that allows only AEAD c
 disables before adding to the lists: the static-RSA `TLS_RSA_*` suites, for example, are disabled
 by default from JDK 24, 21.0.10, 17.0.18 and 11.0.30.
 
-Properties worth considering for your policy file: `jdk.serialFilter` (which classes may be
+Properties worth considering for your policy: `jdk.serialFilter` (which classes may be
 deserialized), `networkaddress.cache.ttl` (how long DNS answers are cached),
 `jdk.includeInExceptions` (whether host names and file paths appear in exception messages; the
 default leaves them out), `ocsp.enable` (certificate revocation checking) and `securerandom.source`.
 
-Every setting takes any Gradle file source, so certificates and policy can come from the repository,
+`trustedCertificates` takes any Gradle file source, so certificates can come from the repository,
 a shared directory, or a versioned artifact in your binary repository. Anything not modelled here goes in
 `src/deploy/runtime/`, which is copied over the runtime as it is (`runtimeOverlay` to change it).
 Each runtime records what was changed, with every certificate's SHA-256 fingerprint, in
@@ -108,9 +101,9 @@ project's hands, publish a **runtime policy** once and point every build machine
 ```properties
 # ~/.gradle/gradle.properties on each machine, or ORG_GRADLE_PROJECT_... on CI. A property here
 # overrides the same property in a project, so a project cannot unset it.
-# a zip in your binary repository
-javaApp.securityPolicyArtifact=com.acme.platform:java-runtime-policy:7
-# or javaApp.securityPolicy=/shared/policy                                  # a directory or zip on disk
+# a zip in your binary repository, by group:name:version
+javaApp.securityPolicy=com.acme.platform:java-runtime-policy:7
+# or a directory or zip on disk: javaApp.securityPolicy=/shared/policy
 ```
 
 The policy is a directory (or a zip of one) with `runtime-policy.properties` and, optionally,
@@ -142,8 +135,8 @@ It is enforced three times:
    a project that hasn't locked its runtime options, passes a forbidden JVM option or ships a
    forbidden library gets no archive.
 3. **Checked again before rollout.** A deployment pipeline that smoke-tests a published release
-   with the `app-smoke-test` plugin, and sets `appSmokeTest.securityPolicy` or
-   `appSmokeTest.securityPolicyArtifact`, refuses an archive that breaks the policy, whoever built it.
+   with the `app-smoke-test` plugin, and sets `appSmokeTest.securityPolicy`, refuses an archive
+   that breaks the policy, whoever built it.
 
 Each runtime records the policy's id, version and SHA-256 in
 `runtime/conf/security/java-app-customisations.txt`.
@@ -158,31 +151,34 @@ control.
 The JVM's own defaults suit few services: a quarter of the memory for the heap, the Serial
 collector on a machine or container with fewer than 2 CPUs or under about 1.8 GB, and heap dumps,
 when switched on, in whatever directory the app started in. Every launcher therefore starts the
-JVM with production defaults, ahead of the project's `jvmArgs`, so any of them can be overridden:
+JVM with production defaults:
+
+| Option | Does |
+|---|---|
+| `-XX:MaxRAMPercentage=75` | Three quarters of the memory for the heap |
+| `-XX:+ExitOnOutOfMemoryError` | Exits on `OutOfMemoryError`, so a supervisor restarts the app |
+| `-XX:+HeapDumpOnOutOfMemoryError` | A heap dump, and `hs_err` crash logs, in `$APP_LOG_DIR` |
+
+They come ahead of the project's `jvmArgs`, so any of them can be overridden there, and anything
+else goes there too:
 
 ```kotlin
 javaApp {
-    runtimeDefaults {
-        maxRamPercentage = 75        // -XX:MaxRAMPercentage
-        exitOnOutOfMemory = true     // -XX:+ExitOnOutOfMemoryError: a supervisor restarts the app
-        heapDumpOnOutOfMemory = true // a heap dump and hs_err crash logs in $APP_LOG_DIR
-        garbageCollector = "G1"      // G1, Parallel, Serial or Z; unset (the default) lets the JVM choose
-        disableAttach = false        // true refuses jcmd, jstack and agents at runtime
-        enabled = true               // false: the JVM's own defaults
-    }
+    jvmArgs.addAll("-XX:MaxRAMPercentage=85", "-XX:+DisableAttachMechanism")   // more heap; no jcmd, jstack or agents
+    // runtimeDefaults = false                                                 // the JVM's own defaults
 }
 ```
 
 The launcher creates `$APP_LOG_DIR` with mode 750 when it is missing, and the JVM writes heap dumps
 readable by the app's user only, since they hold whatever was in memory: tokens, passwords,
-personal data. On `OutOfMemoryError` the app writes its dump and exits with code 3. The collector is
-unset by default because an operator who chooses one in `APP_JAVA_OPTS` would otherwise stop the
-JVM from starting (two collectors conflict); the build refuses one in both `garbageCollector` and
-`jvmArgs` for the same reason.
+personal data. On `OutOfMemoryError` the app writes its dump and exits with code 3. The defaults
+leave the collector to the JVM, because an operator who chooses one in `APP_JAVA_OPTS` would stop
+the JVM from starting if the build had chosen one too (two collectors conflict). Choose one in
+`jvmArgs` (`-XX:+UseG1GC`) when operators won't, or when the runtime's options are locked.
 
 ## Runtime options
 
-`runtimeOptions("locked")` (or `-PjavaApp.runtimeOptions=locked`) makes the launcher refuse to start
+`-PjavaApp.runtimeOptions=locked` makes the launcher refuse to start
 while anything would add JVM options the build did not fix: `APP_JAVA_OPTS`, `JAVA_TOOL_OPTIONS`,
 `JDK_JAVA_OPTIONS`, `_JAVA_OPTIONS`, or a `jvm.options` file in the configuration directory. The
 default, `open`, adds `$APP_CONF_DIR/jvm.options` (a JVM argument file) and then `$APP_JAVA_OPTS`
@@ -230,7 +226,8 @@ on, but not for another one, which is why a cross build needs the jmods.
 > OTN-licensed releases do not. The other distributions are OpenJDK builds under GPLv2 with the
 > Classpath Exception.
 
-To download from a mirror instead, see `javaApp.jdk.url` under [Configuration](reference.md#configuration).
+To download from a mirror, a directory or your binary repository instead, set `javaApp.jdk.source`:
+see [Where JDKs and Node.js come from](binary-repository.md#where-jdks-and-nodejs-come-from).
 
 ### The compile toolchain's JDK
 
@@ -250,7 +247,7 @@ laid out like the [binary repository's runtimes repository](binary-repository.md
 
 ```properties
 # /shared/jdks/oracle/jdk/25.0.3/jdk-25.0.3-linux-x64.tar.gz
-javaApp.jdk.localPath=/shared/jdks
+javaApp.jdk.source=/shared/jdks
 ```
 
 or configure one JDK at a time, as an installed directory or an archive:

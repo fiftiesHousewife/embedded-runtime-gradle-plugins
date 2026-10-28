@@ -5,15 +5,14 @@ description: Find every JDK module a Java app needs so its jlink-trimmed runtime
 
 # Find the JDK modules for the embedded runtime
 
-The java-app plugin links a runtime holding only the modules the app uses. By default these come
-from `jdeps`. jdeps sees only static references, so modules reached by name at runtime are missing
-until something runs the app.
+The java-app plugin links a runtime holding the modules the app uses: what `jdeps` finds plus
+`javaApp { additionalModules }`. jdeps sees only static references, so modules reached by name at
+runtime are missing until something runs the app. Add modules to `additionalModules`, never
+anywhere else.
 
 ## Steps
 
-1. **See what jdeps finds.** Run `./gradlew jdeps` and read `build/app-work/jdeps/modules.txt`. If the build
-   sets `javaApp { jlinkModules = listOf(...) }`, that fixed list replaces jdeps entirely; prefer
-   removing it and using `additionalModules` for the extras.
+1. **See what jdeps finds.** Run `./gradlew jdeps` and read `build/app-work/jdeps/modules.txt`.
 2. **Run the smoke test.** `./gradlew appSmokeTest` starts the packaged archive and waits for
    `bin/<app> healthcheck`. If it passes, the startup and health-check paths are covered.
 3. **If it fails on a missing JDK class,** run `./gradlew jlinkFindModules`. It links, starts the app,
@@ -33,7 +32,7 @@ until something runs the app.
    | `jdk.crypto.cryptoki` | PKCS#11 hardware security modules |
    | `java.naming` | JNDI, LDAP, some DNS lookups |
    | `jdk.naming.dns` | `dns:` JNDI lookups |
-   | `jdk.localedata` | Locales other than English (keep it small with `--include-locales=en,de` in `jlinkOptions`) |
+   | `jdk.localedata` | Locales other than English |
    | `jdk.charsets` | Non-standard charsets such as EBCDIC or Shift_JIS |
    | `jdk.zipfs` | `FileSystems.newFileSystem` on a zip or jar |
    | `java.sql`, `java.sql.rowset` | JDBC drivers |
@@ -54,7 +53,7 @@ until something runs the app.
 - By default the runtime is the smallest shared module set (`base`, `service`, `framework`,
   `server`) holding the modules found, so it can contain more than the app needs and a missing
   module can go unnoticed. `jlinkFindModules` always works on the app's own modules; trust its
-  report over what the built runtime happens to contain. `javaApp { sharedModuleSets = false }`
+  report over what the built runtime happens to contain. `javaApp { moduleSets.set(emptyMap()) }`
   links exactly the app's modules.
 
 - Modules must exist in every target JDK. Cross-target builds link against each target JDK's

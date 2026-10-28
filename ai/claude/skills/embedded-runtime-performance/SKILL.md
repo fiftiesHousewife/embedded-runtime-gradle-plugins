@@ -9,8 +9,9 @@ Measure first; change one thing; measure again.
 
 ## 1. Make sure the runtime can record
 
-Read `build/app-work/jdeps/modules.txt` (after `./gradlew appArchive`). If `jdk.jfr` is missing, add
-`javaApp { additionalModules.addAll("jdk.jfr") }` to `build.gradle.kts` and rebuild.
+Read `build/app-work/jdeps/modules.txt` (after `./gradlew appArchive`). If neither it nor
+`javaApp { additionalModules }` lists `jdk.jfr`, add `javaApp { additionalModules.addAll("jdk.jfr") }`
+to `build.gradle.kts` and rebuild.
 
 ## 2. Record a representative run
 
@@ -24,8 +25,8 @@ APP_JAVA_OPTS="-XX:StartFlightRecording=duration=120s,filename=/tmp/app/app.jfr,
   build/install/<app>/bin/<app> run
 ```
 
-If the build sets `runtimeOptions("locked")`, put the `-XX:StartFlightRecording` option in
-`javaApp { jvmArgs }` temporarily instead, and remove it afterwards.
+If the runtime options are locked (`javaApp.runtimeOptions=locked`), put the `-XX:StartFlightRecording`
+option in `javaApp { jvmArgs }` temporarily instead, and remove it afterwards.
 
 ## 3. Read it
 
@@ -45,10 +46,14 @@ Report what dominates, with the numbers.
 
 | Finding | Change in `javaApp {}` |
 |---|---|
-| Heap near its limit, frequent GC | `runtimeDefaults { maxRamPercentage = 85 }` (75 by default) |
-| Serial GC in use (under 2 CPUs or ~1.8 GB) | more CPUs for the container, or `runtimeDefaults { garbageCollector = "G1" }` / `"Parallel"` (throughput) / `"Z"` (latency) |
+| Heap near its limit, frequent GC | `jvmArgs.add("-XX:MaxRAMPercentage=85")` (75 by default) |
+| Serial GC in use (under 2 CPUs or ~1.8 GB) | more CPUs for the container, or `jvmArgs.add("-XX:+UseG1GC")` / `"-XX:+UseParallelGC"` (throughput) / `"-XX:+UseZGC"` (latency) |
 | Startup dominated by class loading | `jvmArgs += listOf("-XX:+AutoCreateSharedArchive", "-XX:SharedArchiveFile=/var/lib/<app>/app.jsa")` (a full path: `jvmArgs` are not expanded) |
 | A few classes dominate allocation, or one lock dominates contention | a code change, not a flag |
+
+`runtimeDefaults = true` (the default) sets `-XX:MaxRAMPercentage=75`, `-XX:+ExitOnOutOfMemoryError`
+and `-XX:+HeapDumpOnOutOfMemoryError`; `jvmArgs` come after them and win. `runtimeDefaults = false`
+leaves the JVM's own defaults.
 
 ## 5. Prove it
 

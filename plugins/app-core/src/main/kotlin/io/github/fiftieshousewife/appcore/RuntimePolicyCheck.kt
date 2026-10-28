@@ -86,7 +86,7 @@ object RuntimePolicyCheck {
 
     private fun lockedOptions(policy: RuntimePolicy, launchers: List<String>) =
         if (policy.lockedOptions && launchers.any { "runtimeOptions = locked" !in it }) {
-            listOf("the launcher does not lock runtime options; set runtimeOptions(\"locked\")")
+            listOf("the launcher does not lock runtime options; set <javaApp|nodeApp>.runtimeOptions=locked")
         } else {
             emptyList()
         }

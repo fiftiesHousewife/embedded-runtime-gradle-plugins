@@ -100,7 +100,7 @@ is updated.
   with a GPG key. dnf checks them when the repository's `.repo` file says `gpgcheck=1`.
 * **YUM/DNF repositories** are a directory of RPMs plus `repodata/` (`repomd.xml` and the primary,
   filelists and other indexes). Artifactory and Nexus RPM repositories regenerate `repodata/` on
-  every upload, which is what `appPublishRpm` relies on. For a plain web server, copy the RPMs and run
+  every upload, which is what `publish` relies on when it uploads the RPMs. For a plain web server, copy the RPMs and run
   `createrepo_c --update <dir>`.
 * **Rollback** is `dnf history undo <id>` or `dnf downgrade <name>-<old version>`, provided the
   repository keeps old versions.

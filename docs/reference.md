@@ -3,67 +3,35 @@
 ## `javaApp {}` and `nodeApp {}`
 
 ```kotlin
-javaApp {                                       // nodeApp {} has the same first nine settings
-    appName = "orders-service"                  // launcher and archive name; default: project name
+javaApp {                                       // nodeApp {} has the same first eight settings
+    appName = "orders-service"                  // launcher, archive and RPM name; default: project name
     targets("linux-x64", "windows-x64")         // default: -PjavaApp.targets, else this machine
-    archiveFormat("tar.gz")                     // or "tar", "zip", for every target; default: -PjavaApp.archiveFormat, else zip for Windows and tar.gz for the rest
     rpm {                                       // see Packaging and deploying
         enabled = false                         // default: -PjavaApp.rpm
-        packageName = "orders-service"          // default: appName
-        release = "1"
-        summary = "…"                           // default: "<app> with its own runtime"
-        license = "LicenseRef-Proprietary"      // default: the app's license
-        vendor = "Example Ltd"
-        url = "https://example.com/orders"
-        user = "orders-service"                 // service account; default: packageName
+        user = "orders-service"                 // service account; default: appName
         systemd = true                          // install and manage a systemd unit
-        repositoryUrl = uri("https://…/rpm-local") // default: binaryRepo.repo.rpm
     }
     license = "Apache-2.0"                      // SPDX; default LicenseRef-Proprietary (image label, RPM)
-    sourceUrl = "https://github.com/example/orders" // image label; default: the origin remote
-    dockerfile = file("docker/Dockerfile")      // default: the root Dockerfile, which appDockerfile keeps up to date
     configDefaults = file("src/deploy/conf")    // shipped as conf.defaults/; default: node-app only
     sbom = file("build/reports/bom.json")       // your own CycloneDX SBOM instead of the built-in one
-    securityPolicy = "/etc/acme/java-policy"    // a directory or zip; -PjavaApp.securityPolicy wins over this
-    securityPolicyArtifact = "com.acme:java-runtime-policy:7" // or the policy's zip by coordinates
-    gitCommit = "902c348"                       // default: -PjavaApp.gitCommit, else git rev-parse HEAD
-    runtimeSupport {                            // checkRuntimeSupport
-        url = "https://endoflife.date/api/v1/products/" // default: -PjavaApp.runtimeSupportUrl
-        warningDays = 90                        // default: -PjavaApp.endOfLifeWarningDays
-        allowEndOfLife = false                  // default: -PjavaApp.allowEndOfLife
-    }
+    securityPolicy = "/etc/acme/java-policy"    // a directory or zip, or "com.acme:java-runtime-policy:7"; -PjavaApp.securityPolicy wins over this
     smokeTestEnabled = true                     // start the archive during `check`
-    smokeTestTimeout = Duration.ofSeconds(60)
-    allowUntestedPublish = false
 
     javaVersion = 25                            // 11 to 27
-    jdkVersion = "25.0.3"                       // default: the plugin's pin (Temurin's LTS releases only)
     additionalModules = listOf("jdk.crypto.ec") // added to what jdeps finds
-    jlinkModules = listOf("java.base")          // instead: exactly these modules
-    sharedModuleSets = true                     // link the smallest shared set holding them; default: -PjavaApp.sharedModuleSets
-    moduleSets.put("batch", listOf("java.base", "java.sql")) // default: base, service, framework, server
-    runtimeOverlay = file("src/deploy/runtime") // copied over the runtime as it is
+    moduleSets.put("batch", listOf("java.base", "java.sql")) // default: base, service, framework, server; empty: each app's own modules
+    runtimeOverlay = file("src/deploy/runtime") // copied over the runtime as it is; this is the default
     security { … }                              // see Hardening the runtime
-    jlinkOptions = listOf("--strip-debug", "--no-man-pages", "--no-header-files", "--compress=zip-6")
-    runtimeDefaults {                           // production JVM options, ahead of jvmArgs
-        enabled = true
-        maxRamPercentage = 75
-        exitOnOutOfMemory = true
-        heapDumpOnOutOfMemory = true            // dumps and hs_err files in $APP_LOG_DIR
-        garbageCollector = "G1"                 // default unset: the JVM chooses
-        disableAttach = false
-    }
+    runtimeDefaults = true                      // -XX:MaxRAMPercentage=75, exit and heap dump in $APP_LOG_DIR on OutOfMemoryError
     jvmArgs = listOf("-Xss512k")                // after runtimeDefaults, before $APP_JAVA_OPTS
 }
 
 nodeApp {
-    nodeVersion = "24.22.1"                     // default: the plugin's pin
     entryPoint = "main.js"                      // under app/; started by `run`
     appFiles = files("dist")                    // default: src/ (minus src/deploy/), or dist/ with buildScript
     buildScript = "build"                       // npm script run before packaging
     testScript = "test"                         // npm script run by `check`, if package.json has it
-    ignoreInstallScripts = true                 // npm --ignore-scripts for production dependencies
-    portableInstallScripts = listOf("esbuild")  // vetted packages that don't block cross builds
+    installScripts = listOf("esbuild")          // vetted packages whose install scripts run; default: none, npm --ignore-scripts
     nodeArgs = listOf("--enable-source-maps")   // before $APP_NODE_OPTS
     security {
         trustedCertificates.from("certs")       // PEM or DER CAs, added to Node's own via NODE_EXTRA_CA_CERTS
@@ -72,6 +40,11 @@ nodeApp {
     }
 }
 ```
+
+Every archive is a zip for Windows and a tar.gz for Linux and macOS. The Dockerfile is the project's
+root `Dockerfile`. The image label's source and the RPM's URL are the `origin` git remote. An RPM is
+named after `appName`, with release `1`, the app's `license`, and the project's `description` as its
+summary (default: "<app> with its own runtime").
 
 ## `embeddedRuntime {}` in `settings.gradle.kts`
 
@@ -90,15 +63,15 @@ embeddedRuntime {
     }
     jdk {
         distribution = "oracle"                 // javaApp.jdk.distribution
-        pin(21, "21.0.5")                       // javaApp.jdk.21
-        yumRepo = "yum-local"                   // javaApp.jdk.yumRepo; and yumPackage
-        binaryRepo = "generic-local"            // javaApp.jdk.binaryRepo; and binaryRepoPattern,
-        revisionFormat = "[feature]_[update]"   // revisionFormat, url, pattern, localPath, localPattern
-        path(21, "windows-x64", "C:/Program Files/Java/jdk-21") // javaApp.jdk.21.windows-x64.path
-        token("plat", mapOf("linux" to "l64", "windows" to "w64")) // javaApp.jdk.token.plat.linux, …
+        pin(25, "25.0.3")                       // javaApp.jdk.25
+        source = "yum:yum-local/rhel/9"         // javaApp.jdk.source
+        pattern = "jdk-[feature]"               // javaApp.jdk.pattern
+        reuseToolchain = true                   // javaApp.jdk.reuseToolchain
+        path(25, "windows-x64", "C:/Program Files/Java/jdk-25") // javaApp.jdk.25.windows-x64.path
     }
     node {
-        version = "24.22.1"                     // nodeApp.node.version; and url, pattern, binaryRepoPattern,
+        version = "24.22.1"                     // nodeApp.node.version
+        source = "runtimes-local"               // nodeApp.node.source; and pattern
         npmRegistry = "https://npm.example.com" // nodeApp.npm.registry; and npmCaFile
     }
 }
@@ -126,50 +99,53 @@ Each defaults to the `-PappSmokeTest.<name>` property of the same name.
 | `install<Target>Dist`, `<target>DistTar`, `<target>DistZip` | The distribution plugin's tasks for each target's distribution, e.g. `installLinuxX64Dist` |
 | `installDist` | Installs this machine's app with its runtime into `build/install/<app>` |
 | `startScripts` | Gradle's own task; writes the Java launchers with the embedded-runtime script generator |
-| `appRpm` | Builds each Linux target's RPM (`appRpmLinuxX64`, …), when enabled; part of `assemble` |
-| `appPublishRpm` | Uploads the RPMs to `rpm.repositoryUrl`; part of `publish` when that is set |
+| `appRpm` | Builds each Linux target's RPM (`appRpmLinuxX64`, …), when enabled; part of `assemble`. `publish` uploads them when there is a YUM repository |
 | `appSmokeTest` | Starts this machine's archive and waits for its health check; part of `check` |
 | `runApp` | Runs this machine's packaged app; pass arguments with `-Pargs="…"` |
 | `appVerifyPolicyLinuxX64`, … | Checks an assembled app against the runtime policy; every archive depends on it |
 | `appDockerfile` | Creates the project's `Dockerfile` if missing and keeps its embedded-runtime block up to date; one without the block is left as written |
 | `appDockerContext` | Writes a container build context: that Dockerfile plus each Linux archive under `app/amd64/` or `app/arm64/` |
 | `checkRuntimeSupport` | Fails if the embedded runtime's release line has reached end of life; warns if it will within 90 days or a newer patch is out. Not part of `check`; see [Keeping the runtime patched](runtime-updates.md) |
-| `downloadJdk<Target>` | Java, with `javaApp.jdk.yumRepo`: the JDK package from the YUM repository, found in its metadata and checked against its SHA-256 |
-| `jdeps` | Java: lists the JDK modules the code uses |
+| `downloadJdk<Target>` | Java, with `javaApp.jdk.source=yum:…`: the JDK package from the YUM repository, found in its metadata and checked against its SHA-256 |
 | `jlinkFindModules` | Java: finds the modules jdeps can't see, by running the app |
 | `jlinkLinuxX64`, … | Java: builds one target's trimmed runtime |
 | `customiseRuntimeLinuxX64`, … | Java: applies `security {}` and the overlay to it |
 | `npmInstall`, `npmBuild`, `npmTest` | Node: `npm ci`, your build script, your test script |
+| `aiSkills` | Writes the AI assistant skills, the build-check hook and Devin's hook configuration into the project, and adds the Claude Code plugin to `.claude/settings.json`; part of `assemble` |
 | `nodeTrustedCertificates` | Node: bundles `security { trustedCertificates }` and the runtime policy's certificates into `security/trusted-cas.pem`; writes nothing when there are none |
 
 ## Configuration
 
-Gradle properties, set in `gradle.properties`, `~/.gradle/gradle.properties` or with `-P`. Each can
-also be set in code: the repository and runtime ones in `embeddedRuntime {}`, the rest in
-`javaApp {}`, `nodeApp {}` or `appSmokeTest {}` as above.
+Gradle properties, set in `gradle.properties`, `~/.gradle/gradle.properties` or with `-P`. The
+repository and runtime ones can also be set in `embeddedRuntime {}`, and `targets`, `rpm`,
+`securityPolicy` and the `appSmokeTest.` ones in `javaApp {}`, `nodeApp {}` or `appSmokeTest {}` as
+above.
 
 | Property | Default | |
 |---|---|---|
 | `javaApp.jdk.distribution` | `temurin` | JDK vendor |
 | `javaApp.jdk.<feature>` | the plugin's pin (Temurin's LTS releases) | Exact JDK version, e.g. `javaApp.jdk.25=25.0.3` |
-| `javaApp.jdk.url`, `javaApp.jdk.pattern` | the vendor's site | Download JDKs from a mirror |
-| `javaApp.jdk.localPath`, `javaApp.jdk.localPattern` | | Read JDK archives from a shared directory |
+| `javaApp.jdk.source` | the binary repository's runtimes repository when one is configured, else the vendor's site | Where JDKs come from: an `https:` or `file:` URL (a mirror in the vendor's layout), an absolute path (a directory in the runtimes repository's layout, e.g. `/srv/jdks`), a repository's name beside the binary repository's (`jdks-local`), or `yum:` and a repository name or URL (`yum:yum-local/rhel/9`) for the JDK as an RPM package |
+| `javaApp.jdk.pattern` | the vendor's, or the runtimes repository's layout | The files in `javaApp.jdk.source`, with the tokens below; with `yum:`, the package name (`jdk-[feature]` for Oracle, e.g. `java-[feature]-openjdk-devel`), whose version is the pin without its build |
 | `javaApp.jdk.<feature>.<target>.path` | | One JDK, as a directory or archive, e.g. `javaApp.jdk.21.linux-x64.path` |
 | `nodeApp.node.version` | the plugin's pin | Exact Node.js version |
-| `nodeApp.node.url`, `nodeApp.node.pattern` | nodejs.org/dist | Download Node.js from a mirror |
+| `nodeApp.node.source` | the binary repository's runtimes repository when one is configured, else nodejs.org/dist | Where Node.js comes from: an `https:` or `file:` URL (a mirror in nodejs.org's layout), an absolute path, or a repository's name beside the binary repository's |
+| `nodeApp.node.pattern` | nodejs.org's, or the runtimes repository's layout | The files in `nodeApp.node.source`, with the tokens below |
 | `nodeApp.npm.registry` | registry.npmjs.org | npm registry when not using a binary repository |
 | `nodeApp.npm.caFile` | | PEM file of corporate CAs for npm |
 | `javaApp.targets`, `nodeApp.targets` | this machine | Comma-separated targets to build |
-| `javaApp.securityPolicy`, `javaApp.securityPolicyArtifact`, `nodeApp.securityPolicy`, `nodeApp.securityPolicyArtifact` | | The organisation's runtime policy: a directory or zip, or its `group:name:version` |
+| `javaApp.securityPolicy`, `nodeApp.securityPolicy` | | The organisation's runtime policy: a directory or zip, or its `group:name:version` |
 | `appSmokeTest.signerIdentity` | | In a build applying `app-smoke-test`: a regex every archive's Sigstore certificate identity must match, checked before it is started; see [Publishing](publishing.md#only-archives-your-release-workflow-signed) |
 | `appSmokeTest.signerIssuer` | `https://token.actions.githubusercontent.com` | The OIDC issuer that identity must come from |
 | `appSmokeTest.sigstoreTrustedRoot` | fetched from Sigstore | A copy of Sigstore's `trusted_root.json`, for machines that can't fetch it |
-| `appSmokeTest.securityPolicy`, `appSmokeTest.securityPolicyArtifact` | | In a build applying `app-smoke-test`: the policy every archive must comply with before it is started |
-| `javaApp.archiveFormat`, `nodeApp.archiveFormat` | `zip` for Windows, `tar.gz` for the rest | `tar.gz`, `tar` or `zip`, for every target |
+| `appSmokeTest.securityPolicy` | | In a build applying `app-smoke-test`: the policy every archive must comply with before it is started |
 | `javaApp.rpm`, `nodeApp.rpm` | `false` | Also build an RPM per Linux target |
-| `javaApp.sharedModuleSets` | `true` | Link the smallest shared module set holding the app's modules, not exactly those |
+| `javaApp.rpmRepositoryUrl`, `nodeApp.rpmRepositoryUrl` | `binaryRepo.repo.rpm` | A YUM repository accepting HTTP PUT, where `publish` uploads the RPMs |
 | `javaApp.runtimeOptions`, `nodeApp.runtimeOptions` | `open` | `locked` refuses to start while anything would add runtime options |
+| `javaApp.smokeTestTimeout`, `nodeApp.smokeTestTimeout` | `60` | Seconds the started archive may take to get healthy, in `appSmokeTest` and `jlinkFindModules` |
 | `javaApp.allowUntestedPublish`, `nodeApp.allowUntestedPublish` | `false` | Allow publishing an archive that was never started |
+| `javaApp.gitCommit`, `nodeApp.gitCommit` | `git rev-parse HEAD` | The commit recorded in `META-INF/app.json`, for builds outside a checkout |
+| `javaApp.aiSkills`, `nodeApp.aiSkills` | `true` | `false` stops `assemble` writing the AI assistant skills and hooks into the project |
 | `javaApp.runtimeSupportUrl`, `nodeApp.runtimeSupportUrl` | `https://endoflife.date/api/v1/products/` | Where `checkRuntimeSupport` reads end-of-life data; a mirror behind a corporate network |
 | `javaApp.endOfLifeWarningDays`, `nodeApp.endOfLifeWarningDays` | `90` | How early `checkRuntimeSupport` warns of an end of life |
 | `javaApp.allowEndOfLife`, `nodeApp.allowEndOfLife` | `false` | `checkRuntimeSupport` warns instead of failing on an end-of-life runtime |
@@ -180,12 +156,11 @@ also be set in code: the repository and runtime ones in `embeddedRuntime {}`, th
 | `binaryRepo.repo.npm` | `api/npm/npm-virtual` | |
 | `binaryRepo.repo.runtimes` | `runtimes` | |
 | `binaryRepo.repo.releases`, `binaryRepo.repo.snapshots` | `libs-release-local`, `libs-snapshot-local` | |
-| `binaryRepo.repo.rpm` | `rpm-local` | Where `appPublishRpm` uploads |
-| `javaApp.jdk.binaryRepoPattern`, `nodeApp.node.binaryRepoPattern` | the layout above | Layout of an existing runtimes tree; a JDK pattern ending in `.rpm` reads JDK RPMs |
-| `javaApp.jdk.yumRepo` | | A YUM repository holding the JDK as an RPM package: a repository beside the binary repository (`yum-local`, `yum-local/rhel/9`) or a full URL; the package is found in its metadata by name, pinned version and CPU |
-| `javaApp.jdk.yumPackage` | `jdk-[feature]` for Oracle | The JDK package's name in `javaApp.jdk.yumRepo` |
-| `javaApp.jdk.binaryRepo` | `binaryRepo.repo.runtimes` | The repository holding JDKs, e.g. `yum-local` |
+| `binaryRepo.repo.rpm` | `rpm-local` | Where `publish` uploads the RPMs |
 | `javaApp.jdk.reuseToolchain` | `true` | Embed the compile toolchain's JDK for this machine's target when it is exactly the pinned distribution and version |
-| `javaApp.jdk.token.<name>.<os or target>` | | A pattern token of your own, e.g. `javaApp.jdk.token.plat.linux=l64` for `[plat]`; `nodeApp.node.token.…` for Node.js |
-| `javaApp.jdk.revisionFormat` | `[underscored]` | How a curated pattern's `[revision]` spells the version: `[feature]_[update]` gives `21_5` for 21.0.5 |
 | `binaryRepo.allowInsecureProtocol` | `false` | Allow `http://` (test instances only) |
+
+A `pattern` spells targets with the tokens `[os]`, `[arch]`, `[rpmArch]`, `[target]` and
+`[classifier]`, plus Ivy's `[organisation]`, `[module]`, `[revision]`, `[artifact]` and `[ext]`. A JDK
+pattern also spells the version with `[feature]`, `[interim]` and `[update]`; a Node.js pattern outside
+nodejs.org's layout, with `[version]`.

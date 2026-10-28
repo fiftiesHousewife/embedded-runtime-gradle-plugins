@@ -50,7 +50,9 @@ constructor(
         fs.delete { delete(out) } // jlink refuses to write into an existing directory
 
         val modules = modules.get()
-        if (modules.isEmpty()) throw GradleException("javaApp.jlinkModules is empty; add at least java.base")
+        if (modules.isEmpty()) {
+            throw GradleException("No modules to link; add at least java.base to javaApp.additionalModules")
+        }
 
         val tool = JdkTools.home(toolJdk.get().asFile)
         val targetHome = JdkTools.home(targetJdk.get().asFile)

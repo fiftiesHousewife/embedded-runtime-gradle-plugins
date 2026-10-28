@@ -19,7 +19,7 @@ import org.gradle.api.tasks.Nested
  *     jdk {
  *         distribution = "oracle"
  *         pin(21, "21.0.5")
- *         yumRepo = "yum-local"
+ *         source = "yum:yum-local"
  *         path(21, "windows-x64", "C:/Program Files/Java/jdk-21")
  *     }
  * }
@@ -42,7 +42,7 @@ abstract class EmbeddedRuntimeSettings {
     fun asProperties(): Map<String, String> = (binaryRepository.properties() + jdk.properties() + node.properties())
         .mapNotNull { (name, value) -> value.orNull?.toString()?.let { name to it } }
         .toMap() + jdk.pins.get().mapKeys { (feature, _) -> "javaApp.jdk.$feature" } +
-        jdk.paths.get() + jdk.tokens.get() + node.tokens.get()
+        jdk.paths.get()
 
     companion object {
         const val NAME = "embeddedRuntime"
@@ -87,15 +87,12 @@ abstract class BinaryRepositorySettings {
 /** Where JDKs come from: the `javaApp.jdk.*` properties. */
 abstract class JdkSettings {
     abstract val distribution: Property<String>
-    abstract val url: Property<String>
+
+    /** `javaApp.jdk.source`: an `https:` or `file:` URL, `yum:` and a repository, or a repository's name. */
+    abstract val source: Property<String>
+
+    /** `javaApp.jdk.pattern`: the files in [source], or a YUM package's name. */
     abstract val pattern: Property<String>
-    abstract val localPath: Property<String>
-    abstract val localPattern: Property<String>
-    abstract val binaryRepo: Property<String>
-    abstract val binaryRepoPattern: Property<String>
-    abstract val revisionFormat: Property<String>
-    abstract val yumRepo: Property<String>
-    abstract val yumPackage: Property<String>
 
     /** `javaApp.jdk.reuseToolchain`: use the compile toolchain's JDK when it is exactly the pinned one. */
     abstract val reuseToolchain: Property<Boolean>
@@ -113,24 +110,10 @@ abstract class JdkSettings {
     fun path(feature: Int, target: String, path: String) =
         paths.put("javaApp.jdk.$feature.${Target.parse(target).id}.path", path)
 
-    /** `javaApp.jdk.token.<name>.<target or os>`: a pattern token of your own ([CustomTokens]). */
-    abstract val tokens: MapProperty<String, String>
-
-    /** `token("plat", mapOf("linux" to "l64", "windows" to "w64"))` for `[plat]` in a pattern. */
-    fun token(name: String, values: Map<String, String>) =
-        values.forEach { (where, value) -> tokens.put("javaApp.jdk.token.$name.$where", value) }
-
     internal fun properties(): Map<String, Provider<*>> = mapOf(
         "javaApp.jdk.distribution" to distribution,
-        "javaApp.jdk.url" to url,
+        "javaApp.jdk.source" to source,
         "javaApp.jdk.pattern" to pattern,
-        "javaApp.jdk.localPath" to localPath,
-        "javaApp.jdk.localPattern" to localPattern,
-        "javaApp.jdk.binaryRepo" to binaryRepo,
-        "javaApp.jdk.binaryRepoPattern" to binaryRepoPattern,
-        "javaApp.jdk.revisionFormat" to revisionFormat,
-        "javaApp.jdk.yumRepo" to yumRepo,
-        "javaApp.jdk.yumPackage" to yumPackage,
         "javaApp.jdk.reuseToolchain" to reuseToolchain,
     )
 }
@@ -138,23 +121,17 @@ abstract class JdkSettings {
 /** Where Node.js and npm packages come from: the `nodeApp.node.*` and `nodeApp.npm.*` properties. */
 abstract class NodeSettings {
     abstract val version: Property<String>
-    abstract val url: Property<String>
+
+    /** `nodeApp.node.source`: an `https:` or `file:` URL, or a repository's name. */
+    abstract val source: Property<String>
     abstract val pattern: Property<String>
-    abstract val binaryRepoPattern: Property<String>
     abstract val npmRegistry: Property<String>
     abstract val npmCaFile: Property<String>
 
-    /** `nodeApp.node.token.<name>.<target or os>`: a pattern token of your own ([CustomTokens]). */
-    abstract val tokens: MapProperty<String, String>
-
-    fun token(name: String, values: Map<String, String>) =
-        values.forEach { (where, value) -> tokens.put("nodeApp.node.token.$name.$where", value) }
-
     internal fun properties(): Map<String, Provider<*>> = mapOf(
         "nodeApp.node.version" to version,
-        "nodeApp.node.url" to url,
+        "nodeApp.node.source" to source,
         "nodeApp.node.pattern" to pattern,
-        "nodeApp.node.binaryRepoPattern" to binaryRepoPattern,
         "nodeApp.npm.registry" to npmRegistry,
         "nodeApp.npm.caFile" to npmCaFile,
     )

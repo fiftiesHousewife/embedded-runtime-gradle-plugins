@@ -127,28 +127,6 @@ class TargetTokensTest {
     }
 
     @Test
-    fun `tokens of your own take a value per OS, or per target, which wins`() {
-        val tokens = CustomTokens.parse(
-            mapOf(
-                "javaApp.jdk.token.plat.linux" to "l64",
-                "javaApp.jdk.token.plat.windows" to "w64",
-                "javaApp.jdk.token.plat.linux-aarch64" to "la64",
-                "javaApp.jdk.token.ignored" to "no name and place",
-            ),
-            "javaApp.jdk.token.",
-        )
-        val repository = RuntimeRepository.curated("jdks", URI("$REPO/"), "jdk-[revision]-[plat].zip", "oracle")
-        fun file(target: Target) =
-            repository.downloadUri(repository.curated("jdk", "21.0.5", target, tokens.forTarget(target)))
-                .toString().removePrefix("$REPO/")
-        assertAll(
-            { assertEquals("jdk-21.0.5-l64.zip", file(Target.LINUX_X64)) },
-            { assertEquals("jdk-21.0.5-la64.zip", file(Target.LINUX_AARCH64)) },
-            { assertEquals("jdk-21.0.5-w64.zip", file(Target.WINDOWS_X64)) },
-        )
-    }
-
-    @Test
     fun `a token with no value fails, naming the tokens there are`() {
         val repository = RuntimeRepository.curated("jdks", URI("$REPO/"), "jdk-[revision]-[plat].zip", "oracle")
         val failure =

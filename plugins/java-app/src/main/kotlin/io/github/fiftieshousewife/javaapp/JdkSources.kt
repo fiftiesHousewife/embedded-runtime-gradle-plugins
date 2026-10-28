@@ -1,18 +1,17 @@
 package io.github.fiftieshousewife.javaapp
 
 import io.github.fiftieshousewife.appcore.BinaryRepository
-import io.github.fiftieshousewife.appcore.CustomTokens
 import io.github.fiftieshousewife.appcore.RuntimeArtifact
 import io.github.fiftieshousewife.appcore.RuntimeRepository
+import io.github.fiftieshousewife.appcore.RuntimeSource
 import io.github.fiftieshousewife.appcore.Target
 import io.github.fiftieshousewife.appcore.setting
-import io.github.fiftieshousewife.appcore.settingsPrefixedBy
 import org.gradle.api.GradleException
 import org.gradle.api.provider.ProviderFactory
 import java.io.File
 import java.net.URI
 
-/** First match wins: a JDK by path ([localJdk]), [LOCAL_PATH], the curated binary repository, the vendor's site. */
+/** A JDK by path ([localJdk]) wins; else [SOURCE], else the curated binary repository, else the vendor's site. */
 class JdkSources(
     val distribution: JdkDistribution,
     private val location: JdkLocation = JdkLocation.Public(),
@@ -44,7 +43,7 @@ class JdkSources(
 
         // Renamed on upload, so the vendor's own naming is irrelevant here.
         is JdkLocation.Curated ->
-            repository.curated("jdk", location.revision(version), target, location.tokens(version, target))
+            repository.curated("jdk", location.revision(version), target, version.tokens)
     }
 
     /** Gradle can't provision a toolchain from an RPM, so the resolver leaves those to the machine's own JDKs. */
@@ -58,7 +57,7 @@ class JdkSources(
             "jmods",
             location.revision(version),
             target,
-            location.tokens(version, target),
+            version.tokens,
         )
     }
 
@@ -69,30 +68,12 @@ class JdkSources(
 
         const val VERSION_PREFIX = "javaApp.jdk."
 
-        /** Together these reach any tree, a mirror or an internal build server, without a plugin release. */
-        const val PUBLIC_URL = "javaApp.jdk.url"
-        const val PUBLIC_PATTERN = "javaApp.jdk.pattern"
-
-        const val BINARY_REPO_PATTERN = "javaApp.jdk.binaryRepoPattern"
-
-        const val BINARY_REPO_NAME = "javaApp.jdk.binaryRepo"
-
-        /** From [JdkVersion.format]'s tokens: `[feature]_[update]` names `jdk21_5…` for 21.0.5. */
-        const val REVISION_FORMAT = "javaApp.jdk.revisionFormat"
-
-        /** A repository beside the binary repository's (`yum-local/rhel/9`), or a full `https:` / `file:` URL. */
-        const val YUM_REPO = "javaApp.jdk.yumRepo"
-
-        const val YUM_PACKAGE = "javaApp.jdk.yumPackage"
+        /** Where JDKs come from ([RuntimeSource]); [PATTERN] names the files, or the package, in it. */
+        const val SOURCE = "javaApp.jdk.source"
+        const val PATTERN = "javaApp.jdk.pattern"
 
         /** Reuse the compile toolchain's JDK when it is exactly the pin, rather than download another copy. */
         const val REUSE_TOOLCHAIN = "javaApp.jdk.reuseToolchain"
-
-        /** `javaApp.jdk.token.plat.linux=l64`: an organisation's own token for curated and local patterns. */
-        const val TOKEN_PREFIX = "javaApp.jdk.token."
-
-        const val LOCAL_PATH = "javaApp.jdk.localPath"
-        const val LOCAL_PATTERN = "javaApp.jdk.localPattern"
 
         /** A directory or an archive; it wins over every other source for that feature release and target. */
         fun pathProperty(feature: Int, target: Target) = "$VERSION_PREFIX$feature.${target.id}.path"
@@ -102,45 +83,59 @@ class JdkSources(
 
         fun from(providers: ProviderFactory): JdkSources {
             val distribution = providers.setting(DISTRIBUTION)?.let(JdkDistribution::parse) ?: JdkDistribution.DEFAULT
-            return JdkSources(distribution, location(providers), yum(providers, distribution))
+            val source = RuntimeSource.parse(SOURCE, providers.setting(SOURCE))
+            val pattern = providers.setting(PATTERN)
+            val binaryRepo = BinaryRepository.from(providers)
+            return if (source is RuntimeSource.Yum) {
+                JdkSources(
+                    distribution,
+                    location(RuntimeSource.Default, null, binaryRepo),
+                    yum(source, pattern, binaryRepo, distribution),
+                )
+            } else {
+                JdkSources(distribution, location(source, pattern, binaryRepo))
+            }
         }
 
-        private fun yum(providers: ProviderFactory, distribution: JdkDistribution): JdkYumSource? {
-            val repo = providers.setting(YUM_REPO) ?: return null
-            val url = if (Regex("^(https?|file):").containsMatchIn(repo)) {
-                URI.create(repo.trimEnd('/') + "/")
+        private fun yum(
+            source: RuntimeSource.Yum,
+            pattern: String?,
+            binaryRepo: BinaryRepository?,
+            distribution: JdkDistribution,
+        ): JdkYumSource {
+            val url = if (source.isUrl) {
+                URI.create(source.repository + "/")
             } else {
-                BinaryRepository.from(providers)?.repo(repo) ?: throw GradleException(
-                    "$YUM_REPO=$repo names a repository beside the binary repository, but none is configured: " +
-                        "set binaryRepo.repository or binaryRepo.url, or give $YUM_REPO as a full URL",
-                )
+                requireBinaryRepo(binaryRepo, source.repository).repo(source.repository)
             }
-            val name = providers.setting(YUM_PACKAGE) ?: distribution.yumPackage ?: throw GradleException(
-                "$YUM_REPO is set but not $YUM_PACKAGE, the JDK package's name in it " +
+            val name = pattern ?: distribution.yumPackage ?: throw GradleException(
+                "$SOURCE is a YUM repository; set $PATTERN to the JDK package's name in it " +
                     "(e.g. java-[feature]-openjdk-devel)",
             )
-            return JdkYumSource(url, name, providers.setting(REVISION_FORMAT))
+            return JdkYumSource(url, name)
         }
 
-        private fun location(providers: ProviderFactory): JdkLocation {
-            val localPath = providers.setting(LOCAL_PATH)
-            val binaryRepo = BinaryRepository.from(providers)
-            val revision = providers.setting(REVISION_FORMAT)
-            val tokens = CustomTokens.parse(providers.settingsPrefixedBy(TOKEN_PREFIX), TOKEN_PREFIX)
-            return when {
-                localPath != null -> JdkLocation.local(File(localPath))
-                    .copy(pattern = providers.setting(LOCAL_PATTERN), revisionFormat = revision, customTokens = tokens)
+        internal fun location(source: RuntimeSource, pattern: String?, binaryRepo: BinaryRepository?): JdkLocation =
+            when (source) {
+                is RuntimeSource.Mirror -> JdkLocation.Public(source.url, pattern)
 
-                binaryRepo != null -> JdkLocation.binaryRepo(binaryRepo, providers.setting(BINARY_REPO_NAME))
-                    .copy(
-                        pattern = providers.setting(BINARY_REPO_PATTERN),
-                        revisionFormat = revision,
-                        customTokens = tokens,
-                    )
+                is RuntimeSource.Directory -> JdkLocation.local(source.uri).copy(pattern = pattern)
 
-                else -> JdkLocation.Public(providers.setting(PUBLIC_URL), providers.setting(PUBLIC_PATTERN))
+                is RuntimeSource.Repository ->
+                    JdkLocation.binaryRepo(
+                        requireBinaryRepo(binaryRepo, source.name),
+                        source.name,
+                    ).copy(pattern = pattern)
+
+                else -> binaryRepo?.let { JdkLocation.binaryRepo(it).copy(pattern = pattern) }
+                    ?: JdkLocation.Public(null, pattern)
             }
-        }
+
+        private fun requireBinaryRepo(binaryRepo: BinaryRepository?, name: String) =
+            binaryRepo ?: throw GradleException(
+                "$SOURCE names the repository $name beside the binary repository, but none is configured: " +
+                    "set binaryRepo.repository or binaryRepo.url, or give $SOURCE as a URL",
+            )
     }
 }
 
@@ -149,32 +144,21 @@ sealed interface JdkLocation {
     data class Public(val url: String? = null, val pattern: String? = null) : JdkLocation
 
     /** Archives renamed to the curated layout: the binary repository's runtimes repository, or a local directory. */
-    data class Curated(
-        val name: String,
-        val baseUrl: URI,
-        val pattern: String? = null,
-        /** How `[revision]` spells the version; see [JdkSources.REVISION_FORMAT]. */
-        val revisionFormat: String? = null,
-        val customTokens: CustomTokens = CustomTokens(emptyMap()),
-    ) : JdkLocation {
-        fun revision(version: JdkVersion): String = revisionFormat?.let(version::format) ?: version.underscored
-
-        fun tokens(version: JdkVersion, target: Target): Map<String, String> =
-            version.tokens + customTokens.forTarget(target)
+    data class Curated(val name: String, val baseUrl: URI, val pattern: String? = null) : JdkLocation {
+        fun revision(version: JdkVersion): String = version.underscored
     }
 
     companion object {
         fun binaryRepo(binaryRepo: BinaryRepository, repository: String? = null) =
             Curated("binaryRepoJdks", repository?.let(binaryRepo::repo) ?: binaryRepo.runtimesUrl)
 
-        fun local(directory: File) =
-            Curated("localJdks", RuntimeRepository.slash(directory.absoluteFile.toURI().toString()))
+        fun local(directory: URI) = Curated("localJdks", directory)
     }
 }
 
-/** The version is spelled by [versionFormat], or else is the pin without its build (`21.0.5`). */
-data class JdkYumSource(val repository: URI, val packageName: String, val versionFormat: String? = null) {
+/** The package's version is the pin without its build (`21.0.5`). */
+data class JdkYumSource(val repository: URI, val packageName: String) {
     fun packageName(feature: Int): String = packageName.replace("[feature]", feature.toString())
 
-    fun version(version: JdkVersion): String = versionFormat?.let(version::format) ?: version.value.substringBefore('+')
+    fun version(version: JdkVersion): String = version.value.substringBefore('+')
 }

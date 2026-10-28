@@ -1,7 +1,7 @@
 package io.github.fiftieshousewife.javaapp
 
 import io.github.fiftieshousewife.appcore.BinaryRepository
-import io.github.fiftieshousewife.appcore.CustomTokens
+import io.github.fiftieshousewife.appcore.RuntimeSource
 import io.github.fiftieshousewife.appcore.Target
 import org.junit.jupiter.api.Assertions.assertAll
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -82,7 +82,7 @@ class JdkLocationTest {
 
     @Test
     fun `a shared local directory is read in the curated layout, with underscores for plus`() {
-        val local = JdkSources(JdkDistribution.TEMURIN, JdkLocation.local(shared))
+        val local = JdkSources(JdkDistribution.TEMURIN, JdkLocation.local(shared.toURI()))
         assertEquals(
             shared.toURI().resolve("temurin/jdk/21.0.12.1_1/jdk-21.0.12.1_1-linux-x64.tar.gz").toString(),
             uri(local, "21.0.12.1+1"),
@@ -93,7 +93,7 @@ class JdkLocationTest {
     fun `Temurin 24 and later fetch jmods beside the JDK, from the vendor or the curated tree`() {
         val version = JdkVersion("25.0.4.1+1")
         val public = JdkSources(JdkDistribution.TEMURIN)
-        val curated = JdkSources(JdkDistribution.TEMURIN, JdkLocation.local(shared))
+        val curated = JdkSources(JdkDistribution.TEMURIN, JdkLocation.local(shared.toURI()))
         assertAll(
             { assertTrue(JdkDistribution.TEMURIN.separateJmods(25)) },
             { assertFalse(JdkDistribution.TEMURIN.separateJmods(21)) },
@@ -115,27 +115,47 @@ class JdkLocationTest {
     }
 
     @Test
-    fun `a corporate pattern names the version and platform directly, with tokens of its own`() {
-        val tokens = CustomTokens(mapOf("plat" to mapOf("linux" to "l64", "windows" to "w64")))
+    fun `a corporate pattern names the version and platform directly`() {
         val sources = JdkSources(
             JdkDistribution.ORACLE,
             JdkLocation.binaryRepo(binaryRepo).copy(
-                pattern = "java/[feature]/jdk-[feature].[interim].[update]_[plat]_bin.[ext]",
-                customTokens = tokens,
+                pattern = "java/[feature]/jdk-[feature].[interim].[update]_[os]-[arch]_bin.[ext]",
             ),
         )
         val version = JdkVersion("21.0.5")
         assertAll(
             {
                 assertEquals(
-                    "https://repo.example.com/runtimes/java/21/jdk-21.0.5_l64_bin.tar.gz",
+                    "https://repo.example.com/runtimes/java/21/jdk-21.0.5_linux-x64_bin.tar.gz",
                     sources.downloadUri(version, Target.LINUX_X64).toString(),
                 )
             },
             {
                 assertEquals(
-                    "https://repo.example.com/runtimes/java/21/jdk-21.0.5_w64_bin.zip",
+                    "https://repo.example.com/runtimes/java/21/jdk-21.0.5_windows-x64_bin.zip",
                     sources.downloadUri(version, Target.WINDOWS_X64).toString(),
+                )
+            },
+        )
+    }
+
+    @Test
+    fun `each source is read as a location, with the binary repository's tree the default`() {
+        val location = { source: RuntimeSource, repo: BinaryRepository? -> JdkSources.location(source, "p", repo) }
+        assertAll(
+            { assertEquals(JdkLocation.Public(mirror, "p"), location(RuntimeSource.Mirror(mirror), binaryRepo)) },
+            { assertEquals(JdkLocation.Public(null, "p"), location(RuntimeSource.Default, null)) },
+            {
+                assertEquals(
+                    JdkLocation.binaryRepo(binaryRepo).copy(pattern = "p"),
+                    location(RuntimeSource.Default, binaryRepo),
+                )
+            },
+            {
+                assertEquals(
+                    "https://repo.example.com/jdks-local/",
+                    (location(RuntimeSource.Repository("jdks-local"), binaryRepo) as JdkLocation.Curated).baseUrl
+                        .toString(),
                 )
             },
         )

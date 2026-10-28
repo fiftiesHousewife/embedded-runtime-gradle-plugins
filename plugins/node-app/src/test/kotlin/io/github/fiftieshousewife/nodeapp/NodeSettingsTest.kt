@@ -12,15 +12,14 @@ class NodeSettingsTest {
         val settings = ProjectBuilder.builder().build().objects.newInstance(EmbeddedRuntimeSettings::class.java)
         settings.node.apply {
             version.set(NodeSources.VERSION)
-            url.set(NodeSources.PUBLIC_URL)
-            pattern.set(NodeSources.PUBLIC_PATTERN)
-            binaryRepoPattern.set(NodeSources.BINARY_REPO_PATTERN)
+            source.set(NodeSources.SOURCE)
+            pattern.set(NodeSources.PATTERN)
             npmRegistry.set(NodeSources.NPM_REGISTRY)
             npmCaFile.set(NodeSources.NPM_CA_FILE)
         }
         settings.binaryRepository.npmRepo.set(NodeSources.BINARY_REPO_NPM)
         val properties = settings.asProperties()
-        assertEquals(7, properties.size)
+        assertEquals(6, properties.size)
         properties.forEach { (name, value) -> assertEquals(name, value) }
     }
 }

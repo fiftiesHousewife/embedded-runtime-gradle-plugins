@@ -14,15 +14,8 @@ class EmbeddedRuntimeSettingsTest {
     fun `every JDK setter is named for its Gradle property`() {
         settings.jdk.apply {
             distribution.set(JdkSources.DISTRIBUTION)
-            url.set(JdkSources.PUBLIC_URL)
-            pattern.set(JdkSources.PUBLIC_PATTERN)
-            localPath.set(JdkSources.LOCAL_PATH)
-            localPattern.set(JdkSources.LOCAL_PATTERN)
-            binaryRepo.set(JdkSources.BINARY_REPO_NAME)
-            binaryRepoPattern.set(JdkSources.BINARY_REPO_PATTERN)
-            revisionFormat.set(JdkSources.REVISION_FORMAT)
-            yumRepo.set(JdkSources.YUM_REPO)
-            yumPackage.set(JdkSources.YUM_PACKAGE)
+            source.set(JdkSources.SOURCE)
+            pattern.set(JdkSources.PATTERN)
         }
         settings.asProperties().forEach { (name, value) -> assertEquals(name, value) }
     }

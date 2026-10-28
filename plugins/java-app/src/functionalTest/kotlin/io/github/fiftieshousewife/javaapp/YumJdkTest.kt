@@ -39,8 +39,8 @@ class YumJdkTest {
             javaApp = "$FIXTURE_MODULES\ntargets(\"${target.id}\")",
             publishJdk = false,
             properties = listOf(
-                JdkSources.YUM_REPO to repository.toURI().toString(),
-                JdkSources.YUM_PACKAGE to "jdk-[feature]",
+                JdkSources.SOURCE to "yum:${repository.toURI()}",
+                JdkSources.PATTERN to "jdk-[feature]",
                 // Gradle can't provision a compiler from an RPM: it compiles with the installed JDK.
                 "org.gradle.java.installations.paths" to JdkFixture.home.absolutePath,
             ) + JdkFixture.hostJdkUnlessLinux(),
@@ -93,8 +93,8 @@ class YumJdkTest {
             JavaServiceOptions(
                 publishJdk = false,
                 properties = listOf(
-                    JdkSources.YUM_REPO to repository(pin).toURI().toString(),
-                    JdkSources.YUM_PACKAGE to "jdk-[feature]",
+                    JdkSources.SOURCE to "yum:${repository(pin).toURI()}",
+                    JdkSources.PATTERN to "jdk-[feature]",
                     JdkSources.REUSE_TOOLCHAIN to "false",
                 ),
             ),
@@ -102,7 +102,10 @@ class YumJdkTest {
         val output = project.buildAndFail("build").output
         assertAll(
             {
-                assertTrue(output.contains("No JDK for ${host.id}: javaApp.jdk.yumRepo serves Linux JDKs only"), output)
+                assertTrue(
+                    output.contains("No JDK for ${host.id}: javaApp.jdk.source=yum:… serves Linux JDKs only"),
+                    output,
+                )
             },
             { assertTrue(output.contains("reusing it is turned off (javaApp.jdk.reuseToolchain=false)"), output) },
             { assertTrue(output.contains(JdkSources.pathProperty(JdkFixture.javaFeature, host)), output) },

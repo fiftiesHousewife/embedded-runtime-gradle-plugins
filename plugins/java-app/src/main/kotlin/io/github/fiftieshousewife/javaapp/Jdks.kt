@@ -123,7 +123,7 @@ internal class Jdks(
 
     /** A YUM repository or `.rpm` pattern holds Linux JDKs only; this says why the toolchain's wasn't used. */
     private fun linuxOnly(target: Target, feature: Int, sources: JdkSources): GradleException {
-        val source = if (sources.yum != null) JdkSources.YUM_REPO else "the .rpm pattern"
+        val source = if (sources.yum != null) "${JdkSources.SOURCE}=yum:…" else "the .rpm pattern"
         return GradleException(
             "No JDK for ${target.id}: $source serves Linux JDKs only. The compile toolchain's JDK can't be used: " +
                 "${whyNotToolchainJdk(target, sources.distribution, feature)}. Install the pinned JDK where Gradle " +

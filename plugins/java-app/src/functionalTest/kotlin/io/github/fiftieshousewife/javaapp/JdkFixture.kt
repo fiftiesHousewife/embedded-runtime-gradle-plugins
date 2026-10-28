@@ -21,7 +21,7 @@ object JdkFixture {
 
     /** Points the build at the fake site and pins [jdkVersion]. */
     fun properties(project: TestProject) = arrayOf(
-        JdkSources.PUBLIC_URL to
+        JdkSources.SOURCE to
             project.sources
                 .resolve("adoptium")
                 .toURI()

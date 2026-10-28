@@ -2,47 +2,55 @@ package io.github.fiftieshousewife.nodeapp
 
 import io.github.fiftieshousewife.appcore.Arch
 import io.github.fiftieshousewife.appcore.BinaryRepository
-import io.github.fiftieshousewife.appcore.CustomTokens
 import io.github.fiftieshousewife.appcore.Os
 import io.github.fiftieshousewife.appcore.RuntimeArtifact
 import io.github.fiftieshousewife.appcore.RuntimeRepository
+import io.github.fiftieshousewife.appcore.RuntimeSource
 import io.github.fiftieshousewife.appcore.Target
 import io.github.fiftieshousewife.appcore.setting
-import io.github.fiftieshousewife.appcore.settingsPrefixedBy
+import org.gradle.api.GradleException
 import org.gradle.api.provider.ProviderFactory
 import java.net.URI
 
 /** nodejs.org and the public npm registry, or the binary repository's curated tree and npm repository. */
 class NodeSources(private val binaryRepo: BinaryRepository?, private val overrides: NodeOverrides = NodeOverrides()) {
-    val repository: RuntimeRepository
-        get() =
-            if (binaryRepo == null) {
-                RuntimeRepository(
-                    "nodejsDist",
-                    RuntimeRepository.slash(overrides.publicUrl),
-                    overrides.publicPattern ?: DEFAULT_PATTERN,
-                    GROUP,
-                )
-            } else {
-                RuntimeRepository.curated(
-                    "binaryRepoNode",
-                    binaryRepo.runtimesUrl,
-                    overrides.binaryRepoPattern ?: RuntimeRepository.CURATED_PATTERN,
-                    GROUP,
-                )
-            }
+    /** Where Node.js comes from: a mirror keeps nodejs.org's layout, anything else is curated. */
+    private val curatedAt: URI? = when (val source = overrides.source) {
+        is RuntimeSource.Mirror -> null
 
-    fun artifact(version: String, target: Target): RuntimeArtifact = if (binaryRepo == null) {
+        is RuntimeSource.Directory -> source.uri
+
+        is RuntimeSource.Repository -> requireBinaryRepo().repo(source.name)
+
+        is RuntimeSource.Yum -> throw GradleException(
+            "$SOURCE can't be a YUM repository: Node.js isn't packaged as an RPM",
+        )
+
+        RuntimeSource.Default -> binaryRepo?.runtimesUrl
+    }
+
+    val repository: RuntimeRepository
+        get() = curatedAt?.let {
+            val name = if (overrides.source is RuntimeSource.Directory) "localNode" else "binaryRepoNode"
+            RuntimeRepository.curated(name, it, overrides.pattern ?: RuntimeRepository.CURATED_PATTERN, GROUP)
+        } ?: RuntimeRepository(
+            "nodejsDist",
+            RuntimeRepository.slash((overrides.source as? RuntimeSource.Mirror)?.url ?: DEFAULT_URL),
+            overrides.pattern ?: DEFAULT_PATTERN,
+            GROUP,
+        )
+
+    fun artifact(version: String, target: Target): RuntimeArtifact = if (curatedAt == null) {
         RuntimeArtifact(GROUP, "node", version, "node", distClassifier(target), target.archiveExtension)
     } else {
         // Renamed on upload to the archive's own target ids, as for JDKs.
-        repository.curated(
-            "node",
-            version,
-            target,
-            mapOf("version" to version) + overrides.customTokens.forTarget(target),
-        )
+        repository.curated("node", version, target, mapOf("version" to version))
     }
+
+    private fun requireBinaryRepo() = binaryRepo ?: throw GradleException(
+        "$SOURCE names a repository beside the binary repository, but none is configured: " +
+            "set binaryRepo.repository or binaryRepo.url, or give $SOURCE as a URL",
+    )
 
     val npmRegistry: URI
         get() = binaryRepo?.repo(overrides.binaryRepoNpm) ?: RuntimeRepository.slash(overrides.publicNpmRegistry)
@@ -60,16 +68,12 @@ class NodeSources(private val binaryRepo: BinaryRepository?, private val overrid
         /** `nodeApp.node.version=24.22.1` overrides the catalogue pin. */
         const val VERSION = "nodeApp.node.version"
 
-        const val PUBLIC_URL = "nodeApp.node.url"
-        const val PUBLIC_PATTERN = "nodeApp.node.pattern"
-
-        const val BINARY_REPO_PATTERN = "nodeApp.node.binaryRepoPattern"
+        /** Where Node.js comes from ([RuntimeSource]); [PATTERN] names the files in it. */
+        const val SOURCE = "nodeApp.node.source"
+        const val PATTERN = "nodeApp.node.pattern"
 
         const val NPM_REGISTRY = "nodeApp.npm.registry"
         const val BINARY_REPO_NPM = "binaryRepo.repo.npm"
-
-        /** `nodeApp.node.token.<name>.<target or os>=<value>`: a pattern token of your own. */
-        const val TOKEN_PREFIX = "nodeApp.node.token."
 
         /** npm does not use the JVM trust store, so it needs the corporate CAs as a PEM bundle of their own. */
         const val NPM_CA_FILE = "nodeApp.npm.caFile"
@@ -78,12 +82,10 @@ class NodeSources(private val binaryRepo: BinaryRepository?, private val overrid
             binaryRepo = BinaryRepository.from(providers),
             overrides =
             NodeOverrides(
-                publicUrl = providers.setting(PUBLIC_URL) ?: DEFAULT_URL,
-                publicPattern = providers.setting(PUBLIC_PATTERN),
-                binaryRepoPattern = providers.setting(BINARY_REPO_PATTERN),
+                source = RuntimeSource.parse(SOURCE, providers.setting(SOURCE)),
+                pattern = providers.setting(PATTERN),
                 publicNpmRegistry = providers.setting(NPM_REGISTRY) ?: DEFAULT_NPM_REGISTRY,
                 binaryRepoNpm = providers.setting(BINARY_REPO_NPM) ?: DEFAULT_BINARY_REPO_NPM,
-                customTokens = CustomTokens.parse(providers.settingsPrefixedBy(TOKEN_PREFIX), TOKEN_PREFIX),
             ),
         )
 
@@ -113,11 +115,8 @@ class NodeSources(private val binaryRepo: BinaryRepository?, private val overrid
 }
 
 data class NodeOverrides(
-    val publicUrl: String = NodeSources.DEFAULT_URL,
-    val publicPattern: String? = null,
-    val binaryRepoPattern: String? = null,
+    val source: RuntimeSource = RuntimeSource.Default,
+    val pattern: String? = null,
     val publicNpmRegistry: String = NodeSources.DEFAULT_NPM_REGISTRY,
     val binaryRepoNpm: String = NodeSources.DEFAULT_BINARY_REPO_NPM,
-    /** The organisation's own tokens for [binaryRepoPattern]; see [NodeSources.TOKEN_PREFIX]. */
-    val customTokens: CustomTokens = CustomTokens(emptyMap()),
 )

@@ -1,12 +1,11 @@
 package io.github.fiftieshousewife.appcore
 
 import org.gradle.api.GradleException
-import java.io.Serializable
 
 /**
- * Tokens a runtime file pattern may use besides Ivy's own: the target's, the version's and the organisation's
- * ([CustomTokens]). Gradle's Ivy repositories know only their own, so the stretch from the first other token
- * to the last is handed to Ivy as `[classifier]`, and each artifact carries it rendered ([render]).
+ * Tokens a runtime file pattern may use besides Ivy's own: the target's and the version's. Gradle's Ivy
+ * repositories know only their own, so the stretch from the first other token to the last is handed to Ivy
+ * as `[classifier]`, and each artifact carries it rendered ([render]).
  */
 object TargetTokens {
     private val IVY = setOf("organisation", "module", "revision", "artifact", "ext", "type")
@@ -44,29 +43,4 @@ object TargetTokens {
                     (forTarget.keys + others.keys).joinToString { "[$it]" },
             )
         }
-}
-
-/**
- * Set as `<prefix><name>.<target or os>=<value>`, such as `javaApp.jdk.token.plat.linux=l64`; a target's own
- * value wins over its OS's.
- */
-data class CustomTokens(val values: Map<String, Map<String, String>>) : Serializable {
-    fun forTarget(target: Target): Map<String, String> = values.mapNotNull { (name, byTarget) ->
-        (byTarget[target.id] ?: byTarget[target.os.id])?.let { name to it }
-    }.toMap()
-
-    companion object {
-        private const val serialVersionUID = 1L
-
-        fun parse(settings: Map<String, String>, prefix: String) = CustomTokens(
-            settings.filterKeys {
-                it.startsWith(prefix) &&
-                    it.count { c -> c == '.' } >= prefix.count { c -> c == '.' } + 1
-            }
-                .entries.groupBy({ it.key.removePrefix(prefix).substringBefore('.') }) {
-                    it.key.removePrefix(prefix).substringAfter('.') to it.value
-                }
-                .mapValues { (_, pairs) -> pairs.toMap() },
-        )
-    }
 }

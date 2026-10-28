@@ -7,7 +7,7 @@ import org.gradle.jvm.toolchain.JvmVendorSpec
 
 /**
  * A JDK vendor and its download layout. Both the compile toolchain and the embedded runtime come
- * from the one chosen (`javaApp.jdk.distribution`), so they can't disagree; `javaApp.jdk.url` and
+ * from the one chosen (`javaApp.jdk.distribution`), so they can't disagree; `javaApp.jdk.source` and
  * `javaApp.jdk.pattern` reach a layout this enum doesn't know without a plugin release.
  *
  * Oracle's licence, not this plugin, decides whether an archive with an Oracle runtime may be
@@ -193,7 +193,7 @@ enum class JdkDistribution(
             entries.firstOrNull { it.id.equals(value.trim(), ignoreCase = true) }
                 ?: throw GradleException(
                     "Unsupported JDK distribution '$value'. Supported: ${entries.joinToString { it.id }}. " +
-                        "For any other vendor, keep one of these and override javaApp.jdk.url and javaApp.jdk.pattern.",
+                        "For any other vendor, keep one of these and set javaApp.jdk.source and javaApp.jdk.pattern.",
                 )
     }
 }

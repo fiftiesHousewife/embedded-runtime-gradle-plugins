@@ -10,7 +10,7 @@ object NodeFixture {
 
     /** Points the build at the fake site and pins [nodeVersion]. */
     fun properties(project: TestProject) = arrayOf(
-        NodeSources.PUBLIC_URL to
+        NodeSources.SOURCE to
             project.sources
                 .resolve("nodejs")
                 .toURI()

@@ -55,7 +55,7 @@ class BorrowedRepositoryTest {
                 credentials(PasswordCredentials::class)
             }
             """,
-            "binaryRepo.repository=corp\ncorpUsername=ci\ncorpPassword=s3cret\njavaApp.jdk.binaryRepo=yum-local\n",
+            "binaryRepo.repository=corp\ncorpUsername=ci\ncorpPassword=s3cret\njavaApp.jdk.source=yum-local\n",
         )
         assertTrue(repos.contains("REPO binaryRepoJdks $server/yum-local/ ci true"), repos.toString())
     }
@@ -108,7 +108,12 @@ class BorrowedRepositoryTest {
             tmp.resolve("app"),
             JavaServiceOptions(
                 publishJdk = false,
-                properties = listOf("binaryRepo.repository" to "corp", "corp_user" to "dev", "corp_token" to "s3cret"),
+                properties = listOf(
+                    JdkSources.SOURCE to "",
+                    "binaryRepo.repository" to "corp",
+                    "corp_user" to "dev",
+                    "corp_token" to "s3cret",
+                ),
             ),
         )
         project.file("settings.gradle.kts", settingsBorrowing(serverDir.resolve("maven-virtual")))

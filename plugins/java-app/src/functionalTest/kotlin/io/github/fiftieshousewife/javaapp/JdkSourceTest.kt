@@ -46,7 +46,7 @@ class JdkSourceTest {
         val target = JdkFixture.rpmTarget
         val repository = tmp.resolve("corporate-jdks")
         JdkFixture.publishRpm(repository, group = "temurin", target = target.id)
-        val project = rpmProject(repository, "[organisation]/jdk[revision]-64_[classifier].rpm")
+        val project = rpmProject(repository, "[organisation]/jdk[feature]_[update]-64_[classifier].rpm")
         val result = project.build("build")
         assertAll(
             { assertEquals(TaskOutcome.SUCCESS, result.task(":extractJdk${target.taskSuffix}")?.outcome) },
@@ -67,7 +67,7 @@ class JdkSourceTest {
         )
         named.parentFile.mkdirs()
         JdkFixture.publishRpm(tmp.resolve("rpm"), group = "x").copyTo(named)
-        val project = rpmProject(repository, "[organisation]/[os]/jdk[revision]-64_[os].[rpmArch].rpm")
+        val project = rpmProject(repository, "[organisation]/[os]/jdk[feature]_[update]-64_[os].[rpmArch].rpm")
         assertEquals(TaskOutcome.SUCCESS, project.build("build").task(":extractJdk${target.taskSuffix}")?.outcome)
     }
 
@@ -78,9 +78,8 @@ class JdkSourceTest {
             javaApp = "$FIXTURE_MODULES\ntargets(\"${JdkFixture.rpmTarget.id}\")",
             publishJdk = false,
             properties = listOf(
-                JdkSources.LOCAL_PATH to repository.absolutePath,
-                JdkSources.LOCAL_PATTERN to pattern,
-                JdkSources.REVISION_FORMAT to "[feature]_[update]",
+                JdkSources.SOURCE to repository.absolutePath,
+                JdkSources.PATTERN to pattern,
                 // Gradle can't provision a compiler from an RPM: it compiles with the installed JDK.
                 "org.gradle.java.installations.paths" to JdkFixture.home.absolutePath,
             ) + JdkFixture.hostJdkUnlessLinux(),
@@ -98,7 +97,7 @@ class JdkSourceTest {
             rootProject.name = "svc"
             embeddedRuntime {
                 jdk {
-                    localPath = "${shared.absolutePath.replace('\\', '/')}"
+                    source = "${shared.absolutePath.replace('\\', '/')}"
                     pin(${JdkFixture.javaFeature}, "${JdkFixture.jdkVersion}")
                 }
             }
@@ -116,7 +115,7 @@ class JdkSourceTest {
                 tmp,
                 JavaServiceOptions(
                     publishJdk = false,
-                    properties = listOf(JdkSources.LOCAL_PATH to shared.absolutePath),
+                    properties = listOf(JdkSources.SOURCE to shared.absolutePath),
                 ),
             )
         JdkFixture.publishCurated(shared)

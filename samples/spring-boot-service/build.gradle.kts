@@ -62,6 +62,8 @@ testing {
                     val context = tasks.named<Sync>("appDockerContext").map { it.destinationDir }
                     inputs.dir(context)
                     systemProperty("context", context.get().path)
+                    // Testcontainers reaches the engine's socket through JNA, which loads native code.
+                    jvmArgs("--enable-native-access=ALL-UNNAMED")
                     dependsOn(colima)
                     environment(colima.get().environment)
                 }

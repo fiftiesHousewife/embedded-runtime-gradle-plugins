@@ -18,7 +18,9 @@ docker run --rm -v "$rpm_file:/tmp/app.rpm:ro" -e NAME="$name" -e PORT=$port roc
   rpm -V "$NAME"
   id "$NAME"
   test "$(stat -c %U:%a /var/lib/$NAME)" = "$NAME:750"
-  rpm -qc "$NAME" | grep -q "^/etc/$NAME/"
+  test "$(stat -c %U:%G:%a /etc/$NAME)" = "root:$NAME:750"
+  # Default configuration only when the app ships some (configDefaults), and then all in /etc/<app>.
+  ! rpm -qc "$NAME" | grep -v "^/etc/$NAME/"
   export APP_ROOT=/var/lib/$NAME APP_CONF_DIR=/etc/$NAME APP_LOG_DIR=/var/log/$NAME APP_PORT=$PORT APP_LOG_TARGET=stdout
   runuser -u "$NAME" -- /opt/$NAME/bin/$NAME run & pid=$!
   for _ in $(seq 60); do runuser -u "$NAME" -- /opt/$NAME/bin/$NAME healthcheck && healthy=1 && break; sleep 1; done

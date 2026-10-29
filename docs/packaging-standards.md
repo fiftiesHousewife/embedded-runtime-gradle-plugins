@@ -21,7 +21,9 @@ forgotten.
 * **One top-level directory**, `<app>-<version>-<target>/`, so extracting never scatters files into
   the current directory, and two versions or targets can sit side by side.
 * **Unix permissions are recorded** in tar and zip alike, so `bin/<app>` and the runtime's
-  binaries stay executable. Windows ignores them.
+  binaries stay executable. Every file is readable by everyone, and executable by everyone when
+  its owner may run it, so a service account, or OpenShift's arbitrary user in group 0, can load a
+  library that reached the build readable by its owner alone. Windows ignores them.
 * **`tar.gz` is the default** for every target: Linux and macOS have `tar`, Windows 10 and later has
   `tar.exe`. `zip` suits teams that hand Windows builds to people using Explorer; `tar` suits
   pipelines that compress or layer the archive themselves.

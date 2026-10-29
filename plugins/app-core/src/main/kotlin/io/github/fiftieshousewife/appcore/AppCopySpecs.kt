@@ -24,7 +24,20 @@ object AppCopySpecs {
         }
     }
 
+    /** A jar 0600 in the Gradle cache would be unreadable to the service account or OpenShift's user. */
+    fun readableByAll(spec: CopySpec) {
+        spec.eachFile {
+            val mode = readable(permissions.toUnixNumeric())
+            permissions { unix(mode) }
+        }
+    }
+
+    internal fun readable(mode: Int): Int = mode or READ_ALL or if (mode and OWNER_EXECUTE != 0) EXECUTE_ALL else 0
+
     private const val OWNER_WRITE = 0b010_000_000
+    private const val OWNER_EXECUTE = 0b001_000_000
+    private const val READ_ALL = 0b100_100_100
+    private const val EXECUTE_ALL = 0b001_001_001
 
     fun dropTopLevelDirectory(spec: CopySpec, replacement: String? = null) {
         spec.eachFile {

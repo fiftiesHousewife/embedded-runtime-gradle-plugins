@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.function.Executable
+import java.io.File
 import java.net.URI
 
 class RuntimeSourceTest {
@@ -17,7 +18,7 @@ class RuntimeSourceTest {
                 " " to RuntimeSource.Default,
                 "https://mirror.example.com/adoptium" to RuntimeSource.Mirror("https://mirror.example.com/adoptium"),
                 "file:///srv/mirror" to RuntimeSource.Mirror("file:///srv/mirror"),
-                "/srv/jdks" to RuntimeSource.Directory(URI.create("file:/srv/jdks/")),
+                "/srv/jdks" to RuntimeSource.Directory(URI.create(File("/srv/jdks").toURI().toString() + "/")),
                 "jdks-local" to RuntimeSource.Repository("jdks-local"),
                 "yum:rhel/9/" to RuntimeSource.Yum("rhel/9"),
                 "yum:https://repo.example.com/yum" to RuntimeSource.Yum("https://repo.example.com/yum"),

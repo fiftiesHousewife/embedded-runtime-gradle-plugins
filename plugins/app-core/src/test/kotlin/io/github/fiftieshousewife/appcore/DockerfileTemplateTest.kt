@@ -63,7 +63,8 @@ class DockerfileTemplateTest {
         assertAll(
             { assertTrue(pinned.containsMatchIn(rendered), rendered) },
             { assertTrue(rendered.contains("FROM \${BASE_IMAGE}\n"), rendered) },
-            { assertTrue(rendered.contains("COPY --chown=1001:0 app/\${TARGETARCH}/ /app/"), rendered) },
+            { assertTrue(rendered.contains("COPY --chown=1001:0 layers/\${TARGETARCH}/runtime/ /"), rendered) },
+            { assertTrue(rendered.contains("COPY --chown=1001:0 layers/\${TARGETARCH}/app/ /"), rendered) },
             { assertTrue(rendered.contains("""ENTRYPOINT ["/app/bin/orders", "run"]"""), rendered) },
             { assertTrue(rendered.contains("""CMD ["/app/bin/orders", "healthcheck", "ready"]"""), rendered) },
         )

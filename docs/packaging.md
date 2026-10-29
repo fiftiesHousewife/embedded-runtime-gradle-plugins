@@ -146,15 +146,17 @@ USER 1001
 Commit it. Nothing in it changes from one build to the next: the release, its commit and that
 commit's time are `ARG`s (`APP_VERSION`, `GIT_COMMIT`, `CREATED`), which `appDockerContext` fills in
 for each build in the copy it writes to `build/docker-context/`, beside every Linux archive, one per
-CPU (`amd64`, `arm64`, the names container platforms use), split in two: the runtime under
-`runtime/<cpu>/` and the rest under `app/<cpu>/`, so the runtime is a layer of its own. A Dockerfile
-without the markers is entirely yours and is used as written; copy the app in it after
-`ARG TARGETARCH`, which BuildKit, Buildah and Podman set to the CPU being built (Docker's legacy
-builder, `DOCKER_BUILDKIT=0`, does not):
+CPU (`amd64`, `arm64`, the names container platforms use), split in two so the runtime is a layer
+of its own: `layers/<cpu>/runtime/` and `layers/<cpu>/app/`, each holding the paths it takes in the
+image, with fixed times, so each layer is the same in every build and every image of the app
+([Image layers and caching](caching.md)). The same files are also under `runtime/<cpu>/` and
+`app/<cpu>/`, for Dockerfiles written before. A Dockerfile without the markers is entirely yours
+and is used as written; copy the app in it after `ARG TARGETARCH`, which BuildKit, Buildah and
+Podman set to the CPU being built (Docker's legacy builder, `DOCKER_BUILDKIT=0`, does not):
 
 ```dockerfile
-COPY runtime/${TARGETARCH}/ /app/runtime/
-COPY app/${TARGETARCH}/ /app/
+COPY --chown=1001:0 layers/${TARGETARCH}/runtime/ /
+COPY --chown=1001:0 layers/${TARGETARCH}/app/ /
 ```
 
 A Dockerfile that copies all of `app/`, or the app without its runtime, is refused, since its image

@@ -13,7 +13,8 @@ loads the system `libz.so.1`. Without it the container exits at once with code 1
 ## 1. Start from the build context
 
 `./gradlew appDockerContext` writes `build/docker-context/`: the project's `Dockerfile`, each
-`Dockerfile.<name>` beside it, and every Linux archive split into `runtime/<cpu>/` and `app/<cpu>/`.
+`Dockerfile.<name>` beside it, and every Linux archive split into two image trees with fixed times,
+`layers/<cpu>/runtime/` and `layers/<cpu>/app/` (also, for older Dockerfiles, `runtime/<cpu>/` and `app/<cpu>/`).
 Create `Dockerfile.micro` next to `build.gradle.kts`, copied from the generated `Dockerfile`, and
 change it as below. Pin both images by tag and digest: the default Dockerfile's `ubi9/ubi-minimal`
 pin, and `ubi9/ubi-micro` from Red Hat's catalog (`docs/container-testing.md` in the plugins'
@@ -41,8 +42,9 @@ repository shows the query).
 - **Healthcheck**: give the probe JVM its own options, since each probe is a second JVM in the
   container's limits: `CMD ["env", "APP_JAVA_OPTS=-Xmx32m -Xss512k -XX:TieredStopAtLevel=1
   -XX:+UseSerialGC", "/app/bin/<app>", "healthcheck", "ready"]`.
-- Keep `USER 1001`, `COPY --chown=1001:0` for the runtime before the app, and the exec-form
-  `ENTRYPOINT`.
+- Then `COPY --chown=1001:0 layers/${TARGETARCH}/runtime/ /` and `COPY --chown=1001:0
+  layers/${TARGETARCH}/app/ /`: those layers are the same in every build and in every image of the
+  app. Keep `USER 1001` and the exec-form `ENTRYPOINT`.
 
 ## 3. Test it
 
@@ -57,6 +59,8 @@ Build the image from `build/docker-context` with Testcontainers' `ImageFromDocke
 - The image's own `HEALTHCHECK` command (from `inspectImageCmd`) exits 0.
 - `docker stop` ends it with exit code 143, well inside the grace period, and not `OOMKilled`.
 - The labels above are the app's, and `/licenses` holds the licence as a regular file.
+- The image's last two layers (`inspectImageCmd(...).getRootFS().getLayers()`) equal another image's
+  of the app, and a rebuild's with `withNoCache(true)`.
 
 On an Apple-silicon Mac, run the engine natively (`colima start --arch aarch64 --vm-type vz`) and
 include the `linux-aarch64` target: emulated x86_64 can't run UBI 9 (`CPU does not support x86-64-v2`).

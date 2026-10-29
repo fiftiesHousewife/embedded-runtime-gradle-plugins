@@ -1,8 +1,8 @@
 # Testing the container image
 
 `appDockerContext` gives you a build context: the project's `Dockerfile`, each `Dockerfile.<name>`
-beside it, and every Linux archive, its runtime under `runtime/<cpu>/` and the rest under
-`app/<cpu>/`. The plugins construct the Dockerfiles and the context; building images and running
+beside it, and every Linux archive, its runtime and the rest as image trees under
+`layers/<cpu>/runtime/` and `layers/<cpu>/app/` (and, as before, under `runtime/<cpu>/` and `app/<cpu>/`). The plugins construct the Dockerfiles and the context; building images and running
 them is left to your build or CI, since how and where images are built (Docker, Buildah, a CI
 service) differs from one organisation to the next. The
 [Spring Boot sample](../samples/spring-boot-service) shows a complete setup with
@@ -114,7 +114,7 @@ The sample's [`Dockerfile.micro`](../samples/spring-boot-service/Dockerfile.micr
 | The app's own `name`, `vendor`, `maintainer`, `version`, `release`, `summary`, `description`, `url`, `vcs-ref`, `build-date` | Otherwise UBI's labels describe Red Hat's image, and Red Hat's certification rejects Red Hat's name in an image that isn't theirs |
 | `/licenses/java-runtime/`, regular files | The terms the runtime is shipped under, where the certification looks |
 | `USER 1001`, `/var/lib/app` owned by 1001 and group 0 | Not root; writable by OpenShift's arbitrary user too |
-| Three layers on micro's own: zlib, the RPM database, `/var/lib/app` and `/licenses` together, then the runtime, then the app | One build stage prepares the first and the final stage copies it in whole, so the final stage runs nothing. With the app last, Docker's build cache rebuilds only the app's layer for a new release; a registry can't share the runtime's layer between builds yet, since the context's files carry the time each build wrote them |
+| Three layers on micro's own: zlib, the RPM database, `/var/lib/app` and `/licenses` together, then the runtime, then the app | One build stage prepares the first and the final stage copies it in whole, so the final stage runs nothing. The runtime's and the app's layers come from `layers/<cpu>/`, whose trees carry fixed times, so they are byte-identical in every build and in all three of the sample's images: a registry stores the runtime once, and a new release adds only the app's layer |
 | A `HEALTHCHECK` command with its own `APP_JAVA_OPTS` | Each probe starts a second JVM inside the container's limits; small options keep it quick and light, and the server's own options (an agent, a debug port) don't break every probe |
 
 The sample's [`MicroTest`](../samples/spring-boot-service/src/dockerTest/java/io/github/fiftieshousewife/samples/spring/MicroTest.java)

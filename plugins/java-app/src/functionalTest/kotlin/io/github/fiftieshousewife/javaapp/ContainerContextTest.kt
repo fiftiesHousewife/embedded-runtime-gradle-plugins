@@ -8,6 +8,10 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.io.File
+import java.nio.file.Files
+import java.nio.file.LinkOption
+import java.nio.file.attribute.FileTime
+import java.time.Instant
 
 /** `appDockerContext` and `appDockerfile`: what a container image is built from. */
 class ContainerContextTest {
@@ -40,7 +44,23 @@ class ContainerContextTest {
                     context.resolve("app/arm64/META-INF/app.json").readText().contains(""""target": "linux-aarch64""""),
                 )
             },
+            { assertTrue(context.resolve("layers/amd64/runtime/app/runtime/release").isFile) },
+            { assertTrue(context.resolve("layers/arm64/app/app/bin/svc").isFile) },
+            { assertFalse(context.resolve("layers/arm64/app/app/runtime").exists()) },
         )
+    }
+
+    @Test
+    fun `every file and directory in the context has one fixed time, so its image layers repeat`() {
+        val project =
+            javaService(tmp, JavaServiceOptions(javaApp = "$FIXTURE_MODULES\ntargets(\"$host\", \"linux-x64\")"))
+        JdkFixture.publish(project, "linux-x64")
+        project.build("appDockerContext")
+        val context = project.project.resolve("build/docker-context").toPath()
+        val times = Files.walk(context).use { paths ->
+            paths.map { Files.getLastModifiedTime(it, LinkOption.NOFOLLOW_LINKS) }.distinct().toList()
+        }
+        assertEquals(listOf(FileTime.from(Instant.parse("1980-02-01T00:00:00Z"))), times)
     }
 
     @Test

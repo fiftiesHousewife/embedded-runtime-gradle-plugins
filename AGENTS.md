@@ -174,6 +174,12 @@ support) was days old. `docs/packaging-standards.md` records the conventions; ch
 code. The publication is a real software component
 whose Gradle Module Metadata carries the standard OS and architecture attributes.
 
+**Container context** (`DockerContext`): beside `runtime/<cpu>/` and `app/<cpu>/`, kept for
+Dockerfiles written before, each layer is a tree in `layers/<cpu>/` holding the paths it takes in the
+image, and every file in the context gets one fixed time (`ContextTimes`). `COPY` records times, and
+copying into `/app/runtime/` creates `/app` with the build's own, so only a tree copied to `/` gives a
+runtime layer that is byte-identical across builds and images (`ContainerTest` checks it).
+
 **Configuration cache:** lambdas stored in tasks (`onlyIf`, providers resolved at execution) must
 not capture `AppWiring` or anything else holding the `Project`; copy what they need into locals.
 Configuration must not list a directory itself: the cache then takes the whole listing as an input,

@@ -11,6 +11,7 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.testcontainers.DockerClientFactory;
@@ -60,13 +61,37 @@ class ContainerTest {
         }
     }
 
-    /** Docker's own builder sets TARGETARCH only with BuildKit, which Testcontainers doesn't use: give it. */
+    /**
+     * The runtime's and the app's layers, each image's last two, are byte-identical in every image and
+     * in a rebuild without Docker's cache, so a registry stores them once and nodes pull them once.
+     */
+    @Test
+    void everyImageAndARebuildShareTheRuntimeAndAppLayers() throws IOException {
+        List<List<String>> shared = dockerfiles().map(dockerfile -> lastTwoLayers(image(dockerfile))).toList();
+        List<String> rebuilt = lastTwoLayers(image("Dockerfile", "rebuilt", true));
+        assertAll(
+            () -> assertEquals(1, shared.stream().distinct().count(), "runtime and app layers " + shared),
+            () -> assertEquals(shared.getFirst(), rebuilt, "rebuilt without the cache"));
+    }
+
+    private static List<String> lastTwoLayers(String image) {
+        List<String> layers = DockerClientFactory.instance().client().inspectImageCmd(image).exec()
+            .getRootFS().getLayers();
+        return layers.subList(layers.size() - 2, layers.size());
+    }
+
     static String image(String dockerfile) {
+        return image(dockerfile, dockerfile.toLowerCase().replace('.', '-'), false);
+    }
+
+    /** Docker's own builder sets TARGETARCH only with BuildKit, which Testcontainers doesn't use: give it. */
+    private static String image(String dockerfile, String name, boolean noCache) {
         String cpu = DockerClientFactory.instance().getInfo().getArchitecture().equals("aarch64") ? "arm64" : "amd64";
-        return new ImageFromDockerfile("spring-boot-service-" + dockerfile.toLowerCase().replace('.', '-'), false)
+        return new ImageFromDockerfile("spring-boot-service-" + name, false)
             .withFileFromPath(".", CONTEXT)
             .withDockerfilePath(dockerfile)
             .withBuildArg("TARGETARCH", cpu)
+            .withBuildImageCmdModifier(command -> command.withNoCache(noCache))
             .get();
     }
 }

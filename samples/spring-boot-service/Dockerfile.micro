@@ -53,11 +53,12 @@ LABEL org.opencontainers.image.title="spring-boot-service" \
       io.k8s.display-name="spring-boot-service" \
       io.k8s.description="Order service on Spring Boot with its own Oracle Java runtime"
 
-# Three layers on micro's own: the files above, the runtime, then the app, so the build cache keeps
-# the first two for a new release. Nothing runs in this stage, so it needs no emulation for another CPU.
+# Three layers on micro's own: the files above, the runtime, then the app. The runtime's and the
+# app's trees carry fixed times, so their layers are the same in every build and every image.
+# Nothing runs in this stage, so it needs no emulation for another CPU.
 COPY --from=files /out/ /
-COPY --chown=1001:0 runtime/${TARGETARCH}/ /app/runtime/
-COPY --chown=1001:0 app/${TARGETARCH}/ /app/
+COPY --chown=1001:0 layers/${TARGETARCH}/runtime/ /
+COPY --chown=1001:0 layers/${TARGETARCH}/app/ /
 
 # User 1001 has no passwd entry, so HOME would be /, which it can't write; without LANG, Java names
 # files in ASCII alone. Micro carries C.UTF-8 (glibc-minimal-langpack).

@@ -58,8 +58,8 @@ smoke test fails on a missing JDK class, use the `embedded-runtime-jlink-modules
 - `appDockerfile` creates the project's root `Dockerfile` and keeps the block between
   `# >>> embedded-runtime` and `# <<< embedded-runtime` up to date; commit it, and add instructions
   after the block, never inside it. A Dockerfile without the block is the project's own; it copies
-  the CPU being built in two layers: `COPY runtime/${TARGETARCH}/ /app/runtime/`, then
-  `COPY app/${TARGETARCH}/ /app/`. Other images of the app go in `Dockerfile.<name>` beside it;
+  the CPU being built in two layers, `COPY --chown=1001:0 layers/${TARGETARCH}/runtime/ /`, then
+  `COPY --chown=1001:0 layers/${TARGETARCH}/app/ /`, whose trees give the same layers in every build. Other images of the app go in `Dockerfile.<name>` beside it;
   for a Java app on UBI micro, follow the `embedded-runtime-ubi-micro` skill (micro lacks zlib).
 
 ## 5. Done when

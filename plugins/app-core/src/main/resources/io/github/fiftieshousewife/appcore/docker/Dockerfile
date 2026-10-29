@@ -13,9 +13,11 @@ LABEL @LABELS@
 # Where the app writes when nothing is mounted there; group 0 as well, for OpenShift's arbitrary user.
 RUN mkdir -p /var/lib/app/data /var/lib/app/logs && chown -R 1001:0 /var/lib/app && chmod -R g=u /var/lib/app
 
-# The runtime first, in a layer of its own: a new release of the app leaves it alone.
-COPY --chown=1001:0 runtime/${TARGETARCH}/ /app/runtime/
-COPY --chown=1001:0 app/${TARGETARCH}/ /app/
+# The runtime first, in a layer of its own: a new release of the app leaves it alone. Each tree in
+# layers/ holds the paths it takes in the image, with fixed times, so its layer is the same in every
+# build and every image of the app.
+COPY --chown=1001:0 layers/${TARGETARCH}/runtime/ /
+COPY --chown=1001:0 layers/${TARGETARCH}/app/ /
 
 ENV APP_ROOT=/var/lib/app \
     APP_CONF_DIR=/config \

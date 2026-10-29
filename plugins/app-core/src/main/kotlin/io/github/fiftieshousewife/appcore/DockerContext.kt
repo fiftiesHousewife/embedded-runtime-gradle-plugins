@@ -45,9 +45,14 @@ internal class DockerContext(
             linux.forEach { tasks ->
                 val tree = tasks.archive.flatMap { it.archiveFile }.map { archiveOps.archiveTree(it.asFile) }
                 val cpu = tasks.target.arch.container
-                from(tree) { layer(this, "*/$RUNTIME/**", included = true, into = "$RUNTIME/$cpu") }
-                from(tree) { layer(this, "*/$RUNTIME/**", included = false, into = "app/$cpu") }
+                from(tree) { layer(this, RUNTIME_FILES, included = true, into = "$RUNTIME/$cpu") }
+                from(tree) { layer(this, RUNTIME_FILES, included = false, into = "app/$cpu") }
+                from(tree) {
+                    layer(this, RUNTIME_FILES, included = true, into = "$LAYERS/$cpu/$RUNTIME/app/$RUNTIME")
+                }
+                from(tree) { layer(this, RUNTIME_FILES, included = false, into = "$LAYERS/$cpu/app/app") }
             }
+            doLast { ContextTimes.fix(destinationDir.toPath()) }
         }
     }
 
@@ -107,5 +112,9 @@ internal class DockerContext(
 
     private companion object {
         const val RUNTIME = "runtime"
+        const val RUNTIME_FILES = "*/$RUNTIME/**"
+
+        /** Each image layer's files under the path they take in the image, copied to `/` by one `COPY`. */
+        const val LAYERS = "layers"
     }
 }

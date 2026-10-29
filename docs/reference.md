@@ -104,7 +104,7 @@ Each defaults to the `-PappSmokeTest.<name>` property of the same name.
 | `runApp` | Runs this machine's packaged app; pass arguments with `-Pargs="…"` |
 | `appVerifyPolicyLinuxX64`, … | Checks an assembled app against the runtime policy; every archive depends on it |
 | `appDockerfile` | Creates the project's `Dockerfile` if missing and keeps its embedded-runtime block up to date; one without the block is left as written |
-| `appDockerContext` | Writes a container build context: the Dockerfile and each `Dockerfile.<name>`, plus each Linux archive, its runtime under `runtime/<cpu>/` and the rest under `app/<cpu>/` |
+| `appDockerContext` | Writes a container build context: the Dockerfile and each `Dockerfile.<name>`, plus each Linux archive, its runtime and the rest as image trees under `layers/<cpu>/runtime/` and `layers/<cpu>/app/` (and, for older Dockerfiles, under `runtime/<cpu>/` and `app/<cpu>/`), with fixed file times |
 | `checkRuntimeSupport` | Fails if the embedded runtime's release line has reached end of life; warns if it will within 90 days or a newer patch is out. Not part of `check`; see [Keeping the runtime patched](runtime-updates.md) |
 | `downloadJdk<Target>` | Java, with `javaApp.jdk.source=yum:…`: the JDK package from the YUM repository, found in its metadata and checked against its SHA-256 |
 | `jlinkFindModules` | Java: finds the modules jdeps can't see, by running the app |

@@ -1,6 +1,15 @@
 # OpenShift runs the image as an arbitrary user in group 0, so it has no USER: what that user must
 # write is owned by group 0 and as writable for the group as for its owner.
 ARG BASE_IMAGE=registry.access.redhat.com/ubi9/ubi-minimal:9.8-1793050346@sha256:6f3a78179e0b30b930a186e7f68a4af52e51bb82406c9653be10bddd624e40f5
+
+# Everything the image adds besides the runtime and the app, made here and copied in as one layer:
+# the directories the app writes, owned by group 0 and as writable for it, and the terms the image
+# ships under, as regular files, since Red Hat's certification skips links.
+FROM ${BASE_IMAGE} AS files
+ARG TARGETARCH
+RUN mkdir -p /out/var/lib/app/data /out/var/lib/app/logs && chgrp -R 0 /out/var/lib/app && chmod -R g=u /out/var/lib/app
+COPY runtime/${TARGETARCH}/legal/ /out/licenses/java-runtime/
+
 FROM ${BASE_IMAGE}
 
 ARG TARGETARCH
@@ -34,12 +43,11 @@ LABEL org.opencontainers.image.title="spring-boot-service" \
       io.openshift.tags="java,spring-boot" \
       io.openshift.expose-services="8080:http"
 
-RUN mkdir -p /var/lib/app/data /var/lib/app/logs && chgrp -R 0 /var/lib/app && chmod -R g=u /var/lib/app
-
-COPY --chown=1001:0 runtime/${TARGETARCH}/ /app/runtime/
-# The terms the image ships under, as regular files: Red Hat's certification skips links.
-COPY runtime/${TARGETARCH}/legal/ /licenses/java-runtime/
-COPY --chown=1001:0 app/${TARGETARCH}/ /app/
+# Three layers on the base's own: the files above, the runtime, then the app. The runtime's and the
+# app's trees carry fixed times, so their layers are the same in every build and every image.
+COPY --from=files /out/ /
+COPY --chown=1001:0 layers/${TARGETARCH}/runtime/ /
+COPY --chown=1001:0 layers/${TARGETARCH}/app/ /
 
 # An arbitrary user has no passwd entry, so HOME would be /, which it can't write.
 ENV APP_ROOT=/var/lib/app \

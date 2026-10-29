@@ -12,8 +12,8 @@ The Dockerfile the plugins write has three layers that matter:
 | Layer | Contents | Changes when |
 |---|---|---|
 | Base image | `ubi9/ubi-minimal`, pinned to one rebuild's tag and digest | A plugin release moves the pin |
-| `COPY runtime/<cpu>/ /app/runtime/` | The runtime: the linked JDK or Node.js, 30 to 70 MB | The JDK or Node.js release, or the app's modules, change |
-| `COPY app/<cpu>/ /app/` | The launcher, the app and its libraries (`lib/`) | Anything in the app changes |
+| `COPY layers/<cpu>/runtime/ /` | The runtime: the linked JDK or Node.js, 30 to 70 MB | The JDK or Node.js release, or the app's modules, change |
+| `COPY layers/<cpu>/app/ /` | The launcher, the app and its libraries (`lib/`) | Anything in the app changes |
 
 The base layer is shared by every app built with the same plugin release, on every node. A release
 that changes only the app pushes and pulls only the app layer. The runtime layer is shared too, by
@@ -23,6 +23,12 @@ every app on the same runtime and [module set](#shared-module-sets).
 
 - **Archives** are byte-identical when rebuilt from the same commit: fixed timestamps and file order.
   An unchanged release therefore rebuilds to the same image layers.
+- **Image layers** of the runtime and the app are byte-identical whichever build, machine or
+  Dockerfile makes them: every file in `build/docker-context/` has the same fixed time, and each tree
+  in `layers/<cpu>/` holds the paths it takes in the image (`app/runtime/…`), so `COPY … /` creates
+  no directory with the build's own time. A Dockerfile copying `runtime/<cpu>/` to `/app/runtime/`
+  instead still builds, but its layer differs every build, since `COPY` makes `/app` and
+  `/app/runtime` then.
 - **jlink runtimes** are byte-identical for the same JDK, target and module set. Linking the same
   modules twice gives the same `lib/modules` file, so two apps that link the same set ship the same
   runtime.

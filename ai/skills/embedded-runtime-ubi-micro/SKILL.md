@@ -56,3 +56,13 @@ Build the image from `build/docker-context` with Testcontainers' `ImageFromDocke
 
 On an Apple-silicon Mac, run the engine natively (`colima start --arch aarch64 --vm-type vz`) and
 include the `linux-aarch64` target: emulated x86_64 can't run UBI 9 (`CPU does not support x86-64-v2`).
+
+## 4. Build for another CPU
+
+Every `RUN` in the image, the zlib stage's `microdnf` included, runs the target CPU's binaries, so
+building arm64 on x64 (or the reverse) fails with `exec format error` unless QEMU is registered:
+`docker/setup-qemu-action` on GitHub Actions, `docker run --privileged --rm tonistiigi/binfmt
+--install arm64,amd64` on a Linux machine, built in with Docker Desktop. The zlib stage then installs
+the target CPU's package, so one `docker buildx build --platform linux/amd64,linux/arm64 --file
+Dockerfile.micro build/docker-context` makes both. A test that starts the image needs a machine of
+that CPU; an emulated build proves only that it builds.

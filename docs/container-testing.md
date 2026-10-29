@@ -53,7 +53,9 @@ terms as a regular file, that the image has no `USER`, and that its labels name 
 A third, `MicroTest`, is described [below](#on-ubi-micro).
 
 Testcontainers builds with Docker's own builder, which sets `TARGETARCH` only under BuildKit, so the
-test passes it as a build argument, the engine's CPU as container platforms name it.
+test passes it as a build argument, the engine's CPU as container platforms name it. The tests
+therefore start the image of the CPU they run on: the plugins' own CI starts the x64 images and only
+builds the arm64 ones, under QEMU, since a `RUN` step executes the target CPU's binaries.
 
 ### Running it locally
 

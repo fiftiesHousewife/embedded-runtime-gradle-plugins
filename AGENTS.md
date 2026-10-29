@@ -70,6 +70,11 @@ Where things are tested:
   Zip is only the Windows target's format, so no functional test builds one.
 - `AiSkillsTest`: the files for Copilot, Devin and Claude Code, written by `assemble` only when they
   differ, and nothing when turned off.
+- The Spring Boot sample's `dockerTest` (`./gradlew -p samples/spring-boot-service dockerTest`, Linux
+  CI only): `ContainerTest` builds and runs each `Dockerfile*`; `OpenShiftTest` runs the OpenShift
+  image as a random user in group 0 with no capabilities; `MicroTest` runs the micro image read-only,
+  with no capabilities and 512 MiB. CI starts the x64 images only and builds the arm64 ones under QEMU.
+  `.github/scripts/verify-rpm.sh` installs `java-service`'s RPM in Rocky Linux and under systemd.
 - `KotlinAppTest`, `NodeAppPluginTest`, the settings plugin tests, and the URL unit tests.
 
 Known test caveats:
@@ -152,7 +157,11 @@ blocks `publish` while any archive is untested, unless explicitly allowed.
 **Archives** are each target's native format (`ArchiveFormat.nativeTo`): `.zip` for Windows,
 `.tar.gz` for the rest, the task type chosen when targets are registered. Each has one top-level
 directory, reproducible ordering and timestamps, and exec bits set explicitly
-(`AppCopySpecs.executables`), since a Windows checkout or Windows jlink run carries none. Anything
+(`AppCopySpecs.executables`), since a Windows checkout or Windows jlink run carries none. Every file
+is also made readable by everyone (`AppCopySpecs.readableByAll`): a jar can sit 0600 in the Gradle
+cache, and OpenShift's arbitrary user or a service account that doesn't own the files must still
+load it. In an `eachFile` action, read `permissions` before calling `permissions {}`, inside which
+it is already the new, default mode. Anything
 that reads an archive back goes through `archiveTree`, which handles every format.
 
 **RPMs** (`RpmPackages`, `GenerateRpm`, `RpmContents`) are written by Redline in plain Java from the
@@ -167,6 +176,9 @@ whose Gradle Module Metadata carries the standard OS and architecture attributes
 
 **Configuration cache:** lambdas stored in tasks (`onlyIf`, providers resolved at execution) must
 not capture `AppWiring` or anything else holding the `Project`; copy what they need into locals.
+Configuration must not list a directory itself: the cache then takes the whole listing as an input,
+and every `clean` throws it away. Read what the listing yields through a `ValueSource`
+(`DockerfileVariants` finds the `Dockerfile.<name>` files), which the cache compares by value.
 
 **Runtime customisation** (`CustomiseRuntime`, one per target, between `jlink` and the archive)
 copies the linked runtime, refuses forbidden modules (`ForbiddenModules`, from the runtime's `release`

@@ -15,7 +15,8 @@ archive can become a container image. Which conventions each format follows, and
 
 Each target gets the format its own OS opens without a separate tool: `zip` for Windows, `tar.gz`
 for Linux and macOS. Whatever the format, an archive holds one directory
-`<app>-<version>-<target>/`, keeps Unix permissions, is smoke-tested and published the same way, and a
+`<app>-<version>-<target>/`, keeps Unix permissions (every file readable by everyone, so an account
+that doesn't own the files can still run the app), is smoke-tested and published the same way, and a
 consuming build that resolves by Gradle Module Metadata needs no change.
 
 A Mac target's archive is the macOS deliverable. A signed, notarized `.pkg` installer can be made
@@ -163,6 +164,8 @@ Other images of the same app, such as one for OpenShift or one on UBI micro, go 
 `Dockerfile.<name>` (`Dockerfile.openshift`, `Dockerfile.micro`). They are yours, and
 `appDockerContext` copies each into the context with this build's values filled in, so
 `docker build --file build/docker-context/Dockerfile.openshift build/docker-context` builds one.
+UBI micro needs more than a different base image, since the Java runtime loads the system zlib;
+[On UBI micro](container-testing.md#on-ubi-micro) has a complete `Dockerfile.micro`.
 
 What the plugin's block holds:
 

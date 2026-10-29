@@ -41,13 +41,24 @@ jobs:
       - run: ./gradlew -p samples/node-service build
       - run: ./gradlew -p samples/spring-boot-service build
       # Each Dockerfile's image, built and run with Testcontainers: it starts, answers its probes, is
-      # labelled and stops on SIGTERM, and the OpenShift one runs as an arbitrary user in group 0.
+      # labelled and stops on SIGTERM; the OpenShift one runs as an arbitrary user in group 0, the micro
+      # one read-only, with no capabilities and a memory limit.
       - if: runner.os == 'Linux'
         run: ./gradlew -p samples/spring-boot-service dockerTest
-      # The same context builds the arm64 image on this x64 runner without emulation: nothing runs
-      # while building, so the arm64 archive is only copied in.
+      # The same context builds each arm64 image on this x64 runner. Their RUN steps (directories,
+      # micro's zlib) execute arm64 binaries, so QEMU emulates them; nothing is started.
       - if: runner.os == 'Linux'
-        run: docker buildx build --platform linux/arm64 --tag spring-boot-service:arm64 samples/spring-boot-service/build/docker-context
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+      - if: runner.os == 'Linux'
+        working-directory: samples/spring-boot-service/build/docker-context
+        run: |
+          for dockerfile in Dockerfile*; do
+            variant=${dockerfile#Dockerfile}
+            docker buildx build --platform linux/arm64 --file "$dockerfile" \
+              --tag "spring-boot-service:arm64${variant/./-}" .
+          done
       # The Maven Central release, staged unsigned and checked: POM names and metadata, checksums.
       - if: runner.os == 'Linux'
         run: ./gradlew verifyMavenCentralBundle -PreleaseVersion=0.0.0-ci

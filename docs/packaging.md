@@ -194,11 +194,14 @@ javaApp {                                    // or nodeApp
 
 ### Every CPU from one context
 
-Nothing runs while the image is built, so `buildx` builds every CPU from the same context with no
-emulation, and pushes one multi-arch image:
+`buildx` builds every CPU from the same context and pushes one multi-arch image. The Dockerfile's
+one `RUN`, which creates the app's data and log directories, runs the target CPU's shell, so a
+machine building another CPU's image needs QEMU registered (Docker Desktop has it; on Linux, and on
+GitHub's runners, `docker/setup-qemu-action`). Only that step is emulated; the archives are copied:
 
 ```bash
 ./gradlew appDockerContext
+docker run --privileged --rm tonistiigi/binfmt --install arm64,amd64   # once per machine, unless Docker Desktop
 docker buildx create --use                                 # once: a builder that can push multi-arch images
 docker buildx build --platform linux/amd64,linux/arm64 \
     --tag registry.example.com/orders:1.4.2 --push build/docker-context

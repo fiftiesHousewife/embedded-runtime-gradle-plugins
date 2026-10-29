@@ -307,7 +307,7 @@ archive that breaks the runtime policy.
 ### AI assistant skills
 
 Skills that adopt the plugins in a project, find the JDK modules for jlink, upgrade dependencies and
-runtimes, and tune performance with Java Flight Recorder, plus a hook that checks the build still configures after the agent edits a build file.
+runtimes, tune performance with Java Flight Recorder, and run a Java app on UBI micro, plus a hook that checks the build still configures after the agent edits a build file.
 
 Every build installs them, as part of `assemble`, for **GitHub Copilot** (agent mode in VS Code,
 Visual Studio and JetBrains IDEs, the Copilot app and CLI, the cloud agent), **Devin** and **Claude

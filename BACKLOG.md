@@ -3,7 +3,7 @@
 Work that has been asked for and not yet done, newest decisions first. Move an item to the commit
 log, not to a "done" list, when it lands.
 
-Last updated 2026-10-28.
+Last updated 2026-10-29.
 
 ## Next: Dockerfiles parsed and rewritten with OpenRewrite
 
@@ -21,7 +21,7 @@ under the configuration cache.
 | **Engine** | Isolated worker (`classLoaderIsolation`, like the Sigstore verifier): rewrite-core brings Jackson, ASM, JNA, Caffeine, Micrometer and ANTLR. Custom recipes need `javaParameters = true` or their YAML options arrive as null. Strip `~~>` search markers before writing and report them as findings. Lines added to a CRLF file come out LF: normalise |
 | **Recipes to write** | Built-ins cover labels, exec-form entrypoint, `ADD` to `COPY`, non-root user. Missing: ensure an instruction (`EXPOSE`, `ENTRYPOINT`), group-0 ownership on `COPY`, ports below 1024, `/licenses`, merging labels into an existing `LABEL` |
 | **Tasks** | `appDockerfileCheck` (diff of suggestions, fails when strict) and `appDockerfileFix` |
-| **CI cross-checks** | hadolint, Red Hat `preflight check container` on the sample image, and a Testcontainers test running the image as a random UID in group 0. Versions in the catalogue with `# renovate:` comments |
+| **CI cross-checks** | hadolint and Red Hat `preflight check container` on the sample image (the Spring Boot sample's `OpenShiftTest` already runs it as a random UID in group 0 with no capabilities). Versions in the catalogue with `# renovate:` comments |
 | **`USER` per platform** | Decided 2026-10-28: the default Dockerfile keeps `USER 1001`, so plain Docker and Kubernetes don't run it as root and Red Hat's `RunAsNonRoot` check passes; `Dockerfile.openshift` has none, as OpenShift assigns the user |
 | **OCI labels with the commit** | Keep `org.opencontainers.image.revision` and the rest of the OCI set; add `io.k8s`/`io.openshift` labels for OpenShift |
 | **Volume contract** | The image creates `/var/lib/app/data` and `/logs` writable by user 1001 and group 0; document the volume and env-var contract with a sample `Deployment` |
@@ -52,6 +52,8 @@ under the configuration cache.
 | Item | Notes |
 |---|---|
 | Windows functional tests | One functional test now runs on Windows: an installed JDK given by `javaApp.jdk.<feature>.windows-x64.path`, built, zipped and smoke-tested through the `.bat` launcher. The rest still skip there, because the fixtures build fake download sites with the system `tar` and `sh`; porting them means Windows-layout JDK and Node zips (commons-compress is already a dependency) |
+| CI red since 78e84ce | `plugins/`'s `check` depended on `build-logic`'s root `:test`, which doesn't exist, so `./gradlew check` failed at configuration on every OS from 2026-10-27; it now names `:conventions:test` and `:detekt-rules:test`. Confirm the next run is green, then that `dockerTest` passes on Linux x64 (only arm64 was run locally) |
+| Micro's second pin | `Dockerfile.micro` now names UBI minimal too (`BUILD_IMAGE`, which installs zlib). Check that Renovate's Dockerfile support updates that `ARG` with the main Dockerfile's minimal pin, or tie the two together |
 | Functional test not run here | `JdkSourceTest`'s "a JDK packaged as an RPM, named the organisation's way" could not reach its TestKit daemon in the sandbox on 2026-10-28; its pattern now spells `[feature]_[update]` instead of `revisionFormat`. Run it locally |
 | GitHub API access for the agent | Unauthenticated API calls hit the rate limit; `gh` config is unreadable in the sandbox |
 

@@ -5,4 +5,7 @@ plugins {
     id("embedded-runtime.central-release")
 }
 
-tasks.named("check") { dependsOn(gradle.includedBuild("build-logic").task(":test")) }
+tasks.named("check") {
+    val buildLogic = gradle.includedBuild("build-logic")
+    dependsOn(buildLogic.task(":conventions:test"), buildLogic.task(":detekt-rules:test"))
+}

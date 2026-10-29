@@ -149,12 +149,27 @@ class JavaAppPluginTest {
         )
     }
 
+    @Test
+    fun `a dependency only its owner may read is readable by everyone in the archive`() {
+        val dependency = "dependencies { implementation(files(\"private.jar\")) }"
+        val project = javaService(tmp, JavaServiceOptions(build = dependency))
+        val jar = project.project.resolve("private.jar").toPath()
+        Files.write(jar, EMPTY_ZIP)
+        Files.setPosixFilePermissions(jar, PosixFilePermissions.fromString("rw-------"))
+        project.build("appArchive")
+        val entries = TestProject.run("tar", "-tvzf", archive(project).absolutePath)
+        assertTrue(entries.lines().any { it.startsWith("-rw-r--r--") && it.endsWith("lib/private.jar") }, entries)
+    }
+
     private fun sha256(file: File) =
         HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(Files.readAllBytes(file.toPath())))
 
     private companion object {
         /** What HotSpot exits with under -XX:+ExitOnOutOfMemoryError. */
         const val OUT_OF_MEMORY_EXIT = 3
+
+        /** A zip with no entries: its end-of-central-directory record alone. */
+        val EMPTY_ZIP = byteArrayOf(0x50, 0x4b, 0x05, 0x06) + ByteArray(18)
         const val OUT_OF_MEMORY_APP = """
             package test;
             public class Main {

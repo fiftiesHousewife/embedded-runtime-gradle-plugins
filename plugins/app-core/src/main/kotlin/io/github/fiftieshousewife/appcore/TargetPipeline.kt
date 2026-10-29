@@ -95,6 +95,7 @@ internal class TargetPipeline(private val project: Project, private val wiring: 
         }
         into("conf.defaults") { from(extension.configDefaults.map { listOf(it) }.orElse(emptyList())) }
         spec.contents(this)
+        AppCopySpecs.readableByAll(this)
         AppCopySpecs.executableBits(this)
     }
 

@@ -1,5 +1,6 @@
 package io.github.fiftieshousewife.appcore
 
+import io.github.fiftieshousewife.appcore.tasks.DockerfileVariants
 import io.github.fiftieshousewife.appcore.tasks.UpdateDockerfile
 import io.github.fiftieshousewife.appcore.tasks.WriteTextFile
 import org.gradle.api.GradleException
@@ -23,7 +24,10 @@ internal class DockerContext(
     private val extension = wiring.extension
 
     /** `Dockerfile`, then each `Dockerfile.<variant>` at the project's root. */
-    private val variants: List<ImageVariant> = ImageVariant.find(project.layout.projectDirectory.asFile)
+    private val variants: List<ImageVariant> = listOf(ImageVariant(null)) +
+        project.providers.of(DockerfileVariants::class.java) {
+            parameters.directory.set(project.layout.projectDirectory)
+        }.get().map(::ImageVariant)
 
     private val task: TaskProvider<Sync> = register()
 

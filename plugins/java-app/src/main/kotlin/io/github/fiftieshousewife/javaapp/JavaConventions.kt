@@ -57,7 +57,12 @@ internal class JavaConventions(
 
     companion object {
         /** Strip what a server never needs; `--compress` took named levels in Java 21. */
-        fun jlinkOptions(feature: Int) = listOf("--strip-debug", "--no-man-pages", "--no-header-files") +
+        fun jlinkOptions(feature: Int) = listOf(STRIP_DEBUG, "--no-man-pages", "--no-header-files") +
             if (feature >= JdkCatalog.NAMED_COMPRESSION_FROM) "--compress=zip-6" else "--compress=2"
+
+        fun crossLinkOptions(options: List<String>) =
+            options.map { if (it == STRIP_DEBUG) "--strip-java-debug-attributes" else it }
+
+        private const val STRIP_DEBUG = "--strip-debug"
     }
 }

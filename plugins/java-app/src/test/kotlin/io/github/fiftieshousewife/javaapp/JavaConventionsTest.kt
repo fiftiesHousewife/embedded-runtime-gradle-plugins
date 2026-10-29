@@ -13,4 +13,12 @@ class JavaConventionsTest {
             { assertEquals(stripped + "--compress=zip-6", JavaConventions.jlinkOptions(21)) },
         )
     }
+
+    @Test
+    fun `another target's link strips only Java debug attributes, since the host's objcopy can't read it`() {
+        assertEquals(
+            listOf("--strip-java-debug-attributes", "--no-man-pages", "--no-header-files", "--compress=zip-6"),
+            JavaConventions.crossLinkOptions(JavaConventions.jlinkOptions(21)),
+        )
+    }
 }

@@ -1,6 +1,7 @@
 package io.github.fiftieshousewife.javaapp.tasks
 
 import io.github.fiftieshousewife.appcore.Target
+import io.github.fiftieshousewife.javaapp.JavaConventions
 import org.gradle.api.DefaultTask
 import org.gradle.api.GradleException
 import org.gradle.api.file.DirectoryProperty
@@ -65,6 +66,7 @@ constructor(
                     "(JEP 493 builds). Use a JDK distribution that ships jmods, or build on ${target.get()}.",
             )
         }
-        JdkTools.link(exec, JlinkRequest(tool, targetHome, modules, options.get(), out, jmods))
+        val linkOptions = if (cross) JavaConventions.crossLinkOptions(options.get()) else options.get()
+        JdkTools.link(exec, JlinkRequest(tool, targetHome, modules, linkOptions, out, jmods))
     }
 }

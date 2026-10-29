@@ -4,13 +4,23 @@ ARG BASE_IMAGE=registry.access.redhat.com/ubi9/ubi-micro:9.8-1791895366@sha256:5
 ARG BUILD_IMAGE=registry.access.redhat.com/ubi9/ubi-minimal:9.8-1793050346@sha256:6f3a78179e0b30b930a186e7f68a4af52e51bb82406c9653be10bddd624e40f5
 FROM ${BASE_IMAGE} AS micro
 
+# Everything the image adds besides the runtime and the app, made here and copied in as one layer.
 # The Java launcher needs libz.so.1, which micro lacks: installed into a copy of micro's own root by
-# UBI minimal's microdnf, so micro's RPM database records it for scanners and certification.
-FROM ${BUILD_IMAGE} AS zlib
+# UBI minimal's microdnf, so micro's RPM database records it for scanners and certification. The
+# app writes under /var/lib/app when nothing is mounted there: owned by 1001 and group 0, as
+# writable for the group, for OpenShift's arbitrary user.
+FROM ${BUILD_IMAGE} AS files
+ARG TARGETARCH
 COPY --from=micro / /mnt/rootfs/
 RUN microdnf install -y --installroot=/mnt/rootfs --releasever=9 --config=/etc/dnf/dnf.conf --noplugins \
       --setopt=cachedir=/var/cache/dnf --setopt=reposdir=/etc/yum.repos.d --setopt=varsdir=/etc/dnf/vars \
-      --setopt=install_weak_deps=0 --nodocs zlib
+      --setopt=install_weak_deps=0 --nodocs zlib && \
+    mkdir -p /out/usr/lib64 /out/var/lib/rpm /out/var/lib/app/data /out/var/lib/app/logs && \
+    cp -a /mnt/rootfs/usr/lib64/libz.so.1* /out/usr/lib64/ && \
+    cp -a /mnt/rootfs/var/lib/rpm/. /out/var/lib/rpm/ && \
+    chown -R 1001:0 /out/var/lib/app && chmod -R g=u /out/var/lib/app
+# The terms the image ships under, as regular files: Red Hat's certification skips links.
+COPY runtime/${TARGETARCH}/legal/ /out/licenses/java-runtime/
 
 FROM micro
 
@@ -43,17 +53,10 @@ LABEL org.opencontainers.image.title="spring-boot-service" \
       io.k8s.display-name="spring-boot-service" \
       io.k8s.description="Order service on Spring Boot with its own Oracle Java runtime"
 
-# COPY follows symlinks, so the package's libz.so.1 link is made again rather than copied.
-COPY --from=zlib /mnt/rootfs/usr/lib64/libz.so.1.2.11 /usr/lib64/
-COPY --from=zlib /mnt/rootfs/var/lib/rpm/ /var/lib/rpm/
-# Where the app writes when nothing is mounted there; group 0 as well, for OpenShift's arbitrary user.
-RUN ln -s libz.so.1.2.11 /usr/lib64/libz.so.1 && \
-    mkdir -p /var/lib/app/data /var/lib/app/logs && chown -R 1001:0 /var/lib/app && chmod -R g=u /var/lib/app
-
-# The runtime first, in a layer of its own: a new release of the app leaves it alone.
+# Three layers on micro's own: the files above, the runtime, then the app, so the build cache keeps
+# the first two for a new release. Nothing runs in this stage, so it needs no emulation for another CPU.
+COPY --from=files /out/ /
 COPY --chown=1001:0 runtime/${TARGETARCH}/ /app/runtime/
-# The terms the image ships under, as regular files: Red Hat's certification skips links.
-COPY runtime/${TARGETARCH}/legal/ /licenses/java-runtime/
 COPY --chown=1001:0 app/${TARGETARCH}/ /app/
 
 # User 1001 has no passwd entry, so HOME would be /, which it can't write; without LANG, Java names

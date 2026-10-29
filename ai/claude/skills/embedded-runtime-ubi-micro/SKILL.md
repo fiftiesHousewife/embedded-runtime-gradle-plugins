@@ -21,24 +21,28 @@ repository shows the query).
 
 ## 2. What to change
 
-- **zlib as an RPM**, so scanners and Red Hat's certification see it: a `ubi-minimal` stage copies
-  micro's root (`COPY --from=micro / /mnt/rootfs/`) and runs `microdnf install --installroot=/mnt/rootfs
+- **Three layers on micro's own**: everything else the image adds, then the runtime, then the app.
+  A `ubi-minimal` stage builds the first in `/out` and the final stage takes it with one
+  `COPY --from=<stage> /out/ /`, which keeps owners, modes and links; the final stage runs nothing.
+- **zlib as an RPM**, so scanners and Red Hat's certification see it: in that stage, copy micro's
+  root (`COPY --from=micro / /mnt/rootfs/`), run `microdnf install --installroot=/mnt/rootfs
   --releasever=9 --config=/etc/dnf/dnf.conf --noplugins --setopt=cachedir=/var/cache/dnf
   --setopt=reposdir=/etc/yum.repos.d --setopt=varsdir=/etc/dnf/vars --setopt=install_weak_deps=0
-  --nodocs zlib`. The final `FROM micro` stage copies `/usr/lib64/libz.so.1.2.11` and
-  `/var/lib/rpm/`, then `ln -s libz.so.1.2.11 /usr/lib64/libz.so.1` (`COPY` follows links, and a
-  file where the RPM has a link counts as modified).
+  --nodocs zlib`, then `cp -a` `usr/lib64/libz.so.1*` and `var/lib/rpm/.` into `/out` (`cp -a`
+  keeps the package's `libz.so.1` link, which a plain file would count as modified).
+- **`/var/lib/app/data` and `/logs`** made in `/out`, `chown -R 1001:0` and `chmod -R g=u`.
 - **`ENV LANG=C.UTF-8`**: otherwise `sun.jnu.encoding` is ASCII and non-ASCII file names throw
   `InvalidPathException`. Not `en_US.UTF-8`, which micro lacks.
 - **`ENV HOME=/var/lib/app`**: user 1001 has no passwd entry, so `user.home` would be `/`.
 - **Labels**: set `name`, `vendor`, `maintainer`, `version`, `release`, `summary`, `description`,
   `url`, `vcs-ref` and `build-date` to the app's values. Inherited, they name Red Hat's image.
-- **`COPY runtime/${TARGETARCH}/legal/ /licenses/java-runtime/`**: regular files, not a link.
+- **`COPY runtime/${TARGETARCH}/legal/ /out/licenses/java-runtime/`** in that stage: regular files,
+  not a link.
 - **Healthcheck**: give the probe JVM its own options, since each probe is a second JVM in the
   container's limits: `CMD ["env", "APP_JAVA_OPTS=-Xmx32m -Xss512k -XX:TieredStopAtLevel=1
   -XX:+UseSerialGC", "/app/bin/<app>", "healthcheck", "ready"]`.
-- Keep `USER 1001`, `/var/lib/app` owned by `1001:0` with `chmod -R g=u`, the runtime's `COPY` before
-  the app's, and the exec-form `ENTRYPOINT`.
+- Keep `USER 1001`, `COPY --chown=1001:0` for the runtime before the app, and the exec-form
+  `ENTRYPOINT`.
 
 ## 3. Test it
 
@@ -59,7 +63,7 @@ include the `linux-aarch64` target: emulated x86_64 can't run UBI 9 (`CPU does n
 
 ## 4. Build for another CPU
 
-Every `RUN` in the image, the zlib stage's `microdnf` included, runs the target CPU's binaries, so
+The final stage runs nothing, but the zlib stage's `microdnf` runs the target CPU's binaries, so
 building arm64 on x64 (or the reverse) fails with `exec format error` unless QEMU is registered:
 `docker/setup-qemu-action` on GitHub Actions, `docker run --privileged --rm tonistiigi/binfmt
 --install arm64,amd64` on a Linux machine, built in with Docker Desktop. The zlib stage then installs

@@ -43,6 +43,15 @@ checks what a deployment relies on:
 - **It stops on SIGTERM.** Stopped with a grace period, it exits before being killed.
 - **On OpenShift's terms.** `Dockerfile.openshift`'s image is started as an arbitrary user in group 0.
 
+A second test, [`OpenShiftTest`](../samples/spring-boot-service/src/dockerTest/java/io/github/fiftieshousewife/samples/spring/OpenShiftTest.java),
+starts `Dockerfile.openshift`'s image as OpenShift's `restricted-v2` policy does: a random user id
+with no entry in `/etc/passwd`, group 0, every capability dropped and no privilege escalation. It
+checks that the app answers over HTTP and logs to stdout, that this user can read and enter
+everything under `/app` but write nothing there, and can write the data, log and home directories,
+that the runtime is Oracle's Java 25 on Red Hat Enterprise Linux 9, that `/licenses` holds Oracle's
+terms as a regular file, that the image has no `USER`, and that its labels name the app, not UBI.
+A third, `MicroTest`, is described [below](#on-ubi-micro).
+
 Testcontainers builds with Docker's own builder, which sets `TARGETARCH` only under BuildKit, so the
 test passes it as a build argument, the engine's CPU as container platforms name it.
 
@@ -66,8 +75,13 @@ archive, so include that target (`targets(…, "linux-aarch64")`).
 
 OpenShift's restricted policy runs an image as an arbitrary user in group 0 and ignores the image's
 `USER`. The sample's [`Dockerfile.openshift`](../samples/spring-boot-service/Dockerfile.openshift)
-has none, makes `/var/lib/app` writable by group 0, and adds the `io.k8s` and `io.openshift` labels
-the console shows.
+has none, makes `/var/lib/app` writable by group 0 and the user's home, and adds the `io.k8s` and
+`io.openshift` labels the console shows. It also replaces the labels UBI sets (`name`, `vendor`,
+`version`, `release`, `summary`, `description`, `maintainer`, `url`, `vcs-ref`, `build-date`), which
+would otherwise describe Red Hat's base image, and copies the runtime's licence terms (its
+`legal/` directory) into `/licenses` as regular files, since the certification check skips links.
+Red Hat's certification checks both. `--build-arg RELEASE=<n>` numbers rebuilds of
+one version.
 
 ## On UBI micro
 
@@ -76,15 +90,37 @@ what an app with its own runtime needs to start. Its packages are `bash`, `coreu
 `glibc`, `libgcc`, `tzdata` and the files a base system needs; it has no `libstdc++`, `zlib` or
 `ca-certificates`.
 
-**Java apps run on it.** The embedded Java runtime needs only glibc (`libc`, `libm`, `libdl`,
-`libpthread`, `librt`); it carries its own zlib and its own trusted certificates. The launcher
-needs a shell and `dirname`, `basename`, `readlink` and `cat`, all in micro.
+**Java apps run on it, with zlib added.** The JVM itself needs only glibc (`libc`, `libm`, `libdl`,
+`libpthread`, `librt`) and the runtime carries its own trusted certificates, but the `java`
+launcher's `libjli.so` and the runtime's `libzip.so` load the system `libz.so.1`. Without it, `java`
+stops at once with `libz.so.1: cannot open shared object file` (exit code 127). The sample's
+`Dockerfile.micro` installs the `zlib` RPM into a copy of micro's root with UBI minimal's `microdnf`
+and copies in the library and micro's updated RPM database, so the package is recorded as installed
+and micro's own layers stay as they are. The launcher needs a shell and `dirname`, `basename`,
+`readlink` and `cat`, all in micro.
 
 **Node.js apps don't, as they are.** The official Node.js builds for Linux need `libstdc++`, which
 micro leaves out. Stay on UBI minimal for Node.js.
 
-The sample's [`Dockerfile.micro`](../samples/spring-boot-service/Dockerfile.micro) is the default
-Dockerfile on a UBI micro base. To move it to a newer rebuild:
+The sample's [`Dockerfile.micro`](../samples/spring-boot-service/Dockerfile.micro) (117 MB, against
+195 MB on minimal) also does what a Java image on micro needs beyond zlib:
+
+| In the image | Because |
+|---|---|
+| `LANG=C.UTF-8` | Without a locale, Java names files in ASCII alone (`sun.jnu.encoding`), and a name such as `résumé` fails with `InvalidPathException`. Micro carries `C.UTF-8` (`glibc-minimal-langpack`); `en_US.UTF-8` would silently fall back to POSIX |
+| `HOME=/var/lib/app` | User 1001 has no `/etc/passwd` entry, so `HOME`, and Java's `user.home`, would be `/`, which it can't write |
+| The app's own `name`, `vendor`, `maintainer`, `version`, `release`, `summary`, `description`, `url`, `vcs-ref`, `build-date` | Otherwise UBI's labels describe Red Hat's image, and Red Hat's certification rejects Red Hat's name in an image that isn't theirs |
+| `/licenses/java-runtime/`, regular files | The terms the runtime is shipped under, where the certification looks |
+| `USER 1001`, `/var/lib/app` owned by 1001 and group 0 | Not root; writable by OpenShift's arbitrary user too |
+| A `HEALTHCHECK` command with its own `APP_JAVA_OPTS` | Each probe starts a second JVM inside the container's limits; small options keep it quick and light, and the server's own options (an agent, a debug port) don't break every probe |
+
+The sample's [`MicroTest`](../samples/spring-boot-service/src/dockerTest/java/io/github/fiftieshousewife/samples/spring/MicroTest.java)
+starts the image as a hardened pod: its own user, every capability dropped, no privilege
+escalation, a read-only root filesystem with `/tmp` and `/var/lib/app` as empty volumes, and a
+512 MiB memory limit. It checks each row above, that the JVM sees the limit, that the image's own
+`HEALTHCHECK` command passes, and that SIGTERM ends it with exit code 143 within ten seconds.
+
+Its `BUILD_IMAGE` is the UBI minimal image that installs zlib. To move the base to a newer rebuild:
 
 1. **Find the current rebuild.** Red Hat tags each rebuild `9.<minor>-<build>` and moves the plain
    `9.<minor>` tag along with it. Red Hat's catalog API gives the newest rebuild's tags and the

@@ -24,8 +24,8 @@ import org.testcontainers.images.builder.ImageFromDockerfile;
  * the {@code context} system property.
  */
 class ContainerTest {
-    private static final Path CONTEXT = Path.of(System.getProperty("context"));
-    private static final String LAUNCHER = "/app/bin/spring-boot-service";
+    static final Path CONTEXT = Path.of(System.getProperty("context"));
+    static final String LAUNCHER = "/app/bin/spring-boot-service";
     private static final String OPENSHIFT_USER = "1000770000:0";
     private static final int SIGKILL_EXIT = 137;
     private static final List<String> LABELS = List.of("title", "version", "revision", "created", "licenses", "base.name");
@@ -61,7 +61,7 @@ class ContainerTest {
     }
 
     /** Docker's own builder sets TARGETARCH only with BuildKit, which Testcontainers doesn't use: give it. */
-    private static String image(String dockerfile) {
+    static String image(String dockerfile) {
         String cpu = DockerClientFactory.instance().getInfo().getArchitecture().equals("aarch64") ? "arm64" : "amd64";
         return new ImageFromDockerfile("spring-boot-service-" + dockerfile.toLowerCase().replace('.', '-'), false)
             .withFileFromPath(".", CONTEXT)

@@ -8,7 +8,10 @@ ARG BASE_IMAGE
 ARG APP_VERSION
 ARG GIT_COMMIT
 ARG CREATED
+ARG RELEASE=1
 
+# The base image's own name, vendor, version and the rest would otherwise describe UBI, not the app;
+# Red Hat's certification requires them, and the OpenShift console shows them.
 LABEL org.opencontainers.image.title="spring-boot-service" \
       org.opencontainers.image.source="https://github.com/fiftiesHousewife/embedded-runtime-gradle-plugins.git" \
       org.opencontainers.image.licenses="LicenseRef-Proprietary" \
@@ -16,6 +19,16 @@ LABEL org.opencontainers.image.title="spring-boot-service" \
       org.opencontainers.image.revision="${GIT_COMMIT}" \
       org.opencontainers.image.created="${CREATED}" \
       org.opencontainers.image.base.name="${BASE_IMAGE}" \
+      name="spring-boot-service" \
+      vendor="fiftiesHousewife" \
+      maintainer="fiftiesHousewife" \
+      version="${APP_VERSION}" \
+      release="${RELEASE}" \
+      summary="Order service on Spring Boot" \
+      description="Order service on Spring Boot with its own Oracle Java runtime" \
+      url="https://github.com/fiftiesHousewife/embedded-runtime-gradle-plugins" \
+      vcs-ref="${GIT_COMMIT}" \
+      build-date="${CREATED}" \
       io.k8s.display-name="spring-boot-service" \
       io.k8s.description="Order service on Spring Boot with its own Oracle Java runtime" \
       io.openshift.tags="java,spring-boot" \
@@ -24,14 +37,18 @@ LABEL org.opencontainers.image.title="spring-boot-service" \
 RUN mkdir -p /var/lib/app/data /var/lib/app/logs && chgrp -R 0 /var/lib/app && chmod -R g=u /var/lib/app
 
 COPY --chown=1001:0 runtime/${TARGETARCH}/ /app/runtime/
+# The terms the image ships under, as regular files: Red Hat's certification skips links.
+COPY runtime/${TARGETARCH}/legal/ /licenses/java-runtime/
 COPY --chown=1001:0 app/${TARGETARCH}/ /app/
 
+# An arbitrary user has no passwd entry, so HOME would be /, which it can't write.
 ENV APP_ROOT=/var/lib/app \
     APP_CONF_DIR=/config \
     APP_DATA_DIR=/var/lib/app/data \
     APP_LOG_DIR=/var/lib/app/logs \
     APP_LOG_TARGET=stdout \
-    APP_PORT=8080
+    APP_PORT=8080 \
+    HOME=/var/lib/app
 
 EXPOSE 8080
 STOPSIGNAL SIGTERM

@@ -1,36 +1,78 @@
 # UBI micro: no package manager, only what an app with its own runtime needs to start (Java only;
 # Node.js needs libstdc++, which micro leaves out).
 ARG BASE_IMAGE=registry.access.redhat.com/ubi9/ubi-micro:9.8-1791895366@sha256:5be877a2a280ae36eb9ab80ca4efb28bbf77c57abbba38137cdc37a03b8465e6
-FROM ${BASE_IMAGE}
+ARG BUILD_IMAGE=registry.access.redhat.com/ubi9/ubi-minimal:9.8-1793050346@sha256:6f3a78179e0b30b930a186e7f68a4af52e51bb82406c9653be10bddd624e40f5
+FROM ${BASE_IMAGE} AS micro
+
+# The Java launcher needs libz.so.1, which micro lacks: installed into a copy of micro's own root by
+# UBI minimal's microdnf, so micro's RPM database records it for scanners and certification.
+FROM ${BUILD_IMAGE} AS zlib
+COPY --from=micro / /mnt/rootfs/
+RUN microdnf install -y --installroot=/mnt/rootfs --releasever=9 --config=/etc/dnf/dnf.conf --noplugins \
+      --setopt=cachedir=/var/cache/dnf --setopt=reposdir=/etc/yum.repos.d --setopt=varsdir=/etc/dnf/vars \
+      --setopt=install_weak_deps=0 --nodocs zlib
+
+FROM micro
 
 ARG TARGETARCH
 ARG BASE_IMAGE
 ARG APP_VERSION
 ARG GIT_COMMIT
 ARG CREATED
+ARG RELEASE=1
 
+# The base image's own name, vendor, version and the rest would otherwise describe UBI, not the app;
+# Red Hat's certification requires them and rejects Red Hat's name in them.
 LABEL org.opencontainers.image.title="spring-boot-service" \
       org.opencontainers.image.source="https://github.com/fiftiesHousewife/embedded-runtime-gradle-plugins.git" \
       org.opencontainers.image.licenses="LicenseRef-Proprietary" \
       org.opencontainers.image.version="${APP_VERSION}" \
       org.opencontainers.image.revision="${GIT_COMMIT}" \
       org.opencontainers.image.created="${CREATED}" \
-      org.opencontainers.image.base.name="${BASE_IMAGE}"
+      org.opencontainers.image.base.name="${BASE_IMAGE}" \
+      name="spring-boot-service" \
+      vendor="fiftiesHousewife" \
+      maintainer="fiftiesHousewife" \
+      version="${APP_VERSION}" \
+      release="${RELEASE}" \
+      summary="Order service on Spring Boot" \
+      description="Order service on Spring Boot with its own Oracle Java runtime" \
+      url="https://github.com/fiftiesHousewife/embedded-runtime-gradle-plugins" \
+      vcs-ref="${GIT_COMMIT}" \
+      build-date="${CREATED}" \
+      io.k8s.display-name="spring-boot-service" \
+      io.k8s.description="Order service on Spring Boot with its own Oracle Java runtime"
 
-RUN mkdir -p /var/lib/app/data /var/lib/app/logs && chown -R 1001:0 /var/lib/app && chmod -R g=u /var/lib/app
+# COPY follows symlinks, so the package's libz.so.1 link is made again rather than copied.
+COPY --from=zlib /mnt/rootfs/usr/lib64/libz.so.1.2.11 /usr/lib64/
+COPY --from=zlib /mnt/rootfs/var/lib/rpm/ /var/lib/rpm/
+# Where the app writes when nothing is mounted there; group 0 as well, for OpenShift's arbitrary user.
+RUN ln -s libz.so.1.2.11 /usr/lib64/libz.so.1 && \
+    mkdir -p /var/lib/app/data /var/lib/app/logs && chown -R 1001:0 /var/lib/app && chmod -R g=u /var/lib/app
 
+# The runtime first, in a layer of its own: a new release of the app leaves it alone.
 COPY --chown=1001:0 runtime/${TARGETARCH}/ /app/runtime/
+# The terms the image ships under, as regular files: Red Hat's certification skips links.
+COPY runtime/${TARGETARCH}/legal/ /licenses/java-runtime/
 COPY --chown=1001:0 app/${TARGETARCH}/ /app/
 
+# User 1001 has no passwd entry, so HOME would be /, which it can't write; without LANG, Java names
+# files in ASCII alone. Micro carries C.UTF-8 (glibc-minimal-langpack).
 ENV APP_ROOT=/var/lib/app \
     APP_CONF_DIR=/config \
     APP_DATA_DIR=/var/lib/app/data \
     APP_LOG_DIR=/var/lib/app/logs \
     APP_LOG_TARGET=stdout \
-    APP_PORT=8080
+    APP_PORT=8080 \
+    HOME=/var/lib/app \
+    LANG=C.UTF-8
 
 USER 1001
 EXPOSE 8080
-HEALTHCHECK --interval=30s --timeout=10s --start-period=30s CMD ["/app/bin/spring-boot-service", "healthcheck", "ready"]
+# Each probe is a second JVM inside the container's limits: small and quick, and without the
+# server's APP_JAVA_OPTS (an agent or a debug port there would fail every probe).
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s \
+    CMD ["env", "APP_JAVA_OPTS=-Xmx32m -Xss512k -XX:TieredStopAtLevel=1 -XX:+UseSerialGC", \
+         "/app/bin/spring-boot-service", "healthcheck", "ready"]
 STOPSIGNAL SIGTERM
 ENTRYPOINT ["/app/bin/spring-boot-service", "run"]

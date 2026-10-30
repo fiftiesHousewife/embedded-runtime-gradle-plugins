@@ -78,7 +78,9 @@ Where things are tested:
   with no capabilities and 512 MiB. CI starts the x64 images only and builds the arm64 ones under QEMU.
   `.github/scripts/verify-rpm.sh` installs `java-service`'s RPM in Rocky Linux and under systemd.
   `.github/scripts/runtime-checksums.py` records every target's runtime archive at two versions on
-  each OS leg, and the `runtime-reproducible` job checks the legs built the same bytes.
+  each OS leg, and the `runtime-reproducible` job checks that Linux and macOS built the same bytes
+  (Windows' jlink differs, in `release`, legal notices and generated `java.lang.invoke` classes, and
+  is only reported).
 - `KotlinAppTest`, `NodeAppPluginTest`, the settings plugin tests, and the URL unit tests.
 
 Known test caveats:

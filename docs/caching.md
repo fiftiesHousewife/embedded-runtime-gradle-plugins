@@ -55,11 +55,13 @@ just grows. These are what could make them differ, and what the plugins do about
 | The module list | A [shared set](#shared-module-sets), or the app's own modules sorted |
 | Class data sharing | No `--generate-cds-archive`, whose output has not been deterministic |
 | Trusted certificates | Written as the JDK's own `cacerts` is, with no password, MAC or encryption: those add random salts, and Java 17's JKS format dates every entry. The same certificates give the same file whichever JDK runs Gradle; a Java 17 runtime's `cacerts` becomes PKCS12, which Java 17 reads |
+| The build machine | Linux and macOS agents give the same bytes for every target, Windows targets included. A Windows agent doesn't: its jlink writes `release` with CRLF line endings, writes duplicate legal notices as `Please see ..\java.base\LICENSE` pointers where the others copy the text, and generates some `java.lang.invoke` classes in `lib/modules` differently. Publish runtimes from Linux or macOS agents |
 | Compression | gzip by the JVM that runs Gradle. Publish from agents that run Gradle on the same JDK, with Gradle's [daemon JVM criteria](https://docs.gradle.org/current/userguide/gradle_daemon.html#sec:daemon_jvm_criteria), say |
 
 The plugins' own tests rebuild a runtime archive from scratch, and with a new app version, and
 compare the checksums. CI does the same for every target on Linux, macOS and Windows agents, then
-checks that all three agents built the same bytes for each target.
+checks that the Linux and macOS agents built the same bytes for each target, and reports how the
+Windows agent's differ.
 
 ### What Gradle caches
 
@@ -70,7 +72,8 @@ checks that all three agents built the same bytes for each target.
 - **The JDKs themselves aren't hashed** (their pin is the input), so a JDK replaced on disk under
   the same version isn't noticed; dependency verification is what catches that.
 - **The build machine is part of the key,** so a runtime linked on a Mac is never reused by a Linux
-  agent from a shared build cache, though the link now gives the same bytes on both.
+  agent from a shared build cache, though the link gives the same bytes on both. A Windows agent's
+  link really does differ.
 - **`appRuntimeArchive<Target>` runs again for a new version,** since the version is in its file's
   name, and writes the same bytes. Archive tasks are never cached; this one only copies.
 - **Gradle's dependency cache is keyed by coordinates,** not content, so a build that resolves each

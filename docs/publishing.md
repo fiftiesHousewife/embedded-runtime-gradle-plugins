@@ -54,7 +54,8 @@ too. JFrog's build-info record lists both modules, so promoting it moves a relea
 between repositories together.
 
 The saving holds only while the runtime archive really is the same bytes, and nothing fails when it
-stops being so: storage just grows. [Image layers and caching](caching.md#republishing-the-runtime)
+stops being so: storage just grows. Publish from Linux or macOS agents, which give the same bytes for
+every target; a Windows agent's jlink makes a different runtime. [Image layers and caching](caching.md#republishing-the-runtime)
 lists what keeps it identical.
 
 With a binary repository configured, releases go to `libs-release-local` and `-SNAPSHOT` versions to

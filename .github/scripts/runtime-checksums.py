@@ -5,8 +5,10 @@ both versions (the second from a clean build), then prints one line per target: 
 digest of its contents (each entry's name, type, mode and bytes), which tells a compression difference from a
 difference in what was archived.
 
-compare <file>...: fails unless every agent's record gives each target the same archive, and names the entries
-that differ.
+compare <file>... [--report <file>...]: fails unless the agents before --report built each target the same
+archive, naming the entries that differ; the agents after it are compared and reported, never failed. A
+Windows agent's jlink writes CRLF into `release`, backslashed pointers for duplicate legal notices, and
+generates java.lang.invoke classes differently, so its runtime is different bytes.
 
 The record's lines are `<target> <archive SHA-256> <contents digest>`, then `entry <target> <entry line>` for
 every entry, which is how compare finds what differs.
@@ -120,7 +122,7 @@ def shown(a, b):
     return f": {base64.b64decode(first)!r} vs {base64.b64decode(second)!r}"
 
 
-def compare(files):
+def read(files):
     seen, listed = {}, {}
     for file in files:
         agent = pathlib.Path(file).stem
@@ -129,26 +131,35 @@ def compare(files):
                 _, target, entry = line.split(" ", 2)
                 listed.setdefault((agent, target), []).append(entry)
             else:
-                target, archive, content = line.split()
-                seen.setdefault(target, []).append((agent, archive, content))
+                target, archive, _ = line.split()
+                seen.setdefault(target, {})[agent] = archive
+    return seen, listed
+
+
+def compare(files):
+    required = files[:files.index("--report")] if "--report" in files else files
+    reported = files[len(required) + 1:]
+    seen, listed = read(required + reported)
+    agents = [pathlib.Path(file).stem for file in required]
     failed = False
-    for target, records in sorted(seen.items()):
-        archives = {archive for _, archive, _ in records}
-        print(f"{target}: {'the same' if len(archives) == 1 else 'DIFFERENT'} on " +
-              ", ".join(f"{agent} {archive[:12]}" for agent, archive, _ in records))
-        if len(archives) == 1:
-            continue
-        failed = True
-        first = records[0][0]
-        for other, archive, _ in records[1:]:
-            if archive == records[0][1]:
+    for target, archives in sorted(seen.items()):
+        reference = agents[0]
+        print(f"{target}: " + ", ".join(f"{agent} {archive[:12]}" for agent, archive in archives.items()))
+        for other, archive in archives.items():
+            if other == reference or archive == archives[reference]:
                 continue
-            found = differences(listed[(first, target)], listed[(other, target)])
-            files = [f for f in found if not f.startswith("modules:")]
-            resources = [f for f in found if f.startswith("modules:")]
-            what = (f"{len(found)} entries differ: " + "; ".join(files[:6] + resources[:4])) if found else \
-                "compression only"
-            print(f"::error::{target}, {first} against {other}: {what}", file=sys.stderr)
+            found = differences(listed[(reference, target)], listed[(other, target)])
+            if other in agents:
+                failed = True
+                files_ = [f for f in found if not f.startswith("modules:")]
+                resources = [f for f in found if f.startswith("modules:")]
+                what = (f"{len(found)} entries differ: " + "; ".join(files_[:6] + resources[:4])) if found else \
+                    "compression only"
+                print(f"::error::{target}, {reference} against {other}: {what}", file=sys.stderr)
+            else:
+                names = [f.split(" (")[0] for f in found]
+                print(f"{target}: {other} differs from {reference} in {len(found)} entries, as expected: " +
+                      ", ".join(names[:5]))
     if failed:
         sys.exit(1)
 

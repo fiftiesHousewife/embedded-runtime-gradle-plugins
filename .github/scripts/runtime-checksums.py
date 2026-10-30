@@ -5,7 +5,11 @@ both versions (the second from a clean build), then prints one line per target: 
 digest of its contents (each entry's name, type, mode and bytes), which tells a compression difference from a
 difference in what was archived.
 
-compare <file>...: fails unless every agent's record gives each target the same archive.
+compare <file>...: fails unless every agent's record gives each target the same archive, and names the entries
+that differ.
+
+The record's lines are `<target> <archive SHA-256> <contents digest>`, then `entry <target> <entry line>` for
+every entry, which is how compare finds what differs.
 """
 import hashlib
 import pathlib
@@ -21,19 +25,20 @@ def sha256(data):
     return hashlib.sha256(data).hexdigest()
 
 
-def contents(path):
+def entries(path):
     lines = []
     if path.name.endswith(".zip"):
         with zipfile.ZipFile(path) as archive:
             for entry in archive.infolist():
                 mode = entry.external_attr >> 16
-                lines.append(f"{entry.filename} {mode:o} {sha256(archive.read(entry)) if not entry.is_dir() else '-'}")
+                data = sha256(archive.read(entry)) if not entry.is_dir() else "-"
+                lines.append(f"{entry.filename} {mode:o} {data}")
     else:
         with tarfile.open(path) as archive:
             for entry in archive:
                 data = archive.extractfile(entry).read() if entry.isfile() else b""
-                lines.append(f"{entry.name} {entry.type!r} {entry.mode:o} {entry.linkname} {sha256(data)}")
-    return sha256("\n".join(lines).encode())
+                lines.append(f"{entry.name} {entry.type.decode()}{entry.mode:o}{entry.linkname} {sha256(data)}")
+    return lines
 
 
 def runtimes(directory, version):
@@ -55,27 +60,55 @@ def record(first_directory, first, second_directory, second):
         if archive != sha256(after[target].read_bytes()):
             print(f"::error::{target}: the runtime archive changed between {first} and {second}", file=sys.stderr)
             failed = True
-        print(target, archive, contents(before[target]))
+        listed = entries(before[target])
+        print(target, archive, sha256("\n".join(listed).encode()))
+        for line in listed:
+            print("entry", target, line)
     if failed:
         sys.exit(1)
 
 
+def differences(first, second):
+    """`name (what differs)` for each entry the two listings don't share; `kind` is `mode` or `bytes`."""
+    mine, theirs = (dict(line.split(" ", 1) for line in listing) for listing in (first, second))
+    found = []
+    for name in sorted(mine.keys() | theirs.keys()):
+        a, b = mine.get(name), theirs.get(name)
+        if a == b:
+            continue
+        if a is None or b is None:
+            found.append(f"{name} (only one has it)")
+        else:
+            found.append(f"{name} ({'mode ' + a.split()[0] + ' vs ' + b.split()[0] if a.split()[0] != b.split()[0] else 'bytes'})")
+    return found
+
+
 def compare(files):
-    seen = {}
+    seen, listed = {}, {}
     for file in files:
+        agent = pathlib.Path(file).stem
         for line in pathlib.Path(file).read_text().splitlines():
-            target, archive, content = line.split()
-            seen.setdefault(target, []).append((pathlib.Path(file).stem, archive, content))
+            if line.startswith("entry "):
+                _, target, entry = line.split(" ", 2)
+                listed.setdefault((agent, target), []).append(entry)
+            else:
+                target, archive, content = line.split()
+                seen.setdefault(target, []).append((agent, archive, content))
     failed = False
     for target, records in sorted(seen.items()):
         archives = {archive for _, archive, _ in records}
-        same_contents = len({content for _, _, content in records}) == 1
         print(f"{target}: {'the same' if len(archives) == 1 else 'DIFFERENT'} on " +
               ", ".join(f"{agent} {archive[:12]}" for agent, archive, _ in records))
-        if len(archives) > 1:
-            why = "compression only: the contents are the same" if same_contents else "the contents differ"
-            print(f"::error::{target}: agents built different runtime archives ({why})", file=sys.stderr)
-            failed = True
+        if len(archives) == 1:
+            continue
+        failed = True
+        first = records[0][0]
+        for other, archive, _ in records[1:]:
+            if archive == records[0][1]:
+                continue
+            found = differences(listed[(first, target)], listed[(other, target)])
+            what = f"{len(found)} entries differ: " + "; ".join(found[:6]) if found else "compression only"
+            print(f"::error::{target}, {first} against {other}: {what}", file=sys.stderr)
     if failed:
         sys.exit(1)
 

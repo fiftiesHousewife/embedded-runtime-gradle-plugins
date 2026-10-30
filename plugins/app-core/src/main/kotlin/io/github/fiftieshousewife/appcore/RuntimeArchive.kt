@@ -9,7 +9,8 @@ import org.gradle.api.tasks.bundling.Zip
 
 /**
  * `appRuntimeArchive<Target>`: `runtime/` alone, published as `<app>-runtime`. Nothing in it names the app or
- * its version and its times, order and modes are fixed, so an unchanged runtime is the same bytes every release.
+ * its version, and its times, order and modes depend on nothing else, so an unchanged runtime is the same bytes on
+ * every machine and every release.
  */
 internal object RuntimeArchive {
     fun register(
@@ -29,18 +30,21 @@ internal object RuntimeArchive {
             archiveClassifier.set(target.id)
             archiveExtension.set(format.extension)
             destinationDirectory.set(project.layout.buildDirectory.dir("distributions"))
-            into(DIRECTORY) { from(runtime) }
-            useFileSystemPermissions()
-            AppCopySpecs.normalisedModes(this)
-            AppCopySpecs.executableBits(this)
+            // Modes by path, never the file system's: a Windows agent has none.
+            into(DIRECTORY) {
+                from(runtime)
+                AppCopySpecs.runtimeExecutableBits(this)
+            }
         }
     }
 
     /** Installed with the app, so the installed app runs as it is. */
     fun installed(project: Project, runtime: Any) = project.copySpec {
-        into(DIRECTORY) { from(runtime) }
+        into(DIRECTORY) {
+            from(runtime)
+            AppCopySpecs.runtimeExecutableBits(this)
+        }
         AppCopySpecs.readableByAll(this)
-        AppCopySpecs.executableBits(this)
     }
 
     const val SUFFIX = "-runtime"

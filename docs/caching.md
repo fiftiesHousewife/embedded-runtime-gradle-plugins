@@ -49,7 +49,7 @@ just grows. These are what could make them differ, and what the plugins do about
 | The JDK | One exact version, the pin, for every build. Gradle resolves it as a dependency, so `gradle/verification-metadata.xml` can pin its SHA-256 too, which catches a vendor re-releasing a version |
 | The app's name or version | Neither is in the runtime archive: its one directory is `runtime/`, and the version is only in the file's name |
 | Times and order | Every entry has the same fixed time, in a fixed order |
-| Modes | 0755 where the owner may run the file, else 0644, and 0755 for directories, whatever the build machine's umask |
+| Modes | 0755 for the runtime's executables (`bin/`, `jspawnhelper`, `jexec`), 0644 for every other file and 0755 for directories: by path alone, never from the build machine's file system, which on Windows has no modes and elsewhere depends on the umask |
 | jlink's own output | Reproducible for the same JDK, modules and options since the fixes for [JDK-8241602](https://bugs.openjdk.org/browse/JDK-8241602) and [JDK-8252730](https://bugs.openjdk.org/browse/JDK-8252730), which covered images built on different machines |
 | Debug symbols | `--strip-java-debug-attributes`, not `--strip-debug`: on Linux that also runs the build machine's `objcopy` over the native libraries, and its output depends on that machine's binutils |
 | The module list | A [shared set](#shared-module-sets), or the app's own modules sorted |
@@ -58,7 +58,8 @@ just grows. These are what could make them differ, and what the plugins do about
 | Compression | gzip by the JVM that runs Gradle. Publish from agents that run Gradle on the same JDK, with Gradle's [daemon JVM criteria](https://docs.gradle.org/current/userguide/gradle_daemon.html#sec:daemon_jvm_criteria), say |
 
 The plugins' own tests rebuild a runtime archive from scratch, and with a new app version, and
-compare the checksums.
+compare the checksums. CI does the same for every target on Linux, macOS and Windows agents, then
+checks that all three agents built the same bytes for each target.
 
 ### What Gradle caches
 

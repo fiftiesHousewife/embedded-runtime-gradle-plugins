@@ -77,6 +77,8 @@ Where things are tested:
   image as a random user in group 0 with no capabilities; `MicroTest` runs the micro image read-only,
   with no capabilities and 512 MiB. CI starts the x64 images only and builds the arm64 ones under QEMU.
   `.github/scripts/verify-rpm.sh` installs `java-service`'s RPM in Rocky Linux and under systemd.
+  `.github/scripts/runtime-checksums.py` records every target's runtime archive at two versions on
+  each OS leg, and the `runtime-reproducible` job checks the legs built the same bytes.
 - `KotlinAppTest`, `NodeAppPluginTest`, the settings plugin tests, and the URL unit tests.
 
 Known test caveats:
@@ -186,8 +188,9 @@ Metadata carries the standard OS and architecture attributes, and each app varia
 runtime module at the same version (optional in the POM, which has no artifact for it). The
 distribution's contents are the app alone; the install tasks add `runtime/` (`RuntimeArchive.installed`),
 so the RPM, the module search and `runApp` see the whole app. Nothing that reaches the runtime
-archive may depend on the app: no name or version inside it, modes normalised
-(`AppCopySpecs.normalisedModes`), `cacerts` written without a password under JVM-wide PKCS12
+archive may depend on the app or the agent: no name or version inside it, modes by path alone
+(`AppCopySpecs.runtimeExecutableBits`, which matches paths within the runtime's own tree, as a copy
+spec matches a file's source path), CI's `runtime-reproducible` job comparing agents, `cacerts` written without a password under JVM-wide PKCS12
 properties (`TrustedCertificates`; Java 17 has no other way to turn off the salted MAC), and jlink
 run with `--strip-java-debug-attributes` (`--strip-debug` runs the host's `objcopy`). `jlink<T>`
 keeps the host as an input, though its output no longer depends on it.

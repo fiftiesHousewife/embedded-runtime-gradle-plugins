@@ -38,6 +38,21 @@ jobs:
       # The sample's RPM, installed with dnf in a clean Rocky Linux 9 container, started and removed.
       - if: runner.os == 'Linux'
         run: .github/scripts/verify-rpm.sh samples/java-service/build/distributions/java-service-1.0.0-1.x86_64.rpm
+      # Every target's runtime archive, built at two app versions, the second from scratch: the same bytes
+      # each time, and (in runtime-reproducible below) the same on every agent.
+      - name: The runtime archives are the same bytes for both versions
+        run: |
+          targets=-PjavaApp.targets=linux-x64,linux-aarch64,windows-x64,mac-x64,mac-aarch64
+          first="$RUNNER_TEMP/runtime-9.0.0"
+          ./gradlew -p samples/java-service appArchive "$targets" -PappVersion=9.0.0
+          cp -R samples/java-service/build/distributions "$first"
+          ./gradlew -p samples/java-service clean appArchive "$targets" -PappVersion=9.0.1 --no-build-cache
+          python3 .github/scripts/runtime-checksums.py record \
+            "$first" 9.0.0 samples/java-service/build/distributions 9.0.1 | tee "runtime-${{ runner.os }}.txt"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: runtime-${{ runner.os }}
+          path: runtime-${{ runner.os }}.txt
       - run: ./gradlew -p samples/node-service build
       - run: ./gradlew -p samples/spring-boot-service build
       # Each Dockerfile's image, built and run with Testcontainers: it starts, answers its probes, is
@@ -69,6 +84,19 @@ jobs:
       # The post-edit hook shared by Claude Code, Copilot and Devin, called as each calls it.
       - if: runner.os == 'Linux'
         run: .github/scripts/test-agent-hooks.sh
+
+  # The runtime archive must be the same bytes whichever agent builds it, or a repository that stores
+  # by checksum keeps one copy per agent.
+  runtime-reproducible:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: runtime-*
+          merge-multiple: true
+      - run: python3 .github/scripts/runtime-checksums.py compare runtime-*.txt
 
   # A release as it should be done, end to end: the Java sample's archive is signed with Sigstore
   # (keyless: this workflow's own identity is the signing certificate) and given SLSA build

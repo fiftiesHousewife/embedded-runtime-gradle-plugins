@@ -4,7 +4,7 @@ plugins {
 }
 
 group = "io.github.fiftieshousewife.samples"
-version = "1.0.0"
+version = providers.gradleProperty("appVersion").getOrElse("1.0.0")
 description = "Sample HTTP service with its own Java runtime"
 
 application {

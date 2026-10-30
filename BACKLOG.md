@@ -13,7 +13,7 @@ upload. Still open:
 | Item | Notes |
 |---|---|
 | **A guard against silent duplication** | A runtime archive that stops being reproducible fails nothing; storage just grows. Write a fingerprint of the runtime's inputs (JDK pin and its SHA-256, the modules, the jlink options, the customisation record) beside the archive, for the publishing step to set as an Artifactory property (`runtime.inputs`); a pipeline that finds the previous release's fingerprint equal but its SHA-256 different fails |
-| **Reproducible across machines in CI** | The tests rebuild on one machine. Build the sample's runtime archives on two CI agents (the Linux and macOS legs, for the Linux targets) and compare their checksums; then `jlink<T>` could drop the host from its cache key |
+| **The host in `jlink<T>`'s cache key** | CI's `runtime-reproducible` job now compares every target's runtime archive across the Linux, macOS and Windows agents. Once it has stayed green, `jlink<T>` can drop the host from its inputs, so a shared build cache serves one agent's link to another |
 | **Measure the saving** | Runtime archive size × apps × retained versions, against the app archives, from a real repository's Storage Summary |
 | **An SBOM for the runtime module** | The app's SBOM lists the runtime; the runtime module carries none of its own |
 | **CDS on the host** | Not linked into the runtime (`--generate-cds-archive` is not deterministic). `-XX:+AutoCreateSharedArchive -XX:SharedArchiveFile=<data dir>/app.jsa` in the launcher would build one on the host on first start |

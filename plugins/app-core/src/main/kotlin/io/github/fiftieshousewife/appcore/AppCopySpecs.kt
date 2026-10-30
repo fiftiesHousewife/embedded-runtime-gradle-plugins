@@ -16,6 +16,14 @@ object AppCopySpecs {
         spec.filesMatching(executablePatterns) { permissions { unix("rwxr-xr-x") } }
     }
 
+    /** For a spec copying the runtime's own tree: patterns match a file's path in its source, not its destination. */
+    fun runtimeExecutableBits(spec: CopySpec) {
+        val runtime = executables.filter { it.startsWith(RUNTIME) }.map { it.removePrefix(RUNTIME) }
+        spec.filesMatching(runtime) { permissions { unix("rwxr-xr-x") } }
+    }
+
+    private const val RUNTIME = "runtime/"
+
     /** So a read-only runtime (a JDK's `legal/`) can be replaced; `permissions {}` alone would drop exec bits. */
     fun ownerWritable(spec: CopySpec) {
         spec.eachFile {
@@ -31,23 +39,6 @@ object AppCopySpecs {
             permissions { unix(mode) }
         }
     }
-
-    /**
-     * 0755 or 0644 by the owner's execute bit alone, directories 0755: the runtime archive must be the same bytes
-     * whatever the build machine's umask, and whoever unpacks it must be able to read it.
-     */
-    fun normalisedModes(spec: CopySpec) {
-        spec.eachFile {
-            val mode = normalised(permissions.toUnixNumeric())
-            permissions { unix(mode) }
-        }
-        spec.dirPermissions { unix(EXECUTABLE) }
-    }
-
-    internal fun normalised(mode: Int): Int = if (mode and OWNER_EXECUTE != 0) EXECUTABLE else FILE
-
-    private const val EXECUTABLE = 0b111_101_101
-    private const val FILE = 0b110_100_100
 
     internal fun readable(mode: Int): Int = mode or READ_ALL or if (mode and OWNER_EXECUTE != 0) EXECUTE_ALL else 0
 

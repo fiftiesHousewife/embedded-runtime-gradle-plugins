@@ -86,8 +86,10 @@ class TrustedCertificatesTest {
         )
     }
 
+    /** Writable, as `customiseRuntime` makes its copy of the runtime: some JDKs ship `cacerts` read-only. */
     private fun jdkCacerts(name: String): File = File(dir, name).also {
         Files.copy(Path.of(System.getProperty("java.home"), "lib", "security", "cacerts"), it.toPath())
+        it.setWritable(true)
     }
 
     @Test

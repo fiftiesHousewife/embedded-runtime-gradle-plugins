@@ -47,7 +47,7 @@ jobs:
           ./gradlew -p samples/java-service appArchive "$targets" -PappVersion=9.0.0
           cp -R samples/java-service/build/distributions "$first"
           ./gradlew -p samples/java-service clean appArchive "$targets" -PappVersion=9.0.1 --no-build-cache
-          python3 .github/scripts/runtime-checksums.py record \
+          JIMAGE="$JAVA_HOME/bin/jimage" python3 .github/scripts/runtime-checksums.py record \
             "$first" 9.0.0 samples/java-service/build/distributions 9.0.1 | tee "runtime-${{ runner.os }}.txt"
       - uses: actions/upload-artifact@v4
         with:

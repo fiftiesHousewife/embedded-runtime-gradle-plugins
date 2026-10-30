@@ -11,11 +11,15 @@ that differ.
 The record's lines are `<target> <archive SHA-256> <contents digest>`, then `entry <target> <entry line>` for
 every entry, which is how compare finds what differs.
 """
+import base64
 import hashlib
+import os
 import pathlib
 import re
+import subprocess
 import sys
 import tarfile
+import tempfile
 import zipfile
 
 ARCHIVE = re.compile(r"^(?P<app>.+)-runtime-(?P<version>[^-]+)-(?P<target>[a-z]+-[a-z0-9]+)\.(?P<ext>tar\.gz|zip)$")
@@ -25,19 +29,42 @@ def sha256(data):
     return hashlib.sha256(data).hexdigest()
 
 
+def preview(data):
+    """The start of a small file, so a report can show how two copies differ."""
+    return base64.b64encode(data[:120]).decode() if len(data) < 4096 else "-"
+
+
+def modules(data):
+    """lib/modules resource by resource, with $JIMAGE (the host JDK's jimage), when it is set."""
+    tool = os.environ.get("JIMAGE")
+    if not tool:
+        return []
+    with tempfile.TemporaryDirectory() as work:
+        image = pathlib.Path(work, "modules")
+        image.write_bytes(data)
+        out = pathlib.Path(work, "out")
+        subprocess.run([tool, "extract", "--dir", str(out), str(image)], check=True)
+        return [f"modules:{path.relative_to(out).as_posix()} f {sha256(path.read_bytes())} {preview(path.read_bytes())}"
+                for path in sorted(out.rglob("*")) if path.is_file()]
+
+
 def entries(path):
     lines = []
     if path.name.endswith(".zip"):
         with zipfile.ZipFile(path) as archive:
             for entry in archive.infolist():
                 mode = entry.external_attr >> 16
-                data = sha256(archive.read(entry)) if not entry.is_dir() else "-"
-                lines.append(f"{entry.filename} {mode:o} {data}")
+                data = archive.read(entry) if not entry.is_dir() else b""
+                lines.append(f"{entry.filename} {mode:o} {sha256(data)} {preview(data)}")
+                if entry.filename.endswith("lib/modules"):
+                    lines += modules(data)
     else:
         with tarfile.open(path) as archive:
             for entry in archive:
                 data = archive.extractfile(entry).read() if entry.isfile() else b""
-                lines.append(f"{entry.name} {entry.type.decode()}{entry.mode:o}{entry.linkname} {sha256(data)}")
+                lines.append(f"{entry.name} {entry.type.decode()}{entry.mode:o}{entry.linkname} {sha256(data)} {preview(data)}")
+                if entry.name.endswith("lib/modules"):
+                    lines += modules(data)
     return lines
 
 
@@ -74,13 +101,23 @@ def differences(first, second):
     found = []
     for name in sorted(mine.keys() | theirs.keys()):
         a, b = mine.get(name), theirs.get(name)
-        if a == b:
+        if a is not None and b is not None and a.split()[:2] == b.split()[:2]:
             continue
         if a is None or b is None:
             found.append(f"{name} (only one has it)")
+        elif a.split()[0] != b.split()[0]:
+            found.append(f"{name} (mode {a.split()[0]} vs {b.split()[0]})")
         else:
-            found.append(f"{name} ({'mode ' + a.split()[0] + ' vs ' + b.split()[0] if a.split()[0] != b.split()[0] else 'bytes'})")
+            found.append(f"{name} (bytes{shown(a, b)})")
     return found
+
+
+def shown(a, b):
+    """For a small file, how each copy starts."""
+    first, second = a.split()[-1], b.split()[-1]
+    if "-" in (first, second):
+        return ""
+    return f": {base64.b64decode(first)!r} vs {base64.b64decode(second)!r}"
 
 
 def compare(files):
@@ -107,7 +144,10 @@ def compare(files):
             if archive == records[0][1]:
                 continue
             found = differences(listed[(first, target)], listed[(other, target)])
-            what = f"{len(found)} entries differ: " + "; ".join(found[:6]) if found else "compression only"
+            files = [f for f in found if not f.startswith("modules:")]
+            resources = [f for f in found if f.startswith("modules:")]
+            what = (f"{len(found)} entries differ: " + "; ".join(files[:6] + resources[:4])) if found else \
+                "compression only"
             print(f"::error::{target}, {first} against {other}: {what}", file=sys.stderr)
     if failed:
         sys.exit(1)

@@ -18,7 +18,7 @@ abstract class AppSmokeTestPlugin : Plugin<Project> {
             project.configurations.dependencyScope("smokeTest") {
                 description = "Published app archives to smoke-test on this machine"
             }
-        val machineArchives = MachineArchives.resolvable(project, "smokeTestArchives", declared)
+        val machineArchives = MachineArchives.resolvable(project, "smokeTestArchives", declared, transitive = true)
         val extension = extension(project)
         val smoke =
             project.tasks.register("appSmokeTest", AppSmokeTest::class.java) {

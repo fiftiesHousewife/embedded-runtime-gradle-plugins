@@ -58,7 +58,7 @@ embeddedRuntime {
         repository = "artifactory"              // binaryRepo.repository: borrow a repository the build declares
         url = "https://repo.example.com"        // binaryRepo.url
         mavenRepo = "maven-virtual"             // binaryRepo.repo.maven; likewise gradlePluginsRepo,
-        runtimesRepo = "runtimes"               // runtimesRepo, releasesRepo, snapshotsRepo, rpmRepo, npmRepo
+        runtimesRepo = "runtimes"               // runtimesRepo, releasesRepo, snapshotsRepo, npmRepo
         allowInsecureProtocol = false           // binaryRepo.allowInsecureProtocol
     }
     jdk {
@@ -95,16 +95,17 @@ Each defaults to the `-PappSmokeTest.<name>` property of the same name.
 
 | Task | Does |
 |---|---|
-| `appArchive` | Builds every target's archive; part of `assemble` |
+| `appArchive` | Builds every target's app and runtime archives; part of `assemble` |
+| `appRuntimeArchive<Target>` | The runtime alone, `build/distributions/<app>-runtime-<version>-<target>.tar.gz` (`.zip` for Windows), with `runtime/` at its root |
 | `install<Target>Dist`, `<target>DistTar`, `<target>DistZip` | The distribution plugin's tasks for each target's distribution, e.g. `installLinuxX64Dist` |
 | `installDist` | Installs this machine's app with its runtime into `build/install/<app>` |
 | `startScripts` | Gradle's own task; writes the Java launchers with the embedded-runtime script generator |
-| `appRpm` | Builds each Linux target's RPM (`appRpmLinuxX64`, …), when enabled; part of `assemble`. `publish` uploads them when there is a YUM repository |
-| `appSmokeTest` | Starts this machine's archive and waits for its health check; part of `check` |
+| `appRpm` | Builds each Linux target's RPM (`appRpmLinuxX64`, …), when enabled; part of `assemble`. RPMs are not published |
+| `appSmokeTest` | Unpacks this machine's app archive with its runtime archive, starts it and waits for its health check; part of `check` |
 | `runApp` | Runs this machine's packaged app; pass arguments with `-Pargs="…"` |
 | `appVerifyPolicyLinuxX64`, … | Checks an assembled app against the runtime policy; every archive depends on it |
 | `appDockerfile` | Creates the project's `Dockerfile` if missing and keeps its embedded-runtime block up to date; one without the block is left as written |
-| `appDockerContext` | Writes a container build context: the Dockerfile and each `Dockerfile.<name>`, plus each Linux archive, its runtime and the rest as image trees under `layers/<cpu>/runtime/` and `layers/<cpu>/app/` (and, for older Dockerfiles, under `runtime/<cpu>/` and `app/<cpu>/`), with fixed file times |
+| `appDockerContext` | Writes a container build context: the Dockerfile and each `Dockerfile.<name>`, plus each Linux target's runtime archive and app archive, unpacked as image trees under `layers/<cpu>/runtime/` and `layers/<cpu>/app/` (and, for older Dockerfiles, under `runtime/<cpu>/` and `app/<cpu>/`), with fixed file times |
 | `checkRuntimeSupport` | Fails if the embedded runtime's release line has reached end of life; warns if it will within 90 days or a newer patch is out. Not part of `check`; see [Keeping the runtime patched](runtime-updates.md) |
 | `downloadJdk<Target>` | Java, with `javaApp.jdk.source=yum:…`: the JDK package from the YUM repository, found in its metadata and checked against its SHA-256 |
 | `jlinkFindModules` | Java: finds the modules jdeps can't see, by running the app |
@@ -140,7 +141,6 @@ above.
 | `appSmokeTest.sigstoreTrustedRoot` | fetched from Sigstore | A copy of Sigstore's `trusted_root.json`, for machines that can't fetch it |
 | `appSmokeTest.securityPolicy` | | In a build applying `app-smoke-test`: the policy every archive must comply with before it is started |
 | `javaApp.rpm`, `nodeApp.rpm` | `false` | Also build an RPM per Linux target |
-| `javaApp.rpmRepositoryUrl`, `nodeApp.rpmRepositoryUrl` | `binaryRepo.repo.rpm` | A YUM repository accepting HTTP PUT, where `publish` uploads the RPMs |
 | `javaApp.runtimeOptions`, `nodeApp.runtimeOptions` | `open` | `locked` refuses to start while anything would add runtime options |
 | `javaApp.smokeTestTimeout`, `nodeApp.smokeTestTimeout` | `60` | Seconds the started archive may take to get healthy, in `appSmokeTest` and `jlinkFindModules` |
 | `javaApp.allowUntestedPublish`, `nodeApp.allowUntestedPublish` | `false` | Allow publishing an archive that was never started |
@@ -149,14 +149,13 @@ above.
 | `javaApp.runtimeSupportUrl`, `nodeApp.runtimeSupportUrl` | `https://endoflife.date/api/v1/products/` | Where `checkRuntimeSupport` reads end-of-life data; a mirror behind a corporate network |
 | `javaApp.endOfLifeWarningDays`, `nodeApp.endOfLifeWarningDays` | `90` | How early `checkRuntimeSupport` warns of an end of life |
 | `javaApp.allowEndOfLife`, `nodeApp.allowEndOfLife` | `false` | `checkRuntimeSupport` warns instead of failing on an end-of-life runtime |
-| `binaryRepo.repository` | found | The name of a repository the build declares (found when not set; `none` borrows nothing): its server and credentials are used for the runtime archives, npm, publishing and uploads, and the build's own repositories are kept |
+| `binaryRepo.repository` | found | The name of a repository the build declares (found when not set; `none` borrows nothing): its server and credentials are used for the runtime archives, npm and publishing, and the build's own repositories are kept |
 | `binaryRepo.url` | | With no repository declared: download everything through this binary repository (Artifactory, Nexus, …), logging in with `binaryRepoUsername` / `binaryRepoPassword` |
 | `binaryRepo.repo.maven` | `maven-virtual` | |
 | `binaryRepo.repo.gradlePlugins` | `gradle-plugins-virtual` | |
 | `binaryRepo.repo.npm` | `api/npm/npm-virtual` | |
 | `binaryRepo.repo.runtimes` | `runtimes` | |
 | `binaryRepo.repo.releases`, `binaryRepo.repo.snapshots` | `libs-release-local`, `libs-snapshot-local` | |
-| `binaryRepo.repo.rpm` | `rpm-local` | Where `publish` uploads the RPMs |
 | `javaApp.jdk.reuseToolchain` | `true` | Embed the compile toolchain's JDK for this machine's target when it is exactly the pinned distribution and version |
 | `binaryRepo.allowInsecureProtocol` | `false` | Allow `http://` (test instances only) |
 

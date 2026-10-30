@@ -1,7 +1,7 @@
 # Testing the container image
 
 `appDockerContext` gives you a build context: the project's `Dockerfile`, each `Dockerfile.<name>`
-beside it, and every Linux archive, its runtime and the rest as image trees under
+beside it, and every Linux target's runtime archive and app archive, unpacked as image trees under
 `layers/<cpu>/runtime/` and `layers/<cpu>/app/` (and, as before, under `runtime/<cpu>/` and `app/<cpu>/`). The plugins construct the Dockerfiles and the context; building images and running
 them is left to your build or CI, since how and where images are built (Docker, Buildah, a CI
 service) differs from one organisation to the next. The

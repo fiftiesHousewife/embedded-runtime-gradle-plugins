@@ -6,8 +6,9 @@
 [![Gradle](https://img.shields.io/badge/Gradle-9.8%2B-02303A.svg)](https://gradle.org)
 
 Package a Java or Node.js application **with its own runtime**: your code, its libraries, and a
-pinned JDK or Node.js, in one archive per target or as an RPM. Servers and containers need nothing
-installed, and the archive that passes CI is the archive that runs in production.
+pinned JDK or Node.js, as an app archive and a runtime archive per target, or as an RPM. Servers and
+containers need nothing installed, and what passes CI is what runs in production. The runtime archive
+is the same bytes in every release that doesn't change it, so a repository that stores by checksum keeps it once.
 
 | Plugin | For | Embeds |
 |---|---|---|
@@ -87,7 +88,7 @@ application {
 javaApp {
     appName = "orders-service"                 // launcher, archive and RPM name; default: the project name
 
-    // Target platforms: one archive each, zip for Windows and tar.gz for Linux. A Mac or Windows
+    // Target platforms: an app and a runtime archive each, zip for Windows and tar.gz for Linux. A Mac or Windows
     // machine builds the Linux ones directly, with no containers. Only this machine's archive can be
     // started, so only it is smoke-tested.
     targets("linux-x64", "linux-aarch64", "windows-x64")
@@ -149,8 +150,9 @@ javaApp.allowUntestedPublish=true
 javaApp.smokeTestTimeout=90
 ```
 
-`./gradlew build` then gives three archives in `build/distributions/` and two RPMs. `publish` uploads
-them under one version, with the target as the classifier, and the RPMs to the YUM repository. The
+`./gradlew build` then gives an app archive and a runtime archive for each of the three targets in
+`build/distributions/`, and two RPMs. `publish` uploads the archives as two modules under one version,
+`<app>` and `<app>-runtime`, with the target as the classifier; the RPMs are not published. The
 runtime policy is checked before any archive is built. See [Building for Linux, Mac and
 Windows](docs/targets.md), [Java: modules, hardening and JDKs](docs/java.md) and [Packaging and
 deploying](docs/packaging.md).
@@ -194,7 +196,7 @@ The Node.js version is `nodeApp.node.version` (default: the plugin's pin), and
 [What your app needs to do](docs/your-app.md#nodejs-trusted-cas-and-tls) and
 [Behind a corporate binary repository](docs/binary-repository.md) for npm registries and CAs.
 
-### How big the archive is
+### How big the archives are
 
 Measured for linux-x64 against Temurin 21.0.12.1+1, on 25 October 2026, in megabytes of a million
 bytes:
@@ -203,11 +205,11 @@ bytes:
 |---|---|---|
 | Full Temurin 21 JDK, for comparison | 207.5 MB | 353 MB |
 | Temurin 21 JRE, for comparison | 52.1 MB | |
-| **Spring Boot 4.1 web service with Actuator: the whole archive** | **58.9 MB** | **85.7 MB** |
-| of which the trimmed runtime (13 modules found by jdeps, 18 with what they need) | 39.3 MB | 63.9 MB |
-| of which Spring Boot, Tomcat, Jackson and the service (50 jars) | 19.7 MB | 21.8 MB |
-| **Plain HTTP service on the JDK's own server: the whole archive** | **21.0 MB** | **40.9 MB** |
-| of which the trimmed runtime (`java.base`, `jdk.httpserver`; 26 MB of it is the JVM itself) | | 40.9 MB |
+| **Spring Boot 4.1 web service with Actuator: both archives** | **58.9 MB** | **85.7 MB** |
+| of which the runtime archive (13 modules found by jdeps, 18 with what they need) | 39.3 MB | 63.9 MB |
+| of which the app archive: Spring Boot, Tomcat, Jackson and the service (50 jars) | 19.7 MB | 21.8 MB |
+| **Plain HTTP service on the JDK's own server: both archives** | **21.0 MB** | **40.9 MB** |
+| of which the runtime archive (`java.base`, `jdk.httpserver`; 26 MB of it is the JVM itself) | | 40.9 MB |
 
 A whole Spring Boot service, runtime included, is about the size of the vendor's JRE download
 alone. The runtime grows with the modules the app needs: Spring's `java.desktop`, pulled in by
@@ -276,8 +278,8 @@ setting and its default is in the [reference](docs/reference.md).
 |---|---|---|
 | `appRpm`, `appRpm<Target>` | Builds an RPM for each Linux target; part of `assemble` when enabled | `rpm { enabled, user, systemd }`, `appName`, `license`, the project's `description`; `-PjavaApp.rpm` |
 | `appDockerfile` | Creates the project's root `Dockerfile` if missing and keeps the plugin's block of it up to date | |
-| `appDockerContext` | Writes a container build context: the Dockerfile plus each Linux archive, by CPU | `targets(…)`, `license` |
-| `publish` | Gradle's own: publishes every target's archive under one version, with the target as the classifier, and uploads the RPMs when there is a YUM repository. Stops for archives never started on this machine | `-PbinaryRepo.repository` or `-PbinaryRepo.url`, `-PbinaryRepo.repo.releases`, `-PbinaryRepo.repo.snapshots`, `-PbinaryRepo.repo.rpm` or `-PjavaApp.rpmRepositoryUrl`, `-PjavaApp.allowUntestedPublish` |
+| `appDockerContext` | Writes a container build context: the Dockerfile plus each Linux target's runtime and app, by CPU | `targets(…)`, `license` |
+| `publish` | Gradle's own: publishes every target's app archive as `<app>` and runtime archive as `<app>-runtime`, under one version, with the target as the classifier. Stops for archives never started on this machine | `-PbinaryRepo.repository` or `-PbinaryRepo.url`, `-PbinaryRepo.repo.releases`, `-PbinaryRepo.repo.snapshots`, `-PjavaApp.allowUntestedPublish` |
 | `aiSkills` | Writes the AI assistant skills and the build-check hook into the project, and adds the Claude Code plugin to `.claude/settings.json`; part of `assemble` | `-PjavaApp.aiSkills` |
 
 In a deployment pipeline, the `app-smoke-test` plugin adds its own `appSmokeTest`, which smoke-tests

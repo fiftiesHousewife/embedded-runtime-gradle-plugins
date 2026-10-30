@@ -31,12 +31,15 @@ app has no classpath, so its defaults go in `src/deploy/conf/` and ship as `conf
 file. A Java build can ship such a directory too, with `configDefaults`; an RPM installs it as
 `/etc/<name>/`.
 
-## Inside the archive
+## Inside the archives
+
+Each target has two archives: the app, and its runtime, which unpacks as `runtime/` inside the app's
+directory. Installed, the app is laid out like this:
 
 ```
 orders-service-1.4.2/
   bin/orders-service      # .bat on Windows targets
-  runtime/                # the embedded JDK or Node.js
+  runtime/                # the embedded JDK or Node.js: the runtime archive
   lib/                    # Java: your jar and its dependencies
   app/                    # Node: your code, package.json and production node_modules
   security/               # Node: trusted-cas.pem, when nodeApp.security or the runtime policy names CAs
@@ -45,7 +48,9 @@ orders-service-1.4.2/
   META-INF/sbom.cdx.json  # CycloneDX SBOM, including the runtime
 ```
 
-Archives are reproducible: rebuilding the same commit gives a byte-identical file.
+Archives are reproducible: rebuilding the same commit gives byte-identical files. The runtime
+archive names neither the app nor its version, so a new release on the same runtime gives the same
+runtime archive again; see [Image layers and caching](caching.md#republishing-the-runtime).
 
 The SBOM lists the embedded runtime and every library, with their hashes, in the CycloneDX format
 that vulnerability scanners such as Dependency-Track, Grype and Snyk read. It is also published next

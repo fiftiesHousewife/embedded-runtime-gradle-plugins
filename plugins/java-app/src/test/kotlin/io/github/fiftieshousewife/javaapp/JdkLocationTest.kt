@@ -23,7 +23,6 @@ class JdkLocationTest {
             runtimesRepo = "runtimes",
             releasesRepo = "libs-release-local",
             snapshotsRepo = "libs-snapshot-local",
-            rpmRepo = "rpm-local",
             allowInsecureProtocol = false,
         )
 

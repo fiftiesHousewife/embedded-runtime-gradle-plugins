@@ -45,8 +45,8 @@ anywhere else.
 
 5. **Never add** `jdk.jdwp.agent` (remote debugging) to a production runtime. The plugin's
    `security { forbiddenModules }` fails the build if it appears.
-6. **Check the result.** `./gradlew build` passes, and the archive in `build/distributions/` is still
-   small; a runtime over about 60 MB usually means a broad module like `java.se` was added.
+6. **Check the result.** `./gradlew build` passes, and the runtime archive in `build/distributions/`
+   (`<app>-runtime-<version>-<target>`) is still small; a runtime over about 60 MB usually means a broad module like `java.se` was added.
 
 ## Notes
 

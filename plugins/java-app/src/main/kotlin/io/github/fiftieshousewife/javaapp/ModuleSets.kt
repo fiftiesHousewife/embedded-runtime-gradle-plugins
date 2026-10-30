@@ -40,7 +40,7 @@ internal object ModuleSets {
             .filter { (_, modules) -> modules.containsAll(needed) && modules.none(forbidden::contains) }
             .minWithOrNull(compareBy<Map.Entry<String, List<String>>>({ it.value.size }, { it.key }))
             ?.value
-            ?: needed
+            ?: needed.sorted()
 
     private fun split(modules: String) = modules.split(',').map(String::trim).filter(String::isNotEmpty)
 }

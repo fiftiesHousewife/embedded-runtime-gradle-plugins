@@ -1,5 +1,6 @@
 package io.github.fiftieshousewife.appcore.tasks
 
+import io.github.fiftieshousewife.appcore.RuntimeArchive
 import io.github.fiftieshousewife.appcore.RuntimePolicyCheck
 import io.github.fiftieshousewife.appcore.RuntimePolicySource
 import io.github.fiftieshousewife.appcore.Target
@@ -23,12 +24,15 @@ import org.gradle.api.tasks.TaskAction
 import org.gradle.work.DisableCachingByDefault
 import org.gradle.workers.WorkerExecutor
 import java.io.File
+import java.nio.file.Files
 import java.time.Duration
 import javax.inject.Inject
 
 /**
  * Proves an archive itself works, not the build directories it came from: extracts each of
- * [archives] afresh and starts it once with [SmokeRun]. Each archive describes itself in
+ * [archiveFiles] afresh and starts it once with [SmokeRun]. An app archive without `runtime/` runs on
+ * its runtime archive (`<app>-runtime-<version>-<target>`, a single `runtime/` directory), which must be
+ * among [archiveFiles] too, unpacked into the app as a deployment would. Each app archive describes itself in
  * `META-INF/app.json` (name, version, target), so the same task tests the archive a build has just
  * made and one a consuming build has resolved from a repository.
  *
@@ -43,8 +47,9 @@ constructor(
     private val archives: ArchiveOperations,
     private val workers: WorkerExecutor,
 ) : DefaultTask() {
+    /** File names pair an app with its runtime archive. */
     @get:InputFiles
-    @get:PathSensitive(PathSensitivity.NONE)
+    @get:PathSensitive(PathSensitivity.NAME_ONLY)
     abstract val archiveFiles: ConfigurableFileCollection
 
     @get:Input abstract val healthTimeout: Property<Duration>
@@ -89,15 +94,19 @@ constructor(
     @TaskAction
     fun smokeTest() {
         signer.orNull?.let(::verifySignatures)
-        val results = archiveFiles.files.sortedBy { it.name }.mapIndexed(::test)
+        val extracted = archiveFiles.files.sortedBy { it.name }
+            .mapIndexed { index, file -> file to extractTopDirectory(file, temporaryDir.resolve("extract-$index")) }
+        val (runtimes, apps) = extracted.partition { (_, home) -> home.name == RuntimeArchive.DIRECTORY }
+        val runtimeHomes = runtimes.associate { (file, home) -> file.name to home }
+        val results = apps.mapIndexed { index, (file, home) -> test(index, file, home, runtimeHomes) }
         resultFile.get().asFile.writeText(results.joinToString("\n") + "\n")
     }
 
-    private fun test(index: Int, archiveFile: File): String {
+    private fun test(index: Int, archiveFile: File, home: File, runtimes: Map<String, File>): String {
         val host = Target.host()
-        val home = extractTopDirectory(archiveFile, temporaryDir.resolve("extract-$index"))
-        requirePolicy(home)
         val manifest = AppManifest.read(home)
+        installRuntime(home, manifest, runtimes)
+        requirePolicy(home)
         val work = temporaryDir.resolve("run-$index").apply { mkdirs() }
         val launcher = launcher(home, manifest, host)
         val result = SmokeRun(launcher, host.isWindows, work, healthTimeout.get()).run(manifest.version)
@@ -140,6 +149,18 @@ constructor(
         val launcher = home.resolve(if (host.isWindows) "bin/${manifest.name}.bat" else "bin/${manifest.name}")
         if (!launcher.isFile) throw GradleException("Launcher $launcher missing")
         return launcher
+    }
+
+    private fun installRuntime(home: File, manifest: AppManifest, runtimes: Map<String, File>) {
+        val installed = home.resolve(RuntimeArchive.DIRECTORY)
+        if (installed.isDirectory) return
+        val prefix = "${manifest.name}${RuntimeArchive.SUFFIX}-${manifest.version}-${manifest.target}."
+        val runtime = runtimes.entries.firstOrNull { it.key.startsWith(prefix) }?.value
+            ?: throw GradleException(
+                "${manifest.name} ${manifest.version} has no runtime: its archive holds none, " +
+                    "and no $prefix* archive was given to start it with",
+            )
+        Files.move(runtime.toPath(), installed.toPath())
     }
 
     private fun requirePolicy(home: File) {

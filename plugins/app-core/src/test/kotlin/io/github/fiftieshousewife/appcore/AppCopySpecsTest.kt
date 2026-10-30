@@ -34,4 +34,14 @@ class AppCopySpecsTest {
             { assertEquals(0b111_111_101, AppCopySpecs.readable(0b111_110_100)) },
         )
     }
+
+    @Test
+    fun `the runtime archive's modes depend only on whether the owner may run a file, never on the umask`() {
+        assertAll(
+            { assertEquals(0b110_100_100, AppCopySpecs.normalised(0b110_110_100)) },
+            { assertEquals(0b110_100_100, AppCopySpecs.normalised(0b100_000_000)) },
+            { assertEquals(0b111_101_101, AppCopySpecs.normalised(0b111_111_101)) },
+            { assertEquals(0b111_101_101, AppCopySpecs.normalised(0b101_000_000)) },
+        )
+    }
 }

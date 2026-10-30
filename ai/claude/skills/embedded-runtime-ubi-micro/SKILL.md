@@ -13,7 +13,7 @@ loads the system `libz.so.1`. Without it the container exits at once with code 1
 ## 1. Start from the build context
 
 `./gradlew appDockerContext` writes `build/docker-context/`: the project's `Dockerfile`, each
-`Dockerfile.<name>` beside it, and every Linux archive split into two image trees with fixed times,
+`Dockerfile.<name>` beside it, and every Linux target's runtime and app archives unpacked as two image trees with fixed times,
 `layers/<cpu>/runtime/` and `layers/<cpu>/app/` (also, for older Dockerfiles, `runtime/<cpu>/` and `app/<cpu>/`).
 Create `Dockerfile.micro` next to `build.gradle.kts`, copied from the generated `Dockerfile`, and
 change it as below. Pin both images by tag and digest: the default Dockerfile's `ubi9/ubi-minimal`

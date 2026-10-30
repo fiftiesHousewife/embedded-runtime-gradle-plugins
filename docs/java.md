@@ -46,7 +46,7 @@ javaApp {
 
 `moduleSets.set(mapOf(...))` replaces the plugin's sets with your own, and
 `moduleSets.set(emptyMap())` links exactly the app's modules. Choose sets from the runtimes
-you actually ship: each archive's `runtime/release` file lists its modules on its `MODULES=` line.
+you actually ship: each runtime archive's `runtime/release` file lists its modules on its `MODULES=` line.
 [Image layers and caching](caching.md) has heuristics for choosing them.
 
 Every runtime is linked without debug information, man pages or headers, and compressed.

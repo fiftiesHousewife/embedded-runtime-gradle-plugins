@@ -14,6 +14,7 @@ import java.util.HexFormat
 internal object TrustedCertificates {
     /** The JDK's well-known default; trust entries are public, so it protects nothing. */
     private val PASSWORD = "changeit".toCharArray()
+    private const val PKCS12 = "PKCS12"
     private val EXTENSIONS = setOf("pem", "crt", "cer", "der")
     private val FINGERPRINT = HexFormat.ofDelimiter(":").withUpperCase()
 
@@ -41,17 +42,37 @@ internal object TrustedCertificates {
     /** Returns one line per certificate for the customisation record. */
     fun install(cacerts: File, files: List<File>, replace: Boolean, prefix: String = APPROVED): List<String> {
         requireDistinctNames(files)
-        val store = if (replace) {
-            KeyStore.getInstance("PKCS12").apply {
-                load(null, PASSWORD)
-            }
-        } else {
-            KeyStore.getInstance(cacerts, PASSWORD)
+        val store = KeyStore.getInstance(PKCS12).apply { load(null, null) }
+        if (!replace) {
+            val existing = KeyStore.getInstance(cacerts, PASSWORD)
+            existing.aliases().toList().sorted().forEach { store.setCertificateEntry(it, existing.getCertificate(it)) }
         }
         val lines = files.flatMap { file -> add(store, file, prefix) }
-        Files.newOutputStream(cacerts.toPath()).use { store.store(it, PASSWORD) }
+        unprotected { Files.newOutputStream(cacerts.toPath()).use { store.store(it, null) } }
         return lines
     }
+
+    /**
+     * Written as the JDK's own `cacerts` since 18, with no MAC and no encryption. Either would add random salts,
+     * and Java 17's JKS dates every entry, so the runtime would be different bytes every build. Java 17's
+     * `PKCS12` has no other way to ask for that than these JVM-wide properties, so they are set only meanwhile.
+     */
+    private fun unprotected(store: () -> Unit) = synchronized(this) {
+        val previous = UNPROTECTED.associateWith { System.getProperty(it) }
+        UNPROTECTED.forEach { System.setProperty(it, NONE) }
+        try {
+            store()
+        } finally {
+            previous.forEach(::restore)
+        }
+    }
+
+    private fun restore(key: String, value: String?) {
+        if (value == null) System.clearProperty(key) else System.setProperty(key, value)
+    }
+
+    private const val NONE = "NONE"
+    private val UNPROTECTED = listOf("keystore.pkcs12.certProtectionAlgorithm", "keystore.pkcs12.macAlgorithm")
 
     /** Aliases come from file names, so two files called `root.pem` would silently replace each other. */
     private fun requireDistinctNames(files: List<File>) {

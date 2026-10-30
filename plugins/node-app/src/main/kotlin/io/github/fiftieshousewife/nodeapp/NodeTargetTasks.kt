@@ -37,10 +37,10 @@ internal class NodeTargetTasks(
                 launch.map(NodeLaunchCommand::posix),
                 launch.map(NodeLaunchCommand::windows),
             ),
+            runtime = runtime,
             contents = {
                 // A distribution's contents can't depend on tasks directly; an empty collection built by them can.
                 from(project.files().builtBy(npmBuild, verified))
-                into("runtime") { from(runtime) }
                 into("security") { from(trustedCertificates) }
                 into("app") {
                     from(extension.appFiles)

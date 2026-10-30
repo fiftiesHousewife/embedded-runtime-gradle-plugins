@@ -55,8 +55,10 @@ plugin from the portal.
 
 Where things are tested:
 
-- `JavaAppPluginTest`: the archive's contents and reproducibility, re-extracting a JDK with
+- `JavaAppPluginTest`: the app archive's contents and reproducibility, re-extracting a JDK with
   read-only files, launchers from Gradle's `startScripts` (and a build's own generator winning).
+  `RuntimeArchiveTest`: the runtime archive's layout and modes, the same bytes after a rebuild and
+  for a new version, and the smoke test starting the app on it.
 - `JavaAppTargetsTest`: several targets in one build and one publication, and refusing to publish
   untested archives; `ContainerContextTest` the container context and the Dockerfile's block;
   `ConsumerPluginsTest` the `app-smoke-test` consumer plugin, including its runtime policy check.
@@ -65,8 +67,8 @@ Where things are tested:
 - `JavaAppModulesTest`: jdeps' modules, `jlinkFindModules` fixing a missing module, and shared sets.
 - `JavaAppSecurityTest`: certificates, policy and ciphers seen by the running JVM (a probe program run
   on the built runtime), the customisation record and overlay, and the forbidden-module guard.
-- `JavaAppPackagingTest`: a project's own SBOM, the RPM's header and file list (read back by
-  `RpmFile` in the test fixtures), and `publish` uploading the RPMs to a `RecordingRepository`.
+- `JavaAppPackagingTest`: a project's own SBOM, and the RPM's header and file list (read back by
+  `RpmFile` in the test fixtures).
   Zip is only the Windows target's format, so no functional test builds one.
 - `AiSkillsTest`: the files for Copilot, Devin and Claude Code, written by `assemble` only when they
   differ, and nothing when turned off.
@@ -95,17 +97,19 @@ resource). `AppWiring` builds the shared pipeline; `TargetPipeline` the part bui
 
 ```
 startScripts (Java) / appLaunchers<T> (Node) ─┐
-appManifest<T>, appSbom<T>                     ─┼─► distribution <target> ─┬─► <target>DistTar/Zip ──► publish
-runtime/ (customiseRuntime<T> or Node)          ─┘    (Gradle's plugin)      └─► install<Target>Dist (build/app/<target>)
-                                                         appVerifyPolicy<T> ─┘   checked before any archive
-                     install<Target>Dist ──► appRpm<T> (Linux, rpm enabled) ──► publish (uploads to YUM)
-                     this machine's      ──► appSmokeTest, runApp (HostTasks), jlinkFindModules
-                     a Linux one         ──► appDockerContext (DockerContext)
+appManifest<T>, appSbom<T>                     ─┴─► distribution <target> ─┬─► <target>DistTar/Zip ───────► publish <app>
+                                                     (Gradle's plugin)      └─► install<Target>Dist (build/app/<target>)
+runtime/ (customiseRuntime<T> or Node) ───────────────────────────────────────┬─┘  adds runtime/
+                                                                                └─► appRuntimeArchive<T> ──► publish <app>-runtime
+                                                         appVerifyPolicy<T> (on install<Target>Dist) before either archive
+                     install<Target>Dist ──► appRpm<T> (Linux, rpm enabled; not published)
+                     this machine's      ──► appSmokeTest (both archives), runApp (HostTasks), jlinkFindModules
+                     a Linux one's archives ──► appDockerContext (DockerContext)
 ```
 
 Each plugin contributes an `Ecosystem` (its names: `java`/`javaApp`/settings plugin id) and, per
-target, an `EcosystemSpec` (runtime name and version, where the launchers come from, archive
-contents, SBOM inputs). Everything Java- or Node-specific stays in its own module.
+target, an `EcosystemSpec` (runtime name and version, where the launchers come from, what
+`runtime/` is copied from, the app's other contents, SBOM inputs). Everything Java- or Node-specific stays in its own module.
 
 **Targets are known only after the build script runs,** so per-target tasks are registered in
 `afterEvaluate`, as are the Java plugin's JDK tasks (the Java release is final then too). Tasks a
@@ -114,8 +118,10 @@ are registered up front and wired to their target afterwards. Values feeding con
 apply time but known later (the jdeps modules) go through a property set in `afterEvaluate`.
 
 **One smoke test, three users.** `SmokeRun` starts an extracted app through its launcher and waits
-for its health check. `AppSmokeTest` reads the name, version and target from each archive's
-`META-INF/app.json`, so the producing build and the consumer plugin use the same task, and
+for its health check. `AppSmokeTest` reads the name, version and target from each app archive's
+`META-INF/app.json`, unpacks the runtime archive named after them (`<app>-runtime-<version>-<target>`,
+told apart by its one `runtime/` directory) into it, so the producing build and the consumer plugin
+use the same task (the consumer resolves transitively, which brings the runtime module), and
 `JlinkFindModules` reruns `SmokeRun` against freshly linked runtimes, reading the failure output for
 missing JDK classes (mapped to modules with `jimage list`).
 
@@ -171,10 +177,22 @@ tasks and replaces its compression and BouncyCastle dependencies with current re
 stamps payload files with the current time, so RPMs are not reproducible. Nebula's ospackage
 plugin was not used: it pulls in a Docker plugin, and 13.x (the first with configuration-cache
 support) was days old. `docs/packaging-standards.md` records the conventions; change it with the
-code. The publication is a real software component
-whose Gradle Module Metadata carries the standard OS and architecture attributes.
+code. RPMs are not published: a runtime republished inside one would never be the same bytes.
 
-**Container context** (`DockerContext`): beside `runtime/<cpu>/` and `app/<cpu>/`, kept for
+**Two publications, `<app>` and `<app>-runtime`** (`AppPublishing`, `RuntimeArchive`), so that a
+release with an unchanged runtime publishes the same runtime bytes, which Artifactory stores once
+(`docs/caching.md` lists every control). Each is a real software component whose Gradle Module
+Metadata carries the standard OS and architecture attributes, and each app variant depends on the
+runtime module at the same version (optional in the POM, which has no artifact for it). The
+distribution's contents are the app alone; the install tasks add `runtime/` (`RuntimeArchive.installed`),
+so the RPM, the module search and `runApp` see the whole app. Nothing that reaches the runtime
+archive may depend on the app: no name or version inside it, modes normalised
+(`AppCopySpecs.normalisedModes`), `cacerts` written without a password under JVM-wide PKCS12
+properties (`TrustedCertificates`; Java 17 has no other way to turn off the salted MAC), and jlink
+run with `--strip-java-debug-attributes` (`--strip-debug` runs the host's `objcopy`). `jlink<T>`
+keeps the host as an input, though its output no longer depends on it.
+
+**Container context** (`DockerContext`), unpacked from each Linux target's two archives: beside `runtime/<cpu>/` and `app/<cpu>/`, kept for
 Dockerfiles written before, each layer is a tree in `layers/<cpu>/` holding the paths it takes in the
 image, and every file in the context gets one fixed time (`ContextTimes`). `COPY` records times, and
 copying into `/app/runtime/` creates `/app` with the build's own, so only a tree copied to `/` gives a

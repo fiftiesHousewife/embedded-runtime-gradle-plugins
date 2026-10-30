@@ -12,9 +12,9 @@ import org.gradle.api.tasks.Sync
 import org.gradle.api.tasks.TaskProvider
 
 /**
- * `appDockerContext`: the project's Dockerfiles, filled in with this build, beside every Linux archive
- * split in two, `runtime/<cpu>/` and `app/<cpu>/`, so an image keeps the runtime in a layer of its own
- * that a new release of the app leaves alone.
+ * `appDockerContext`: the project's Dockerfiles, filled in with this build, beside every Linux target's
+ * runtime and app archives, unpacked as `runtime/<cpu>/` and `app/<cpu>/`, so an image keeps the runtime in
+ * a layer of its own that a new release of the app leaves alone.
  */
 internal class DockerContext(
     private val project: Project,
@@ -43,25 +43,25 @@ internal class DockerContext(
                 return@configure
             }
             linux.forEach { tasks ->
-                val tree = tasks.archive.flatMap { it.archiveFile }.map { archiveOps.archiveTree(it.asFile) }
+                val runtime = tasks.runtimeArchive.flatMap { it.archiveFile }.map { archiveOps.archiveTree(it.asFile) }
+                val app = tasks.archive.flatMap { it.archiveFile }.map { archiveOps.archiveTree(it.asFile) }
                 val cpu = tasks.target.arch.container
-                from(tree) { layer(this, RUNTIME_FILES, included = true, into = "$RUNTIME/$cpu") }
-                from(tree) { layer(this, RUNTIME_FILES, included = false, into = "app/$cpu") }
-                from(tree) {
-                    layer(this, RUNTIME_FILES, included = true, into = "$LAYERS/$cpu/$RUNTIME/app/$RUNTIME")
-                }
-                from(tree) { layer(this, RUNTIME_FILES, included = false, into = "$LAYERS/$cpu/app/app") }
+                from(runtime) { layer(this, into = "$RUNTIME/$cpu") }
+                from(app) { layer(this, into = "app/$cpu") }
+                from(runtime) { layer(this, into = "$LAYERS/$cpu/$RUNTIME/app/$RUNTIME") }
+                from(app) { layer(this, into = "$LAYERS/$cpu/app/app") }
             }
             doLast { ContextTimes.fix(destinationDir.toPath()) }
         }
     }
 
-    /** Not `into(...)`: inside a child spec the path already starts with it, so dropping a segment would drop that. */
-    private fun layer(spec: CopySpec, pattern: String, included: Boolean, into: String) {
-        if (included) spec.include(pattern) else spec.exclude(pattern)
-        val dropped = if (included) 2 else 1
+    /**
+     * The archive's tree without its top-level directory, under [into]. Not `into(...)`: inside a child spec
+     * the path already starts with it, so dropping a segment would drop that.
+     */
+    private fun layer(spec: CopySpec, into: String) {
         spec.eachFile {
-            val segments = listOf(into) + relativePath.segments.drop(dropped)
+            val segments = listOf(into) + relativePath.segments.drop(1)
             relativePath = RelativePath.parse(!isDirectory, segments.joinToString("/"))
         }
         spec.includeEmptyDirs = false
@@ -111,8 +111,7 @@ internal class DockerContext(
         }
 
     private companion object {
-        const val RUNTIME = "runtime"
-        const val RUNTIME_FILES = "*/$RUNTIME/**"
+        const val RUNTIME = RuntimeArchive.DIRECTORY
 
         /** Each image layer's files under the path they take in the image, copied to `/` by one `COPY`. */
         const val LAYERS = "layers"

@@ -6,19 +6,11 @@ import org.junit.jupiter.api.Test
 
 class JavaConventionsTest {
     @Test
-    fun `strips what a server never needs and compresses with the release's own option`() {
-        val stripped = listOf("--strip-debug", "--no-man-pages", "--no-header-files")
+    fun `strips what a server never needs, with no native tools, and compresses with the release's own option`() {
+        val stripped = listOf("--strip-java-debug-attributes", "--no-man-pages", "--no-header-files")
         assertAll(
             { assertEquals(stripped + "--compress=2", JavaConventions.jlinkOptions(17)) },
             { assertEquals(stripped + "--compress=zip-6", JavaConventions.jlinkOptions(21)) },
-        )
-    }
-
-    @Test
-    fun `another target's link strips only Java debug attributes, since the host's objcopy can't read it`() {
-        assertEquals(
-            listOf("--strip-java-debug-attributes", "--no-man-pages", "--no-header-files", "--compress=zip-6"),
-            JavaConventions.crossLinkOptions(JavaConventions.jlinkOptions(21)),
         )
     }
 }

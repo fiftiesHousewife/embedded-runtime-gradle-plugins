@@ -1,6 +1,6 @@
 ---
 name: embedded-runtime-adopt
-description: Set up the java-app or node-app Gradle plugin in an existing project so it ships as one archive with its own JDK or Node.js runtime - settings plugin, build configuration, the run/healthcheck contract, configuration defaults, targets and the corporate binary repository. Use when asked to add, adopt, or migrate to the embedded runtime plugins, or to package an app with its own runtime.
+description: Set up the java-app or node-app Gradle plugin in an existing project so it ships with its own JDK or Node.js runtime, as an app archive and a runtime archive per target - settings plugin, build configuration, the run/healthcheck contract, configuration defaults, targets and the corporate binary repository. Use when asked to add, adopt, or migrate to the embedded runtime plugins, or to package an app with its own runtime.
 ---
 
 # Adopt the embedded runtime plugins
@@ -44,8 +44,13 @@ smoke test fails on a missing JDK class, use the `embedded-runtime-jlink-modules
 ## 4. Targets, packaging and the corporate network
 
 - Every OS/CPU deployed to: `targets("linux-x64", "linux-aarch64", "windows-x64")`.
-- An RPM for Linux servers: `rpm { enabled = true }`. Archives are zip for Windows targets and
-  tar.gz for Linux and macOS.
+- Each target gets two archives, zip for Windows targets and tar.gz for Linux and macOS: the app
+  (`<app>-<version>-<target>`) and its runtime (`<app>-runtime-<version>-<target>`, one `runtime/`
+  directory, unpacked inside the app's). `publish` uploads them as two modules, `<app>` and
+  `<app>-runtime`, at one version; an unchanged runtime is the same bytes every release, so
+  Artifactory stores it once (`artifactoryPublish` from JFrog's plugin also skips the upload). A
+  deployment unpacks the app, then the runtime into it. An RPM for Linux servers:
+  `rpm { enabled = true }`; RPMs are built, not published.
 - Behind a corporate binary repository (Artifactory, Nexus): if `settings.gradle.kts` already
   declares the repository, set `binaryRepo.repository=<its name>` in the project's
   `gradle.properties`; its URL and credentials are reused, whatever the credential properties are

@@ -26,9 +26,9 @@ class ModuleSetsTest {
     }
 
     @Test
-    fun `falls back to exactly the app's modules when no set holds them all`() {
-        val needed = listOf("java.base", "jdk.jdwp.agent")
-        assertEquals(needed, ModuleSets.choose(needed, sets, emptyList()))
+    fun `falls back to exactly the app's modules, sorted, when no set holds them all`() {
+        val needed = listOf("jdk.jdwp.agent", "java.base")
+        assertEquals(listOf("java.base", "jdk.jdwp.agent"), ModuleSets.choose(needed, sets, emptyList()))
     }
 
     @Test

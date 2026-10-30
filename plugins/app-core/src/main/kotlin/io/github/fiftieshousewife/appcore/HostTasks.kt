@@ -39,7 +39,10 @@ internal class HostTasks(private val project: Project, wiring: AppWiring) {
 
     /** This machine's archive is the one `appSmokeTest` starts and `runApp` runs. */
     fun use(hostTasks: TargetTasks) {
-        smoke.configure { archiveFiles.from(hostTasks.archive.flatMap { it.archiveFile }) }
+        smoke.configure {
+            archiveFiles.from(hostTasks.archive.flatMap { it.archiveFile })
+            archiveFiles.from(hostTasks.runtimeArchive.flatMap { it.archiveFile })
+        }
         runApp.configure {
             dependsOn(hostTasks.assemble)
             appDir.set(project.layout.dir(hostTasks.assemble.map { it.destinationDir }))

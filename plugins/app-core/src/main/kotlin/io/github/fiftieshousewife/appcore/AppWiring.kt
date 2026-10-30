@@ -121,7 +121,7 @@ class AppWiring(
         val allArchives =
             tasks.register("appArchive") {
                 group = taskGroup
-                description = "Builds the archive for every target"
+                description = "Builds the app and runtime archives for every target"
             }
         val hostTasks = HostTasks(project, this)
         val smoke = hostTasks.smoke
@@ -149,11 +149,11 @@ class AppWiring(
         if (targets.isEmpty()) throw GradleException("${ecosystem.extensionName}.targets is empty; name at least one")
         val pipeline = TargetPipeline(project, this)
         val built = targets.map { pipeline.register(it, contribute(it)) }
-        lifecycle.allArchives.configure { dependsOn(built.map { it.archive }) }
+        lifecycle.allArchives.configure { dependsOn(built.map { it.archive } + built.map { it.runtimeArchive }) }
         built.firstOrNull { it.target == host }?.let(lifecycle.hostTasks::use)
         lifecycle.dockerContext.useLinuxArchives(built)
         lifecycle.publishing.addTargets(built, untestedTargets(targets, host, extension.smokeTestEnabled.get()))
-        rpmPackages.register(built, listOf(lifecycle.publishing.guard, lifecycle.hostTasks.smoke))
+        rpmPackages.register(built)
     }
 
     companion object {

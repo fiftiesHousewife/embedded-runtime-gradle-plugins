@@ -60,8 +60,7 @@ javaApp.jdk.source=jdks-local
 ```
 
 The same login is used for compile JDKs, npm (`binaryRepo.repo.npm`, beside it too), publishing
-archives (`binaryRepo.repo.releases`/`snapshots`), uploading RPMs (`binaryRepo.repo.rpm`) and
-fetching approved certificates. If `binaryRepo.repository` names a repository the build doesn't
+archives (`binaryRepo.repo.releases`/`snapshots`) and fetching approved certificates. If `binaryRepo.repository` names a repository the build doesn't
 declare, the build stops and lists the ones it does.
 
 ## No repository declared: one setting per machine
@@ -133,7 +132,6 @@ The JDK refuses Basic proxy authentication for HTTPS tunnels by default; to allo
 | `npm-virtual` | npm virtual | registry.npmjs.org |
 | `runtimes` | Generic local | Approved JDK and Node.js archives |
 | `libs-release-local`, `libs-snapshot-local` | Maven local | Your published apps |
-| `rpm-local` | RPM local | Your apps' RPMs, if you build them; the repository maintains `repodata/` |
 
 JDK and Node.js archives are read from `runtimes` in this layout:
 

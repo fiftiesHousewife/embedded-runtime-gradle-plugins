@@ -23,8 +23,8 @@ internal class JavaEcosystem(private val project: Project, private val jdkVersio
         runtimeName = JdkSources.from(project.providers).distribution.id,
         runtimeVersion = jdkVersion,
         launchers = Launchers.StartScripts(project.tasks.named("startScripts")),
+        runtime = runtime,
         contents = {
-            into("runtime") { from(runtime) }
             into("lib") {
                 from(jar)
                 from(runtimeClasspath)

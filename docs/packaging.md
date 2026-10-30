@@ -1,12 +1,12 @@
 # Packaging and deploying
 
-Every build makes an archive per target. Linux targets can also be packaged as RPMs, and any Linux
-archive can become a container image. Which conventions each format follows, and why, is in
+Every build makes two archives per target, the app and its runtime. Linux targets can also be
+packaged as RPMs, and any Linux target can become a container image. Which conventions each format follows, and why, is in
 [Packaging standards](packaging-standards.md).
 
 | Format | For | How |
 |---|---|---|
-| `.tar.gz` | Linux and macOS targets | Always built |
+| `.tar.gz` | Linux and macOS targets: the app, and its runtime | Always built |
 | `.zip` | Windows targets: Explorer opens it | Always built |
 | `.rpm` | Red Hat family servers managed with dnf | `rpm { enabled = true }` |
 | Container image | Kubernetes, ECS, any OCI runtime | `appDockerContext`, then `docker build` |
@@ -14,10 +14,29 @@ archive can become a container image. Which conventions each format follows, and
 ## Archives
 
 Each target gets the format its own OS opens without a separate tool: `zip` for Windows, `tar.gz`
-for Linux and macOS. Whatever the format, an archive holds one directory
-`<app>-<version>-<target>/`, keeps Unix permissions (every file readable by everyone, so an account
-that doesn't own the files can still run the app), is smoke-tested and published the same way, and a
-consuming build that resolves by Gradle Module Metadata needs no change.
+for Linux and macOS. Whatever the format, each target has two archives, both keeping Unix
+permissions (every file readable by everyone, so an account that doesn't own the files can still
+run the app):
+
+| Archive | Holds | Published as |
+|---|---|---|
+| `<app>-<version>-<target>.tar.gz` | One directory, `<app>-<version>-<target>/`: the launchers, libraries, metadata and SBOM | `<group>:<app>:<version>` |
+| `<app>-runtime-<version>-<target>.tar.gz` | One directory, `runtime/`: the linked JDK, or Node.js | `<group>:<app>-runtime:<version>` |
+
+The runtime archive names neither the app nor its version, and its times, order and modes are
+fixed, so every release whose runtime is unchanged publishes the same bytes. A repository that stores
+by checksum, as Artifactory does, keeps them once; see
+[Image layers and caching](caching.md#republishing-the-runtime). The app is installed by unpacking
+both, the runtime inside the app's directory:
+
+```bash
+tar -xzf orders-service-1.4.2-linux-x64.tar.gz
+tar -xzf orders-service-runtime-1.4.2-linux-x64.tar.gz -C orders-service-1.4.2-linux-x64
+```
+
+The smoke test starts the app installed exactly that way, and a consuming build that resolves the
+app by Gradle Module Metadata (`app-smoke-test`, for one) gets the runtime archive for the same
+machine with it.
 
 A Mac target's archive is the macOS deliverable. A signed, notarized `.pkg` installer can be made
 from it on a Mac; see [Packaging standards](packaging-standards.md#the-macos-archive).
@@ -57,39 +76,17 @@ Per-server settings such as `APP_PORT=8080` go in `/etc/orders-service/env`. Uni
 drop-in (`systemctl edit orders-service`), not in the packaged unit. Set `systemd = false` for hosts
 without systemd.
 
-### Publishing RPMs
+### RPMs are built, not published
 
-With a binary repository configured, `./gradlew publish` also uploads each RPM to the RPM repository
-`binaryRepo.repo.rpm` (default `rpm-local`) using the same credentials, and the repository (Artifactory, Nexus) rebuilds the
-repository's `repodata/`. Any other YUM repository that accepts an HTTP PUT works too:
+`publish` doesn't upload RPMs. An RPM can't be byte-identical from one build to the next (its
+payload carries the build's own times), so each release would store its runtime again, which the
+[runtime archive](#archives) avoids. Copy the RPMs from `build/distributions/` to your own YUM
+repository if you deploy them, and point dnf at it with a `.repo` file in `/etc/yum.repos.d/`. Have
+the repository sign its metadata (`repo_gpgcheck=1`), or sign the packages with `rpm --addsign`
+before uploading them (`gpgcheck=1`).
 
-```bash
-./gradlew publish -PjavaApp.rpmRepositoryUrl=https://nexus.example.com/repository/yum-hosted
-```
-
-`nodeApp.rpmRepositoryUrl` does the same for a Node.js app, and either can go in `gradle.properties`.
-
-Servers then need a `.repo` file pointing dnf at it, such as `/etc/yum.repos.d/apps.repo`:
-
-```ini
-[apps]
-name=Our apps
-baseurl=https://repo.example.com/rpm-local
-# The repository signs its metadata with its own GPG key (Artifactory: "GPG Signing" on the
-# repository; Nexus: a signing key on the yum-hosted repository), and dnf refuses metadata it can't
-# verify. The RPMs themselves are not signed by the plugin.
-repo_gpgcheck=1
-gpgkey=https://repo.example.com/api/gpg/key/public
-gpgcheck=0
-```
-
-RPM signatures are PGP by design, so this is where an RPM install is checked: the repository's key
-vouches for the metadata, which holds every package's checksum. To sign the packages themselves as
-well, run `rpm --addsign` in CI before `publish` uploads them, and set `gpgcheck=1`.
-
-Two caveats. RPMs are not byte-reproducible, unlike the archives. The RPM is built from the same
-directory as this target's archive, but only the archive for the build machine is smoke-tested;
-publishing checks that as for archives.
+The RPM holds the same directory as this target's archives, runtime included. Only the build
+machine's archives are smoke-tested.
 
 ## Built with Gradle's own distributions
 
@@ -99,12 +96,14 @@ named after it, so it has the distribution plugin's usual tasks:
 | Task | Does |
 |---|---|
 | `install<Target>Dist`, e.g. `installLinuxX64Dist` | Lays the app out in `build/app/<target>/<app>-<version>/` |
-| `<target>DistTar` / `<target>DistZip` | The archive, `build/distributions/<app>-<version>-<target>.tar.gz` (`.zip` for Windows); only the one for the target's OS is enabled |
-| `appArchive` | Every target's archive |
+| `<target>DistTar` / `<target>DistZip` | The app archive, `build/distributions/<app>-<version>-<target>.tar.gz` (`.zip` for Windows); only the one for the target's OS is enabled |
+| `appRuntimeArchive<Target>` | The runtime archive, `build/distributions/<app>-runtime-<version>-<target>.tar.gz` |
+| `appArchive` | Every target's archives |
 | `installDist` | Gradle's usual task: this machine's app with its runtime, in `build/install/<app>` |
 
-An archive's single top-level directory is `<app>-<version>-<target>/`, so archives for two targets
-unpack side by side.
+An app archive's single top-level directory is `<app>-<version>-<target>/`, so archives for two
+targets unpack side by side. The distribution's contents are the app alone; `install<Target>Dist` adds
+`runtime/`.
 
 Java launchers come from Gradle's own `startScripts` task. The plugin sets a script generator that
 starts the embedded runtime and adds `run`, `healthcheck` and `version`; `application {
@@ -121,7 +120,41 @@ The smoke test still starts the result, so a launcher that can't run the app fai
 
 Installing on servers is left to the tools made for it: the RPM above, where dnf installs, upgrades
 and rolls back, a container image, or the deployment tooling you already run. Every one of them can
-take the archive as it is.
+take the archives as they are.
+
+### One runtime per host
+
+A repository stores an unchanged runtime once, but a server still downloads it with every release.
+A deployment step can keep each runtime once per host instead, in a directory named by its
+SHA-256, and link the app to it. Artifactory's storage API gives the checksum without downloading
+the file:
+
+```bash
+set -euo pipefail
+# APP, VERSION, TARGET, APP_DIR (where the app archive was unpacked), ART (the repository URL) and TOKEN
+FILE="$APP-runtime-$VERSION-$TARGET.tar.gz"
+PATH_IN_REPO="com/example/$APP-runtime/$VERSION/$FILE"
+CACHE="$HOME/runtimes"
+SHA=$(curl -fsS -H "Authorization: Bearer $TOKEN" "$ART/api/storage/libs-release-local/$PATH_IN_REPO" \
+  | jq -r .checksums.sha256)
+if [ ! -d "$CACHE/$SHA" ]; then
+  mkdir -p "$CACHE/$SHA.partial"
+  curl -fsS -H "Authorization: Bearer $TOKEN" "$ART/libs-release-local/$PATH_IN_REPO" -o "$CACHE/$FILE"
+  echo "$SHA  $CACHE/$FILE" | sha256sum -c -
+  tar -xzf "$CACHE/$FILE" -C "$CACHE/$SHA.partial" --strip-components=1
+  mv "$CACHE/$SHA.partial" "$CACHE/$SHA"
+  rm -f "$CACHE/$FILE"
+fi
+ln -sfn "$CACHE/$SHA" "$APP_DIR/runtime"
+```
+
+Unlike the shared installs this replaces, the link can't point at the wrong runtime: the directory is
+named by the bytes the release was built and tested with, so a release whose runtime changed gets a
+new directory, and a rollback finds its old one still there. The launcher follows the link. The
+cache needs no root, and it is optional: without it each deploy unpacks its own runtime and nothing
+else changes. On Windows, use `Get-FileHash -Algorithm SHA256`, `Expand-Archive`, and a directory
+junction (`New-Item -ItemType Junction`), which needs no administrator rights, for the link. Keep
+directories still linked from an installed release when cleaning the cache up.
 
 ## As a container image
 
@@ -145,9 +178,9 @@ USER 1001
 
 Commit it. Nothing in it changes from one build to the next: the release, its commit and that
 commit's time are `ARG`s (`APP_VERSION`, `GIT_COMMIT`, `CREATED`), which `appDockerContext` fills in
-for each build in the copy it writes to `build/docker-context/`, beside every Linux archive, one per
-CPU (`amd64`, `arm64`, the names container platforms use), split in two so the runtime is a layer
-of its own: `layers/<cpu>/runtime/` and `layers/<cpu>/app/`, each holding the paths it takes in the
+for each build in the copy it writes to `build/docker-context/`, beside every Linux target's
+runtime and app archives, unpacked, one per CPU (`amd64`, `arm64`, the names container platforms
+use), so the runtime is a layer of its own: `layers/<cpu>/runtime/` and `layers/<cpu>/app/`, each holding the paths it takes in the
 image, with fixed times, so each layer is the same in every build and every image of the app
 ([Image layers and caching](caching.md)). The same files are also under `runtime/<cpu>/` and
 `app/<cpu>/`, for Dockerfiles written before. A Dockerfile without the markers is entirely yours
@@ -172,7 +205,7 @@ UBI micro needs more than a different base image, since the Java runtime loads t
 What the plugin's block holds:
 
 - **Base image by digest.** `registry.access.redhat.com/ubi9/ubi-minimal`, which needs only glibc
-  and a shell since the runtime is in the archive, pinned to one rebuild's tag (`9.8-<build>`) and
+  and a shell since the runtime comes with the app, pinned to one rebuild's tag (`9.8-<build>`) and
   the digest of its multi-arch index, so every build of a plugin release starts from the same bytes.
   A plugin release moves the pin. To use a registry mirror or another base image, pass the whole
   reference, digest included:

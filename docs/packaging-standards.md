@@ -8,8 +8,8 @@ forgotten.
 
 | Standard | What it requires | How the plugins meet it |
 |---|---|---|
-| Reproducible builds ([reproducible-builds.org](https://reproducible-builds.org/docs/)) | The same source builds the same bytes | Archives have fixed timestamps and file order. `SOURCE_DATE_EPOCH` sets an RPM's build time, but Redline stamps RPM payload files with the build machine's clock, so RPMs are not byte-identical |
-| [CycloneDX](https://cyclonedx.org/specification/overview/) SBOM | A machine-readable list of every component | `META-INF/sbom.cdx.json` in every archive and published next to it, listing the runtime as well as the libraries |
+| Reproducible builds ([reproducible-builds.org](https://reproducible-builds.org/docs/)) | The same source builds the same bytes | Archives have fixed timestamps and file order. The runtime archive also has fixed modes and names neither the app nor its version, so it is byte-identical across releases too; see [Image layers and caching](caching.md#republishing-the-runtime). `SOURCE_DATE_EPOCH` sets an RPM's build time, but Redline stamps RPM payload files with the build machine's clock, so RPMs are not byte-identical and are not published |
+| [CycloneDX](https://cyclonedx.org/specification/overview/) SBOM | A machine-readable list of every component | `META-INF/sbom.cdx.json` in every app archive and published next to it, listing the runtime as well as the libraries |
 | [Package URL](https://github.com/package-url/purl-spec) | One identifier per component across ecosystems | Every SBOM component has a purl: `pkg:maven/…`, `pkg:npm/…`, `pkg:generic/…` for the runtime |
 | [Gradle Module Metadata](https://docs.gradle.org/current/userguide/publishing_gradle_module_metadata.html) | Variants described by attributes, not file names | One variant per target, with `org.gradle.native.operatingSystem` and `org.gradle.native.architecture` |
 | Checksums | A digest beside every published file | Gradle publishes `.sha256` and `.sha512` with each file; Gradle verifies them when it resolves an archive, e.g. for `app-smoke-test` |
@@ -69,7 +69,7 @@ RHEL, Rocky, Alma, Oracle Linux, Amazon Linux and SUSE follow.
 
 | Path | Holds | Owner, mode |
 |---|---|---|
-| `/opt/<name>/` | The app directory exactly as in the archive. FHS: `/opt` is for self-contained add-on packages, which an app with its own runtime is | `root`, read-only to the service |
+| `/opt/<name>/` | The app directory as installed: the app archive's contents with `runtime/` in it. FHS: `/opt` is for self-contained add-on packages, which an app with its own runtime is | `root`, read-only to the service |
 | `/etc/<name>/` | `conf.defaults/`, marked **`%config(noreplace)`**; an optional `env` file | `root:<user>`, `0750`, files `0640` |
 | `/var/lib/<name>/` | Data (`APP_DATA_DIR`, and `APP_ROOT`) | `<user>`, `0750` |
 | `/var/log/<name>/` | Logs (`APP_LOG_DIR`) | `<user>`, `0750` |
@@ -102,8 +102,7 @@ is updated.
   with a GPG key. dnf checks them when the repository's `.repo` file says `gpgcheck=1`.
 * **YUM/DNF repositories** are a directory of RPMs plus `repodata/` (`repomd.xml` and the primary,
   filelists and other indexes). Artifactory and Nexus RPM repositories regenerate `repodata/` on
-  every upload, which is what `publish` relies on when it uploads the RPMs. For a plain web server, copy the RPMs and run
-  `createrepo_c --update <dir>`.
+  every upload. For a plain web server, copy the RPMs and run `createrepo_c --update <dir>`.
 * **Rollback** is `dnf history undo <id>` or `dnf downgrade <name>-<old version>`, provided the
   repository keeps old versions.
 

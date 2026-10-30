@@ -26,7 +26,7 @@ class JavaAppPluginTest {
         project.project.resolve("build/distributions/svc-$version-$host.tar.gz")
 
     @Test
-    fun `builds and smoke-tests a self-contained archive laid out like the application plugin's`() {
+    fun `builds and smoke-tests an app archive laid out like the application plugin's, without its runtime`() {
         val project = javaService(tmp)
         val result = project.build("build")
         val entries = TestProject.run("tar", "-tvzf", archive(project).absolutePath).lines()
@@ -38,7 +38,8 @@ class JavaAppPluginTest {
             EXECUTABLES.map { path ->
                 { assertTrue(entries.any { it.startsWith("-rwxr-xr-x") && it.endsWith(path) }, "$path") }
             }
-        assertAll(checks(listOf(smokeTested) + present + executable))
+        val noRuntime = { assertTrue(entries.none { "/runtime/" in it }, entries.joinToString("\n")) }
+        assertAll(checks(listOf(smokeTested, noRuntime) + present + executable))
     }
 
     @Test
@@ -182,12 +183,11 @@ class JavaAppPluginTest {
         val LAYOUT =
             listOf(
                 "bin/svc",
-                "runtime/bin/java",
                 "lib/svc-2.0.0.jar",
                 "conf.defaults/app.properties",
                 "META-INF/app.json",
                 "META-INF/sbom.cdx.json",
             )
-        val EXECUTABLES = listOf("bin/svc", "runtime/lib/jspawnhelper")
+        val EXECUTABLES = listOf("bin/svc")
     }
 }

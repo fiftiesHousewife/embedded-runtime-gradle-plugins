@@ -2,7 +2,11 @@ package io.github.fiftieshousewife.appcore
 
 import io.github.fiftieshousewife.appcore.tasks.AppSmokeTest
 import io.github.fiftieshousewife.appcore.tasks.VerifyPublishable
+import org.gradle.api.NamedDomainObjectProvider
 import org.gradle.api.Project
+import org.gradle.api.artifacts.ConsumableConfiguration
+import org.gradle.api.artifacts.DependencyScopeConfiguration
+import org.gradle.api.artifacts.ExternalModuleDependency
 import org.gradle.api.attributes.Bundling
 import org.gradle.api.attributes.Category
 import org.gradle.api.component.AdhocComponentWithVariants
@@ -18,9 +22,14 @@ import org.gradle.nativeplatform.OperatingSystemFamily
 import org.gradle.plugins.signing.SigningExtension
 
 /**
- * Publishes every target's archive and SBOM under one set of coordinates: a Maven publication of a
- * real software component with one variant per target, the corporate repository when one is
+ * Publishes two modules at the app's version: `<app>`, every target's app archive and SBOM, and
+ * `<app>-runtime`, every target's runtime archive. Each is a Maven publication of a real software
+ * component with one variant per target; with them come the corporate repository when one is
  * configured, opt-in signing, and the guard that refuses to publish an archive nobody has started.
+ *
+ * The runtime is a module of its own so that a release whose runtime is unchanged publishes the same
+ * runtime bytes again, which a repository that stores by checksum keeps once. Each app variant depends
+ * on the runtime module, so a Gradle build resolving the app gets the runtime for the same machine.
  *
  * Each variant carries its target's OS and architecture as Gradle's standard attributes, so the
  * Gradle Module Metadata describes which archive is for which machine and a consuming Gradle build
@@ -35,11 +44,13 @@ internal class AppPublishing(
     private val ecosystem = wiring.ecosystem
 
     private val publicationName = ecosystem.extensionName
+    private val runtimePublicationName = "${publicationName}Runtime"
     private val component: AdhocComponentWithVariants = components.adhoc(publicationName)
+    private val runtimeComponent: AdhocComponentWithVariants = components.adhoc(runtimePublicationName)
     private val publishing: PublishingExtension
 
-    /** Fails a publication of archives nobody started; RPM uploads depend on it too. */
-    val guard: TaskProvider<VerifyPublishable> =
+    /** Fails a publication of archives nobody started. */
+    private val guard: TaskProvider<VerifyPublishable> =
         project.tasks.register("appVerifyPublishable", VerifyPublishable::class.java) {
             description = "Fails publication of archives that were not smoke-tested on this machine"
             allowUntested.set(wiring.facts.allowUntestedPublish)
@@ -66,16 +77,9 @@ internal class AppPublishing(
     }
 
     fun register(smoke: TaskProvider<AppSmokeTest>) {
-        publishing.publications.register(publicationName, MavenPublication::class.java) {
-            artifactId = extension.appName.get()
-            from(component)
-            pom {
-                // Every artifact carries a target classifier, so there is no main artifact.
-                packaging = "pom"
-                name.set(extension.appName)
-                description.set("Self-contained ${extension.appName.get()} archive (runtime, libraries, application)")
-            }
-        }
+        val app = extension.appName.get()
+        publication(publicationName, app, component, "$app: launchers, libraries and application, without the runtime")
+        publication(runtimePublicationName, app + RuntimeArchive.SUFFIX, runtimeComponent, "The runtime $app runs on")
 
         // The publish URL depends on whether the version is a snapshot, which build scripts set
         // after plugins are applied; this is the one place an afterEvaluate is warranted.
@@ -86,6 +90,7 @@ internal class AppPublishing(
             project.extensions.getByType(SigningExtension::class.java).apply {
                 useInMemoryPgpKeys(key, project.providers.gradleProperty("signingPassword").orNull)
                 sign(publishing.publications.getByName(publicationName))
+                sign(publishing.publications.getByName(runtimePublicationName))
             }
         }
 
@@ -93,10 +98,23 @@ internal class AppPublishing(
         project.tasks.withType(PublishToMavenLocal::class.java).configureEach { dependsOn(smoke) }
     }
 
-    /** Adds each target's archive as a variant and its SBOM as an artifact; [untested] were never started here. */
+    private fun publication(name: String, id: String, from: AdhocComponentWithVariants, summary: String) =
+        publishing.publications.register(name, MavenPublication::class.java) {
+            artifactId = id
+            from(from)
+            pom {
+                // Every artifact carries a target classifier, so there is no main artifact.
+                packaging = "pom"
+                this.name.set(id)
+                description.set(summary)
+            }
+        }
+
+    /** Adds each target's archives as variants and its SBOM as an artifact; [untested] were never started here. */
     fun addTargets(built: List<TargetTasks>, untested: List<Target>) {
         guard.configure { untestedTargets.set(untested.map { it.id }) }
-        built.forEach(::addVariant)
+        val runtime = runtimeDependency()
+        built.forEach { addVariant(it, runtime) }
         publishing.publications.named(publicationName, MavenPublication::class.java) {
             built.forEach { t ->
                 artifact(t.sbom) {
@@ -107,30 +125,60 @@ internal class AppPublishing(
         }
     }
 
-    private fun addVariant(built: TargetTasks) {
+    /** The runtime module at this version: in the Gradle Module Metadata, and optional in the POM. */
+    private fun runtimeDependency() = project.configurations.dependencyScope("${publicationName}RuntimeModule") {
+        description = "The runtime module each app variant depends on"
+        val coordinates = extension.appName.map { "${project.group}:$it${RuntimeArchive.SUFFIX}:${project.version}" }
+        dependencies.addLater(coordinates.map(project.dependencies::create).map { it as ExternalModuleDependency })
+    }
+
+    private fun addVariant(built: TargetTasks, runtime: NamedDomainObjectProvider<DependencyScopeConfiguration>) {
+        val app = elements(built, runtime = false) {
+            extendsFrom(runtime.get())
+            outgoing.artifact(built.archive)
+        }
+        // Optional in the POM: a Maven build resolving the app must not go looking for a runtime jar.
+        component.addVariantsFromConfiguration(app.get()) {
+            mapToMavenScope(MAVEN_SCOPE)
+            mapToOptional()
+        }
+        val ownRuntime = elements(built, runtime = true) {
+            outgoing.artifact(built.runtimeArchive)
+        }
+        runtimeComponent.addVariantsFromConfiguration(ownRuntime.get()) { mapToMavenScope(MAVEN_SCOPE) }
+    }
+
+    /** One target's variant of the app module, or of the runtime module when [runtime]. */
+    private fun elements(
+        built: TargetTasks,
+        runtime: Boolean,
+        configure: ConsumableConfiguration.() -> Unit,
+    ): NamedDomainObjectProvider<ConsumableConfiguration> {
         val objects = project.objects
-        val elements =
-            project.configurations.consumable("${publicationName}Elements${built.target.taskSuffix}") {
-                description = "The app archive for ${built.target.id}"
-                attributes {
-                    attribute(Category.CATEGORY_ATTRIBUTE, objects.named(Category::class.java, "${ecosystem.id}-app"))
-                    // The runtime and every dependency are inside the archive.
-                    attribute(Bundling.BUNDLING_ATTRIBUTE, objects.named(Bundling::class.java, Bundling.EMBEDDED))
-                    attribute(
-                        OperatingSystemFamily.OPERATING_SYSTEM_ATTRIBUTE,
-                        objects.named(OperatingSystemFamily::class.java, osFamilyOf(built.target)),
-                    )
-                    attribute(
-                        MachineArchitecture.ARCHITECTURE_ATTRIBUTE,
-                        objects.named(MachineArchitecture::class.java, architectureOf(built.target)),
-                    )
-                }
-                outgoing.artifact(built.archive)
+        val kind = if (runtime) "Runtime" else ""
+        val category = if (runtime) "runtime" else "app"
+        return project.configurations.consumable("$publicationName${kind}Elements${built.target.taskSuffix}") {
+            description = "The $category archive for ${built.target.id}"
+            attributes {
+                attribute(Category.CATEGORY_ATTRIBUTE, objects.named(Category::class.java, "${ecosystem.id}-$category"))
+                // The runtime and every dependency are inside the archives.
+                attribute(Bundling.BUNDLING_ATTRIBUTE, objects.named(Bundling::class.java, Bundling.EMBEDDED))
+                attribute(
+                    OperatingSystemFamily.OPERATING_SYSTEM_ATTRIBUTE,
+                    objects.named(OperatingSystemFamily::class.java, osFamilyOf(built.target)),
+                )
+                attribute(
+                    MachineArchitecture.ARCHITECTURE_ATTRIBUTE,
+                    objects.named(MachineArchitecture::class.java, architectureOf(built.target)),
+                )
             }
-        component.addVariantsFromConfiguration(elements.get()) { mapToMavenScope("runtime") }
+            configure()
+        }
     }
 
     companion object {
+        private const val MAVEN_SCOPE = "runtime"
+
         fun osFamilyOf(target: Target) = when (target.os) {
             Os.LINUX -> OperatingSystemFamily.LINUX
             Os.WINDOWS -> OperatingSystemFamily.WINDOWS

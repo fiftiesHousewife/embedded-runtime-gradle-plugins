@@ -82,7 +82,7 @@ jobs:
       id-token: write      # Sigstore's certificate is issued for this workflow's identity token
       attestations: write  # GitHub artifact attestations
     env:
-      REPO: samples/java-service/build/repo/io/github/fiftieshousewife/samples/java-service/1.0.0
+      REPO: samples/java-service/build/repo/io/github/fiftieshousewife/samples
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-java@v6
@@ -93,14 +93,18 @@ jobs:
             21
       - name: Build, then publish with a Sigstore bundle beside every file
         run: ./gradlew -p samples/java-service build publishAllPublicationsToSampleRepository -PsigstoreSign=true
-      - name: SLSA build provenance for the archive
+      - name: SLSA build provenance for the app and runtime archives
         uses: actions/attest-build-provenance@v4.2.2
         with:
-          subject-path: ${{ env.REPO }}/java-service-1.0.0-linux-x64.tar.gz
+          subject-path: |
+            ${{ env.REPO }}/java-service/1.0.0/java-service-1.0.0-linux-x64.tar.gz
+            ${{ env.REPO }}/java-service-runtime/1.0.0/java-service-runtime-1.0.0-linux-x64.tar.gz
       - name: The provenance verifies
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh attestation verify "$REPO/java-service-1.0.0-linux-x64.tar.gz" --repo "${{ github.repository }}"
+        run: |
+          gh attestation verify "$REPO/java-service/1.0.0/java-service-1.0.0-linux-x64.tar.gz" --repo "${{ github.repository }}"
+          gh attestation verify "$REPO/java-service-runtime/1.0.0/java-service-runtime-1.0.0-linux-x64.tar.gz" --repo "${{ github.repository }}"
       - name: app-smoke-test verifies the signature, then starts the archive
         run: >
           ./gradlew -p samples/deployment-pipeline appSmokeTest

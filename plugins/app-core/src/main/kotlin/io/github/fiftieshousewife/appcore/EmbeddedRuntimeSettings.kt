@@ -66,7 +66,6 @@ abstract class BinaryRepositorySettings {
     abstract val runtimesRepo: Property<String>
     abstract val releasesRepo: Property<String>
     abstract val snapshotsRepo: Property<String>
-    abstract val rpmRepo: Property<String>
     abstract val npmRepo: Property<String>
     abstract val allowInsecureProtocol: Property<Boolean>
 
@@ -78,7 +77,6 @@ abstract class BinaryRepositorySettings {
         BinaryRepository.RUNTIMES_REPO to runtimesRepo,
         BinaryRepository.RELEASES_REPO to releasesRepo,
         BinaryRepository.SNAPSHOTS_REPO to snapshotsRepo,
-        BinaryRepository.RPM_REPO to rpmRepo,
         "binaryRepo.repo.npm" to npmRepo,
         BinaryRepository.ALLOW_INSECURE to allowInsecureProtocol,
     )

@@ -24,7 +24,6 @@ data class BinaryRepository(
     val runtimesRepo: String,
     val releasesRepo: String,
     val snapshotsRepo: String,
-    val rpmRepo: String,
     val allowInsecureProtocol: Boolean,
     val borrowedFrom: String? = null,
     private val borrowedLogin: RepositoryLogin? = null,
@@ -34,7 +33,6 @@ data class BinaryRepository(
     val mavenUrl: URI get() = repo(mavenRepo)
     val gradlePluginsUrl: URI get() = repo(gradlePluginsRepo)
     val runtimesUrl: URI get() = repo(runtimesRepo)
-    val rpmUrl: URI get() = repo(rpmRepo)
 
     fun publishUrl(snapshot: Boolean): URI = repo(if (snapshot) snapshotsRepo else releasesRepo)
 
@@ -65,7 +63,6 @@ data class BinaryRepository(
         const val RUNTIMES_REPO = "binaryRepo.repo.runtimes"
         const val RELEASES_REPO = "binaryRepo.repo.releases"
         const val SNAPSHOTS_REPO = "binaryRepo.repo.snapshots"
-        const val RPM_REPO = "binaryRepo.repo.rpm"
         const val ALLOW_INSECURE = "binaryRepo.allowInsecureProtocol"
 
         /** Gradle reads `binaryRepoUsername`/`Password` at execution: secrets never reach the configuration cache. */
@@ -160,7 +157,6 @@ data class BinaryRepository(
             runtimesRepo = providers.setting(RUNTIMES_REPO) ?: "runtimes",
             releasesRepo = providers.setting(RELEASES_REPO) ?: "libs-release-local",
             snapshotsRepo = providers.setting(SNAPSHOTS_REPO) ?: "libs-snapshot-local",
-            rpmRepo = providers.setting(RPM_REPO) ?: "rpm-local",
             allowInsecureProtocol = allowInsecureProtocol,
         )
     }

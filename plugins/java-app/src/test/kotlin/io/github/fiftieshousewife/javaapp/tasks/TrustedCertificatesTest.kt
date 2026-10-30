@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.io.File
 import java.nio.file.Files
+import java.nio.file.Path
 import java.security.KeyStore
 
 class TrustedCertificatesTest {
@@ -58,7 +59,7 @@ class TrustedCertificatesTest {
 
     @Test
     fun `replacing the trust store leaves only the approved certificates`() {
-        val cacerts = File(dir, "cacerts")
+        val cacerts = jdkCacerts("cacerts")
         val lines = TrustedCertificates.install(cacerts, listOf(resource("acme-bundle.pem")), replace = true)
         val store = KeyStore.getInstance(cacerts, "changeit".toCharArray())
         assertAll(
@@ -71,6 +72,22 @@ class TrustedCertificatesTest {
             { assertEquals(2, lines.size) },
             { assertTrue(Files.size(cacerts.toPath()) > 0) },
         )
+    }
+
+    @Test
+    fun `the same certificates give the same bytes, whether added or replacing the JDK's`() {
+        val certificates = listOf(resource("acme-bundle.pem"))
+        val written = listOf(true, true, false, false).mapIndexed { index, replace ->
+            jdkCacerts("cacerts-$index").also { TrustedCertificates.install(it, certificates, replace) }
+        }.map { Files.readAllBytes(it.toPath()).toList() }
+        assertAll(
+            { assertEquals(written[0], written[1]) },
+            { assertEquals(written[2], written[3]) },
+        )
+    }
+
+    private fun jdkCacerts(name: String): File = File(dir, name).also {
+        Files.copy(Path.of(System.getProperty("java.home"), "lib", "security", "cacerts"), it.toPath())
     }
 
     @Test

@@ -21,6 +21,10 @@ class NodeAppPluginTest {
         val result = project.build("build")
         val archive = project.project.resolve("build/distributions/web-3.1.0-${TestProject.hostTarget()}.tar.gz")
         val entries = TestProject.run("tar", "-tzf", archive.absolutePath).lines()
+        val runtime = project.project.resolve(
+            "build/distributions/web-runtime-3.1.0-${TestProject.hostTarget()}.tar.gz",
+        )
+        val runtimeEntries = TestProject.run("tar", "-tzf", runtime.absolutePath).lines()
         val outcomes = listOf(":npmTest", ":appSmokeTest").map { task ->
             { assertEquals(TaskOutcome.SUCCESS, result.task(task)?.outcome) }
         }
@@ -28,7 +32,8 @@ class NodeAppPluginTest {
             { assertTrue(entries.contains("web-3.1.0-${TestProject.hostTarget()}/$path"), "missing $path") }
         }
         val testsLeftOut = { assertFalse(entries.any { it.contains("server.test.mjs") }, "tests must not be packaged") }
-        assertAll(checks(outcomes + present + testsLeftOut))
+        val runtimeApart = { assertTrue("runtime/bin/node" in runtimeEntries, runtimeEntries.joinToString("\n")) }
+        assertAll(checks(outcomes + present + testsLeftOut + runtimeApart))
     }
 
     @Test
@@ -163,6 +168,6 @@ class NodeAppPluginTest {
 
     private companion object {
         const val PEM_HEADER = "-----BEGIN CERTIFICATE-----"
-        val LAYOUT = listOf("bin/web", "runtime/bin/node", "app/server.mjs", "app/package.json")
+        val LAYOUT = listOf("bin/web", "app/server.mjs", "app/package.json")
     }
 }

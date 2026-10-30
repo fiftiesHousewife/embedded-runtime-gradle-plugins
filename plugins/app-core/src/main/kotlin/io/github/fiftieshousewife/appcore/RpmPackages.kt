@@ -1,16 +1,13 @@
 package io.github.fiftieshousewife.appcore
 
 import io.github.fiftieshousewife.appcore.tasks.GenerateRpm
-import io.github.fiftieshousewife.appcore.tasks.PublishRpm
 import org.gradle.api.Project
 import org.gradle.api.Task
 import org.gradle.api.tasks.TaskProvider
-import java.net.URI
 
 /**
- * `appRpm<Target>` for each Linux target when `rpm { enabled = true }`, `appRpm` for all of them,
- * and the upload `publish` runs when there is a YUM repository: `<javaApp|nodeApp>.rpmRepositoryUrl`,
- * else the binary repository's `binaryRepo.repo.rpm`.
+ * `appRpm<Target>` for each Linux target when `rpm { enabled = true }`, and `appRpm` for all of them. An RPM is
+ * built, not published: its payload times are the build's own, so a republished runtime would never deduplicate.
  */
 internal class RpmPackages(private val project: Project, private val wiring: AppWiring) {
     private val providers = project.providers
@@ -23,17 +20,6 @@ internal class RpmPackages(private val project: Project, private val wiring: App
             description = "Builds the RPM for every Linux target (javaApp/nodeApp rpm { enabled = true })"
         }
 
-    private val repositoryUrl =
-        providers.gradleProperty(wiring.ecosystem.property("rpmRepositoryUrl")).map(URI::create)
-            .let { property -> wiring.binaryRepo?.let { repo -> property.orElse(repo.rpmUrl) } ?: property }
-
-    private val publish: TaskProvider<PublishRpm> =
-        tasks.register("appPublishRpm", PublishRpm::class.java) {
-            description = "Uploads every RPM to the YUM repository, as part of publish"
-            repositoryUrl.set(this@RpmPackages.repositoryUrl)
-            login.set(wiring.binaryRepo?.login(providers) ?: BinaryRepository.identityLogin(providers))
-        }
-
     fun applyConventions() {
         val appName = wiring.extension.appName
         rpm.enabled.convention(
@@ -44,18 +30,13 @@ internal class RpmPackages(private val project: Project, private val wiring: App
     }
 
     /** Registers the RPM tasks for [built], once targets and settings are final. */
-    fun register(built: List<TargetTasks>, guards: List<TaskProvider<out Task>>) {
+    fun register(built: List<TargetTasks>) {
         rpm.enabled.finalizeValue()
         if (!rpm.enabled.get()) return
         val summary = project.description
         val packages = built.filter { it.target.os == Os.LINUX }.map { registerTarget(it, summary) }
         all.configure { dependsOn(packages) }
         tasks.named("assemble") { dependsOn(all) }
-        publish.configure {
-            this.packages.from(packages)
-            dependsOn(guards)
-        }
-        if (repositoryUrl.isPresent) tasks.named("publish") { dependsOn(publish) }
     }
 
     private fun registerTarget(built: TargetTasks, summary: String?) =

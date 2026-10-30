@@ -3,7 +3,20 @@
 Work that has been asked for and not yet done, newest decisions first. Move an item to the commit
 log, not to a "done" list, when it lands.
 
-Last updated 2026-10-29.
+Last updated 2026-10-30.
+
+## The runtime published apart from the app
+
+Done 2026-10-30: `<app>` and `<app>-runtime` publications, a byte-identical runtime archive, no RPM
+upload. Still open:
+
+| Item | Notes |
+|---|---|
+| **A guard against silent duplication** | A runtime archive that stops being reproducible fails nothing; storage just grows. Write a fingerprint of the runtime's inputs (JDK pin and its SHA-256, the modules, the jlink options, the customisation record) beside the archive, for the publishing step to set as an Artifactory property (`runtime.inputs`); a pipeline that finds the previous release's fingerprint equal but its SHA-256 different fails |
+| **Reproducible across machines in CI** | The tests rebuild on one machine. Build the sample's runtime archives on two CI agents (the Linux and macOS legs, for the Linux targets) and compare their checksums; then `jlink<T>` could drop the host from its cache key |
+| **Measure the saving** | Runtime archive size × apps × retained versions, against the app archives, from a real repository's Storage Summary |
+| **An SBOM for the runtime module** | The app's SBOM lists the runtime; the runtime module carries none of its own |
+| **CDS on the host** | Not linked into the runtime (`--generate-cds-archive` is not deterministic). `-XX:+AutoCreateSharedArchive -XX:SharedArchiveFile=<data dir>/app.jsa` in the launcher would build one on the host on first start |
 
 ## Next: Dockerfiles parsed and rewritten with OpenRewrite
 
@@ -52,7 +65,6 @@ under the configuration cache.
 | Item | Notes |
 |---|---|
 | Windows functional tests | One functional test now runs on Windows: an installed JDK given by `javaApp.jdk.<feature>.windows-x64.path`, built, zipped and smoke-tested through the `.bat` launcher. The rest still skip there, because the fixtures build fake download sites with the system `tar` and `sh`; porting them means Windows-layout JDK and Node zips (commons-compress is already a dependency) |
-| CI red since 78e84ce | Three causes, fixed 2026-10-29: `check` named `build-logic`'s nonexistent root `:test`; `Dockerfile.<name>` discovery listed the project directory at configuration, so every `clean` invalidated the configuration cache; and a Unix-only expectation in `RuntimeSourceTest`. Confirm the next run is green, including `dockerTest` on Linux x64 (only arm64 was run locally) |
 | A Dockerfile that builds with no emulation | `e81ca52` put a `RUN` (data and log directories) in the generated Dockerfile, so building another CPU's image now needs QEMU (CI registers it). The context could carry the directories, made with their modes, for a `COPY --chown=1001:0` instead, and the cross-build would run nothing again |
 | Micro's second pin | `Dockerfile.micro` now names UBI minimal too (`BUILD_IMAGE`, which installs zlib). Check that Renovate's Dockerfile support updates that `ARG` with the main Dockerfile's minimal pin, or tie the two together |
 | Functional test not run here | `JdkSourceTest`'s "a JDK packaged as an RPM, named the organisation's way" could not reach its TestKit daemon in the sandbox on 2026-10-28; its pattern now spells `[feature]_[update]` instead of `revisionFormat`. Run it locally |

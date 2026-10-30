@@ -37,7 +37,8 @@ data class EcosystemSpec(
     val runtimeName: String,
     val runtimeVersion: Provider<String>,
     val launchers: Launchers,
-    /** The ecosystem's own content: `runtime/`, plus `lib/` or `app/`. */
+    val runtime: Any,
+    /** The rest: `lib/` or `app/`. */
     val contents: CopySpec.() -> Unit,
     val sbom: GenerateSbom.() -> Unit,
 )
@@ -46,10 +47,11 @@ data class EcosystemSpec(
 internal fun untestedTargets(targets: Collection<Target>, host: Target, smokeTestEnabled: Boolean): List<Target> =
     targets.filter { it != host || !smokeTestEnabled }
 
-class TargetTasks(
+data class TargetTasks(
     val target: Target,
     val assemble: TaskProvider<Sync>,
     val archive: TaskProvider<out AbstractArchiveTask>,
+    val runtimeArchive: TaskProvider<out AbstractArchiveTask>,
     /** The built-in SBOM, or the project's own ([AppExtension.sbom]). */
     val sbom: Provider<RegularFile>,
 )

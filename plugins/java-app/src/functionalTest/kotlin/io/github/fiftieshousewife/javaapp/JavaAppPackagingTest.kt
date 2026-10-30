@@ -1,6 +1,5 @@
 package io.github.fiftieshousewife.javaapp
 
-import io.github.fiftieshousewife.appcore.RecordingRepository
 import io.github.fiftieshousewife.appcore.RpmEntry
 import io.github.fiftieshousewife.appcore.RpmFile
 import io.github.fiftieshousewife.appcore.Target
@@ -13,7 +12,7 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.io.File
 
-/** The other ways to ship an app: a zip archive, and an RPM installed into a YUM repository. */
+/** The other ways to ship an app: a zip archive, and an RPM. */
 class JavaAppPackagingTest {
     @TempDir
     lateinit var tmp: File
@@ -76,25 +75,6 @@ class JavaAppPackagingTest {
             },
             { assertTrue(rpm.preInstall.contains("useradd -r -g svc"), rpm.preInstall) },
             { assertTrue("shadow-utils" in rpm.requires, rpm.requires.toString()) },
-        )
-    }
-
-    @Test
-    fun `publish uploads each RPM to the YUM repository with the publishing credentials`() {
-        val requests = RecordingRepository().use { server ->
-            val project = javaService(tmp, rpmService())
-            project.build(
-                "publish",
-                "-PjavaApp.rpmRepositoryUrl=${server.url}/rpm-local",
-                "-PjavaApp.allowUntestedPublish=true",
-                "-PbinaryRepoUsername=ci",
-                "-PbinaryRepoPassword=secret",
-            )
-            server.requests
-        }
-        assertEquals(
-            "PUT /rpm-local/svc-2.0.0-1.aarch64.rpm Basic Y2k6c2VjcmV0",
-            requests.last { "aarch64" in it },
         )
     }
 

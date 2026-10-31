@@ -66,14 +66,14 @@ Windows agent's differ.
 ### What Gradle caches
 
 - **`jlink<Target>` and `customiseRuntime<Target>` are cacheable**, keyed by the pin, the build
-  machine and the target, the modules, the jlink options, the certificates, the policy and the
+  target, whether the build machine runs Windows, the modules, the jlink options, the certificates, the policy and the
   overlay: not the app's code or version. A change to the app doesn't link the runtime again, and
   a build cache hit restores the same bytes a link would have made.
 - **The JDKs themselves aren't hashed** (their pin is the input), so a JDK replaced on disk under
   the same version isn't noticed; dependency verification is what catches that.
-- **The build machine is part of the key,** so a runtime linked on a Mac is never reused by a Linux
-  agent from a shared build cache, though the link gives the same bytes on both. A Windows agent's
-  link really does differ.
+- **The build machine is not part of the key,** only whether it runs Windows: Linux and macOS agents
+  link the same bytes, so a shared build cache serves a runtime linked on a Mac to a Linux agent. A
+  Windows agent's link differs, so it never shares one with them.
 - **`appRuntimeArchive<Target>` runs again for a new version,** since the version is in its file's
   name, and writes the same bytes. Archive tasks are never cached; this one only copies.
 - **Gradle's dependency cache is keyed by coordinates,** not content, so a build that resolves each

@@ -1,9 +1,12 @@
 package io.github.fiftieshousewife.javaapp
 
+import io.github.fiftieshousewife.appcore.Target
 import io.github.fiftieshousewife.appcore.TestProject
 import io.github.fiftieshousewife.appcore.checks
+import org.gradle.testkit.runner.TaskOutcome
 import org.junit.jupiter.api.Assertions.assertAll
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
@@ -52,6 +55,19 @@ class RuntimeArchiveTest {
         assertAll(
             { assertEquals(first, rebuilt) },
             { assertEquals(first, sha256(runtimeArchive(project, "2.0.1"))) },
+        )
+    }
+
+    @Test
+    fun `the link is restored from the build cache, keyed by whether the host is Windows but not by the host`() {
+        val project = javaService(tmp)
+        val suffix = Target.parse(host).taskSuffix
+        project.build("jlink$suffix", "--build-cache")
+        val restored = project.build("clean", "jlink$suffix", "--build-cache", "-Dorg.gradle.caching.debug=true")
+        assertAll(
+            { assertEquals(TaskOutcome.FROM_CACHE, restored.task(":jlink$suffix")?.outcome) },
+            { assertTrue(restored.output.contains("fingerprint for 'windowsHost'"), restored.output) },
+            { assertFalse(restored.output.contains("fingerprint for 'host'"), restored.output) },
         )
     }
 

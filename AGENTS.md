@@ -194,8 +194,8 @@ archive may depend on the app or the agent: no name or version inside it, modes 
 (`AppCopySpecs.runtimeExecutableBits`, which matches paths within the runtime's own tree, as a copy
 spec matches a file's source path), CI's `runtime-reproducible` job comparing agents, `cacerts` written without a password under JVM-wide PKCS12
 properties (`TrustedCertificates`; Java 17 has no other way to turn off the salted MAC), and jlink
-run with `--strip-java-debug-attributes` (`--strip-debug` runs the host's `objcopy`). `jlink<T>`
-keeps the host as an input, though its output no longer depends on it.
+run with `--strip-java-debug-attributes` (`--strip-debug` runs the host's `objcopy`). `jlink<T>`'s
+cache key has whether the host is Windows, not the host, since only Windows' jlink writes other bytes.
 
 **Container context** (`DockerContext`), unpacked from each Linux target's two archives: beside `runtime/<cpu>/` and `app/<cpu>/`, kept for
 Dockerfiles written before, each layer is a tree in `layers/<cpu>/` holding the paths it takes in the

@@ -18,6 +18,8 @@ import javax.inject.Inject
 /**
  * Runs the host's jlink against the target JDK's `jmods`, so a cross link needs no container. The JDKs are
  * `@Internal` since the pin they come from is the tracked input: Gradle need not hash ~300 MB of JDK every build.
+ * The host is `@Internal` too: Linux and macOS link the same bytes for every target, so a shared build cache can
+ * serve one's link to the other. A Windows host's jlink writes different bytes, hence [windowsHost].
  */
 @CacheableTask
 abstract class JlinkRuntime
@@ -34,7 +36,9 @@ constructor(
 
     @get:Input abstract val jdkVersion: Property<String>
 
-    @get:Input abstract val host: Property<Target>
+    @get:Internal abstract val host: Property<Target>
+
+    @get:Input abstract val windowsHost: Property<Boolean>
 
     @get:Input abstract val target: Property<Target>
 

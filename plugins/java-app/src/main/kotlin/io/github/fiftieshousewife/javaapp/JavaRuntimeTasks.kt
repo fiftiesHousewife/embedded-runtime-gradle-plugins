@@ -52,6 +52,7 @@ internal class JavaRuntimeTasks(
             dependsOn(toolHome.tasks + targetHome.tasks)
             jdkVersion.set(conventions.jdkVersion)
             host.set(wiring.host)
+            windowsHost.set(wiring.host.isWindows)
             this.target.set(target)
             modules.set(linkedModules)
             options.set(conventions.jlinkOptions)

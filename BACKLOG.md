@@ -8,12 +8,11 @@ Last updated 2026-10-30.
 ## The runtime published apart from the app
 
 Done 2026-10-30: `<app>` and `<app>-runtime` publications, a byte-identical runtime archive, no RPM
-upload. Still open:
+upload; 2026-10-31: the host out of `jlink<T>`'s cache key (only whether it is Windows). Still open:
 
 | Item | Notes |
 |---|---|
 | **A guard against silent duplication** | A runtime archive that stops being reproducible fails nothing; storage just grows. Write a fingerprint of the runtime's inputs (JDK pin and its SHA-256, the modules, the jlink options, the customisation record) beside the archive, for the publishing step to set as an Artifactory property (`runtime.inputs`); a pipeline that finds the previous release's fingerprint equal but its SHA-256 different fails |
-| **The host in `jlink<T>`'s cache key** | CI's `runtime-reproducible` job shows Linux and macOS agents link the same bytes for every target; Windows' differ. `jlink<T>` could take whether the host is Windows in place of the host itself, so a shared build cache serves a Mac's link to a Linux agent |
 | **The same runtime from a Windows agent** | Its jlink writes CRLF into `release` and backslashed pointer files for duplicate legal notices (both could be normalised in `customiseRuntime`), and `generate-jli-classes` generates `BoundMethodHandle$Species_*` differently; only `--disable-plugin generate-jli-classes`, which changes every runtime, would remove that. Find why first: the record lists each resource's SHA-256 |
 | **Measure the saving** | Runtime archive size × apps × retained versions, against the app archives, from a real repository's Storage Summary |
 | **An SBOM for the runtime module** | The app's SBOM lists the runtime; the runtime module carries none of its own |

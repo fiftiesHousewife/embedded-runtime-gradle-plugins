@@ -1,6 +1,7 @@
 package io.github.fiftieshousewife.appcore.tasks
 
 import com.github.packageurl.PackageURLBuilder
+import io.github.fiftieshousewife.appcore.Sha256
 import org.cyclonedx.Version
 import org.cyclonedx.generators.BomGeneratorFactory
 import org.cyclonedx.model.Bom
@@ -9,17 +10,9 @@ import org.cyclonedx.model.Hash
 import org.cyclonedx.model.Metadata
 import org.cyclonedx.model.metadata.ToolInformation
 import java.io.File
-import java.io.OutputStream
-import java.nio.file.Files
-import java.security.DigestInputStream
-import java.security.MessageDigest
-import java.util.HexFormat
 import java.util.UUID
 
-/**
- * The components [GenerateSbom] lists, built with the CycloneDX reference model and package-url's
- * purl builder, and the CycloneDX 1.5 JSON they make.
- */
+/** The components [GenerateSbom] lists, built with the CycloneDX reference model and package-url's purl builder. */
 internal object CycloneDx {
     private const val TOOL = "io.github.fiftieshousewife.appcore"
 
@@ -52,7 +45,7 @@ internal object CycloneDx {
         val parts = coordinates.split(":", limit = 4)
         val maven = Coordinates(parts[0], parts[1], parts[2])
         return component(Component.Type.LIBRARY, purl("maven", maven), maven).apply {
-            filesByName[parts.last()]?.let { hashes = listOf(Hash(Hash.Algorithm.SHA_256, sha256(it))) }
+            filesByName[parts.last()]?.let { hashes = listOf(Hash(Hash.Algorithm.SHA_256, Sha256.of(it.toPath()))) }
         }
     }
 
@@ -104,12 +97,4 @@ internal object CycloneDx {
         .withVersion(coordinates.version)
         .build()
         .canonicalize()
-
-    private fun sha256(file: File): String {
-        val digest = MessageDigest.getInstance("SHA-256")
-        DigestInputStream(Files.newInputStream(file.toPath()), digest).use {
-            it.transferTo(OutputStream.nullOutputStream())
-        }
-        return HexFormat.of().formatHex(digest.digest())
-    }
 }

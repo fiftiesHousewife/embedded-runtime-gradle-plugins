@@ -49,7 +49,8 @@ internal class TargetPipeline(private val project: Project, private val wiring: 
         val runtimeArchive = RuntimeArchive.register(project, wiring, target, spec.runtime).apply {
             configure { dependsOn(verified) }
         }
-        return TargetTasks(target, install, archive, runtimeArchive, parts.sbom)
+        val fingerprint = RuntimeFingerprints(project, wiring).register(target, spec)
+        return TargetTasks(target, install, archive, runtimeArchive, fingerprint, parts.sbom)
     }
 
     /** The generated pieces every target's directory holds besides the ecosystem's own content. */

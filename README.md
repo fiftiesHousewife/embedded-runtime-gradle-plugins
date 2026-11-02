@@ -280,6 +280,7 @@ setting and its default is in the [reference](docs/reference.md).
 | `appDockerfile` | Creates the project's root `Dockerfile` if missing and keeps the plugin's block of it up to date | |
 | `appDockerContext` | Writes a container build context: the Dockerfile plus each Linux target's runtime and app, by CPU | `targets(…)`, `license` |
 | `publish` | Gradle's own: publishes every target's app archive as `<app>` and runtime archive as `<app>-runtime`, under one version, with the target as the classifier. Stops for archives never started on this machine | `-PbinaryRepo.repository` or `-PbinaryRepo.url`, `-PbinaryRepo.repo.releases`, `-PbinaryRepo.repo.snapshots`, `-PjavaApp.allowUntestedPublish` |
+| `appVerifyRuntimeFingerprint` | Before `publish`: fails when a runtime's inputs equal the previous release's but its archive doesn't, so the repository would store it twice | `-PjavaApp.previousRelease` |
 | `aiSkills` | Writes the AI assistant skills and the build-check hook into the project, and adds the Claude Code plugin to `.claude/settings.json`; part of `assemble` | `-PjavaApp.aiSkills` |
 
 In a deployment pipeline, the `app-smoke-test` plugin adds its own `appSmokeTest`, which smoke-tests

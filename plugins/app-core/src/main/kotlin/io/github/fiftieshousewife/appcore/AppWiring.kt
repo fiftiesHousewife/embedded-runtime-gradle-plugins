@@ -149,7 +149,9 @@ class AppWiring(
         if (targets.isEmpty()) throw GradleException("${ecosystem.extensionName}.targets is empty; name at least one")
         val pipeline = TargetPipeline(project, this)
         val built = targets.map { pipeline.register(it, contribute(it)) }
-        lifecycle.allArchives.configure { dependsOn(built.map { it.archive } + built.map { it.runtimeArchive }) }
+        lifecycle.allArchives.configure {
+            dependsOn(built.map { it.archive } + built.map { it.runtimeArchive } + built.map { it.runtimeFingerprint })
+        }
         built.firstOrNull { it.target == host }?.let(lifecycle.hostTasks::use)
         lifecycle.dockerContext.useLinuxArchives(built)
         lifecycle.publishing.addTargets(built, untestedTargets(targets, host, extension.smokeTestEnabled.get()))

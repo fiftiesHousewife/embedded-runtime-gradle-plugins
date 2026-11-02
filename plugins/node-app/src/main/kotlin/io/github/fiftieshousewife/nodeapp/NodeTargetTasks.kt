@@ -49,6 +49,8 @@ internal class NodeTargetTasks(
                 into("app/node_modules") { from(prodModules) { exclude(".bin/**", ".package-lock.json") } }
             },
             sbom = { nodeModules.set(prodModules) },
+            // The runtime is the distribution's node binary and licence, as they are.
+            fingerprint = { sources.from(runtime) },
         )
     }
 

@@ -115,6 +115,17 @@ internal class AppPublishing(
         guard.configure { untestedTargets.set(untested.map { it.id }) }
         val runtime = runtimeDependency()
         built.forEach { addVariant(it, runtime) }
+        val fingerprints = RuntimeFingerprints(project, wiring).guard(built)
+        project.tasks.withType(PublishToMavenRepository::class.java).configureEach { dependsOn(fingerprints) }
+        // Beside the runtime, not in its variant: what a deployment resolves is the archive alone.
+        publishing.publications.named(runtimePublicationName, MavenPublication::class.java) {
+            built.forEach { t ->
+                artifact(t.runtimeFingerprint) {
+                    classifier = t.target.id + RuntimeFingerprint.CLASSIFIER_SUFFIX
+                    extension = RuntimeFingerprint.EXTENSION
+                }
+            }
+        }
         publishing.publications.named(publicationName, MavenPublication::class.java) {
             built.forEach { t ->
                 artifact(t.sbom) {

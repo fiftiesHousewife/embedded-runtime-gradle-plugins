@@ -1,6 +1,7 @@
 package io.github.fiftieshousewife.appcore
 
 import io.github.fiftieshousewife.appcore.tasks.GenerateSbom
+import io.github.fiftieshousewife.appcore.tasks.WriteRuntimeFingerprint
 import org.gradle.api.Task
 import org.gradle.api.component.SoftwareComponentFactory
 import org.gradle.api.file.ArchiveOperations
@@ -41,6 +42,8 @@ data class EcosystemSpec(
     /** The rest: `lib/` or `app/`. */
     val contents: CopySpec.() -> Unit,
     val sbom: GenerateSbom.() -> Unit,
+    /** What else the runtime is built from, beyond its name, version and target ([RuntimeFingerprint]). */
+    val fingerprint: WriteRuntimeFingerprint.() -> Unit,
 )
 
 /** The targets whose archives are never started here: all but this machine's, and that one too without a smoke test. */
@@ -52,6 +55,7 @@ data class TargetTasks(
     val assemble: TaskProvider<Sync>,
     val archive: TaskProvider<out AbstractArchiveTask>,
     val runtimeArchive: TaskProvider<out AbstractArchiveTask>,
+    val runtimeFingerprint: TaskProvider<WriteRuntimeFingerprint>,
     /** The built-in SBOM, or the project's own ([AppExtension.sbom]). */
     val sbom: Provider<RegularFile>,
 )

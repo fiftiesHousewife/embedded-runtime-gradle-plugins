@@ -58,6 +58,8 @@ just grows. These are what could make them differ, and what the plugins do about
 | The build machine | Linux and macOS agents give the same bytes for every target, Windows targets included. A Windows agent doesn't: its jlink writes `release` with CRLF line endings, writes duplicate legal notices as `Please see ..\java.base\LICENSE` pointers where the others copy the text, and generates some `java.lang.invoke` classes in `lib/modules` differently. Publish runtimes from Linux or macOS agents |
 | Compression | gzip by the JVM that runs Gradle. Publish from agents that run Gradle on the same JDK, with Gradle's [daemon JVM criteria](https://docs.gradle.org/current/userguide/gradle_daemon.html#sec:daemon_jvm_criteria), say |
 
+`appVerifyRuntimeFingerprint` catches any of these before a release is published: it fails when a
+runtime's inputs equal the previous release's but its archive doesn't ([Publishing](publishing.md#a-check-that-it-still-is)).
 The plugins' own tests rebuild a runtime archive from scratch, and with a new app version, and
 compare the checksums. CI does the same for every target on Linux, macOS and Windows agents, then
 checks that the Linux and macOS agents built the same bytes for each target, and reports how the

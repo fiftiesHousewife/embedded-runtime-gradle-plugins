@@ -97,6 +97,8 @@ Each defaults to the `-PappSmokeTest.<name>` property of the same name.
 |---|---|
 | `appArchive` | Builds every target's app and runtime archives; part of `assemble` |
 | `appRuntimeArchive<Target>` | The runtime alone, `build/distributions/<app>-runtime-<version>-<target>.tar.gz` (`.zip` for Windows), with `runtime/` at its root |
+| `appRuntimeFingerprint<Target>` | `build/distributions/<app>-runtime-<version>-<target>-inputs.txt`: what the runtime archive is built from, published beside it; see [Publishing](publishing.md#a-check-that-it-still-is) |
+| `appVerifyRuntimeFingerprint` | With `previousRelease` set, compares each runtime with that release's and fails when the inputs are the same but the archive is not; `publish` depends on it |
 | `install<Target>Dist`, `<target>DistTar`, `<target>DistZip` | The distribution plugin's tasks for each target's distribution, e.g. `installLinuxX64Dist` |
 | `installDist` | Installs this machine's app with its runtime into `build/install/<app>` |
 | `startScripts` | Gradle's own task; writes the Java launchers with the embedded-runtime script generator |
@@ -144,6 +146,7 @@ above.
 | `javaApp.runtimeOptions`, `nodeApp.runtimeOptions` | `open` | `locked` refuses to start while anything would add runtime options |
 | `javaApp.smokeTestTimeout`, `nodeApp.smokeTestTimeout` | `60` | Seconds the started archive may take to get healthy, in `appSmokeTest` and `jlinkFindModules` |
 | `javaApp.allowUntestedPublish`, `nodeApp.allowUntestedPublish` | `false` | Allow publishing an archive that was never started |
+| `javaApp.previousRelease`, `nodeApp.previousRelease` | | The release, or `latest.release`, whose runtimes `appVerifyRuntimeFingerprint` compares this build's with, resolved from the build's repositories |
 | `javaApp.gitCommit`, `nodeApp.gitCommit` | `git rev-parse HEAD` | The commit recorded in `META-INF/app.json`, for builds outside a checkout |
 | `javaApp.aiSkills`, `nodeApp.aiSkills` | `true` | `false` stops `assemble` writing the AI assistant skills and hooks into the project |
 | `javaApp.runtimeSupportUrl`, `nodeApp.runtimeSupportUrl` | `https://endoflife.date/api/v1/products/` | Where `checkRuntimeSupport` reads end-of-life data; a mirror behind a corporate network |

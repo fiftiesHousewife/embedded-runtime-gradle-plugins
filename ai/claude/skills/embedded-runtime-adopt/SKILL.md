@@ -48,7 +48,9 @@ smoke test fails on a missing JDK class, use the `embedded-runtime-jlink-modules
   (`<app>-<version>-<target>`) and its runtime (`<app>-runtime-<version>-<target>`, one `runtime/`
   directory, unpacked inside the app's). `publish` uploads them as two modules, `<app>` and
   `<app>-runtime`, at one version; an unchanged runtime is the same bytes every release, so
-  Artifactory stores it once (`artifactoryPublish` from JFrog's plugin also skips the upload). A
+  Artifactory stores it once (`artifactoryPublish` from JFrog's plugin also skips the upload).
+  `-PjavaApp.previousRelease=latest.release` on `publish` fails when a runtime's inputs (its
+  `-inputs.txt` fingerprint, published beside it) equal that release's but its bytes don't. A
   deployment unpacks the app, then the runtime into it. An RPM for Linux servers:
   `rpm { enabled = true }`; RPMs are built, not published.
 - Behind a corporate binary repository (Artifactory, Nexus): if `settings.gradle.kts` already

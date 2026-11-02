@@ -27,6 +27,8 @@ class BuildFacts(project: Project, private val ecosystem: Ecosystem) {
 
     val allowUntestedPublish: Provider<Boolean> = flag("allowUntestedPublish")
 
+    val previousRelease: Provider<String> = property("previousRelease")
+
     val runtimeSupportUrl: Provider<String> = property("runtimeSupportUrl").orElse(RuntimeSupport.DEFAULT_URL)
 
     val endOfLifeWarningDays: Provider<Int> =

@@ -9,6 +9,7 @@ com/example/orders-service/1.4.2/orders-service-1.4.2-linux-x64.tar.gz
 com/example/orders-service/1.4.2/orders-service-1.4.2-linux-x64-cyclonedx.json
 com/example/orders-service/1.4.2/orders-service-1.4.2-windows-x64.zip      # zip for Windows
 com/example/orders-service-runtime/1.4.2/orders-service-runtime-1.4.2-linux-x64.tar.gz
+com/example/orders-service-runtime/1.4.2/orders-service-runtime-1.4.2-linux-x64-inputs.txt
 com/example/orders-service-runtime/1.4.2/orders-service-runtime-1.4.2-windows-x64.zip
 …
 ```
@@ -57,6 +58,31 @@ The saving holds only while the runtime archive really is the same bytes, and no
 stops being so: storage just grows. Publish from Linux or macOS agents, which give the same bytes for
 every target; a Windows agent's jlink makes a different runtime. [Image layers and caching](caching.md#republishing-the-runtime)
 lists what keeps it identical.
+
+### A check that it still is
+
+Beside each runtime archive is its fingerprint, `<app>-runtime-<version>-<target>-inputs.txt`: one
+sorted line for each thing the runtime is built from, and nothing about the app. For Java those are
+the JDK distribution and version, a SHA-256 for each of the JDK's `jmods` and its `lib/modules`, the
+modules, the jlink options, whether a Windows agent linked it, the customisation record (certificates,
+policy, security properties) and every overlay file; for Node.js, the `node` binary and its licence;
+for both, the target and the plugin's version. It is the same bytes whenever its inputs are, so it
+is stored once too.
+
+Name the release to compare with, and `publish` checks each target first:
+
+```bash
+./gradlew publish -PjavaApp.previousRelease=latest.release    # or a version: 1.4.1
+```
+
+`appVerifyRuntimeFingerprint` fetches that release's runtime archives and fingerprints from the
+build's repositories and, for each target, reports one of four things: a target the release didn't
+have; a new runtime, naming the lines that changed (a new JDK patch, say); the same runtime, stored
+once; or the same inputs with an archive of different bytes, which fails the build, since the
+repository would store a second copy. A failure means something reaching the archive isn't
+reproducible on this agent, or isn't in the fingerprint; compare the two archives' entries. The
+report is in `build/app-work/runtime-fingerprint.txt`. A repository it can't reach fails the check
+rather than passing it; a release or a target it doesn't have does not.
 
 With a binary repository configured, releases go to `libs-release-local` and `-SNAPSHOT` versions to
 `libs-snapshot-local`. To publish under other coordinates:

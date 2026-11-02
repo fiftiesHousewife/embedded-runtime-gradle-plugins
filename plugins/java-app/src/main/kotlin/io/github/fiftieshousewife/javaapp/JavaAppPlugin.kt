@@ -50,7 +50,10 @@ constructor(
             },
         )
         val ecosystem = JavaEcosystem(project, conventions.jdkVersion)
-        wiring.register { target -> ecosystem.spec(runtimeTasks.customise(target, runtimeTasks.jlink(target))) }
+        wiring.register { target ->
+            val jlink = runtimeTasks.jlink(target)
+            ecosystem.spec(jlink, runtimeTasks.customise(target, jlink))
+        }
         project.tasks.named("appSmokeTest", AppSmokeTest::class.java) {
             failureHint.set("If the app is missing a JDK module, ./gradlew jlinkFindModules finds which.")
         }

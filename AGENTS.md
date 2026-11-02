@@ -58,7 +58,8 @@ Where things are tested:
 - `JavaAppPluginTest`: the app archive's contents and reproducibility, re-extracting a JDK with
   read-only files, launchers from Gradle's `startScripts` (and a build's own generator winning).
   `RuntimeArchiveTest`: the runtime archive's layout and modes, the same bytes after a rebuild and
-  for a new version, and the smoke test starting the app on it.
+  for a new version, and the smoke test starting the app on it. `RuntimeFingerprintTest`: the
+  fingerprint published beside it, and the guard against a published release (a tampered one fails).
 - `JavaAppTargetsTest`: several targets in one build and one publication, and refusing to publish
   untested archives; `ContainerContextTest` the container context and the Dockerfile's block;
   `ConsumerPluginsTest` the `app-smoke-test` consumer plugin, including its runtime policy check.
@@ -196,6 +197,13 @@ spec matches a file's source path), CI's `runtime-reproducible` job comparing ag
 properties (`TrustedCertificates`; Java 17 has no other way to turn off the salted MAC), and jlink
 run with `--strip-java-debug-attributes` (`--strip-debug` runs the host's `objcopy`). `jlink<T>`'s
 cache key has whether the host is Windows, not the host, since only Windows' jlink writes other bytes.
+Each runtime archive has a fingerprint of its inputs beside it (`RuntimeFingerprints`, from the
+ecosystem's `EcosystemSpec.fingerprint`), published as an extra artifact of the runtime publication,
+outside its variants so resolving the runtime fetches the archive alone. `appVerifyRuntimeFingerprint`
+resolves the previous release's pair per target (one configuration each, with that target's
+attributes, so the variant is chosen and the classifiers name the files), leniently so a missing
+target is new, and fails on any other resolution failure, told apart by exception name since Gradle's
+not-found types are internal. Anything new that reaches the runtime archive belongs in the fingerprint.
 
 **Container context** (`DockerContext`), unpacked from each Linux target's two archives: beside `runtime/<cpu>/` and `app/<cpu>/`, kept for
 Dockerfiles written before, each layer is a tree in `layers/<cpu>/` holding the paths it takes in the

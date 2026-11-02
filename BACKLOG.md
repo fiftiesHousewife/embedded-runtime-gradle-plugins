@@ -8,11 +8,10 @@ Last updated 2026-10-30.
 ## The runtime published apart from the app
 
 Done 2026-10-30: `<app>` and `<app>-runtime` publications, a byte-identical runtime archive, no RPM
-upload; 2026-10-31: the host out of `jlink<T>`'s cache key (only whether it is Windows). Still open:
+upload; 2026-10-31: the host out of `jlink<T>`'s cache key (only whether it is Windows); 2026-11-02: the runtime's fingerprint, published beside it, and `appVerifyRuntimeFingerprint` before `publish`. Still open:
 
 | Item | Notes |
 |---|---|
-| **A guard against silent duplication** | A runtime archive that stops being reproducible fails nothing; storage just grows. Write a fingerprint of the runtime's inputs (JDK pin and its SHA-256, the modules, the jlink options, the customisation record) beside the archive, for the publishing step to set as an Artifactory property (`runtime.inputs`); a pipeline that finds the previous release's fingerprint equal but its SHA-256 different fails |
 | **The same runtime from a Windows agent** | Its jlink writes CRLF into `release` and backslashed pointer files for duplicate legal notices (both could be normalised in `customiseRuntime`), and `generate-jli-classes` generates `BoundMethodHandle$Species_*` differently; only `--disable-plugin generate-jli-classes`, which changes every runtime, would remove that. Find why first: the record lists each resource's SHA-256 |
 | **Measure the saving** | Runtime archive size × apps × retained versions, against the app archives, from a real repository's Storage Summary |
 | **An SBOM for the runtime module** | The app's SBOM lists the runtime; the runtime module carries none of its own |
@@ -39,6 +38,19 @@ under the configuration cache.
 | **OCI labels with the commit** | Keep `org.opencontainers.image.revision` and the rest of the OCI set; add `io.k8s`/`io.openshift` labels for OpenShift |
 | **Volume contract** | The image creates `/var/lib/app/data` and `/logs` writable by user 1001 and group 0; document the volume and env-var contract with a sample `Deployment` |
 | **Variants from the engine** | `Dockerfile.openshift` and `Dockerfile.micro` are hand-written in the Spring Boot sample; the engine's `openshift` and `redhat-certified` standards should write them, so they follow plugin releases as the managed block does |
+| **Status 2026-11-02** | Not started past the spike. `rewrite-docker` is still at 8.90.4 (2026-08-24); two parser fixes are on main, unreleased (whitespace before commas in JSON arrays, `=` in `COPY` paths). None of the spike's problems (CRLF, `AddUserInstruction` placement, label merging, inline markers) has an upstream issue, and none of the recipes we need exists upstream: ours to write, or to contribute |
+| **Packages for UBI micro** | Jib can't run dnf. The declarative form found is a lockfile: Konflux's `rpm-lockfile-prototype` (`rpms.in.yaml` to `rpms.lock.yaml`: NEVRA, URL, SHA-256 per arch), with dnf still installing so the rpmdb lists the package for scanners. A `micro { packages("zlib") }` DSL would write the lock and render the build stage from it. Unpacking RPMs into a layer in Java (Redline) avoids emulation but leaves zlib out of the rpmdb, so scanners miss its CVEs. Unverified: gathered from memory, check each tool before building on it |
+
+## Next: sizing CPU and memory
+
+Asked for 2026-11-02. A research pass (partly from memory, to verify) suggests:
+
+| Item | Notes |
+|---|---|
+| **Measure** | `appSize<Target>`: start the image under Testcontainers with a memory and CPU limit, warm up, drive load (an `HttpClient` loop by default; Gatling or k6 optional), read cgroup v2 `memory.peak` and `cpu.stat` (usage, throttling), heap, metaspace and threads from Actuator or JFR (`jdk.jfr` is in the runtime; `jcmd` is not) |
+| **Recommend** | Requests and limits as a resources snippet: memory from peak plus headroom, CPU request from steady-state usage and no CPU limit by default (throttling); JVM flags from the Paketo memory calculator's formula (heap = limit − metaspace from class count − threads × stack − code cache − direct − headroom), `ActiveProcessorCount`, and the GC (under 2 CPUs or 1792 MB the JVM picks Serial); `--max-old-space-size` for Node.js |
+| **Guard** | Fail when the heap percentage of the limit plus measured non-heap exceeds the limit, or the run was throttled or OOM-killed |
+| **Limits of it** | A build agent is not production: record the agent with the result, report startup apart from steady state, and treat the output as a starting point for VPA (`Off` mode) or KRR to refine. In-place pod resize is stable in Kubernetes 1.35, with a startup CPU boost in VPA |
 
 ## Shared module sets
 

@@ -3,6 +3,7 @@ package io.github.fiftieshousewife.javaapp
 import io.github.fiftieshousewife.appcore.EcosystemSpec
 import io.github.fiftieshousewife.appcore.Launchers
 import io.github.fiftieshousewife.javaapp.tasks.CustomiseRuntime
+import io.github.fiftieshousewife.javaapp.tasks.JlinkRuntime
 import org.gradle.api.Project
 import org.gradle.api.artifacts.component.ModuleComponentIdentifier
 import org.gradle.api.artifacts.result.ResolvedArtifactResult
@@ -19,7 +20,7 @@ internal class JavaEcosystem(private val project: Project, private val jdkVersio
     private val runtimeClasspath = project.configurations.named("runtimeClasspath")
     private val resolvedArtifacts = runtimeClasspath.flatMap { it.incoming.artifacts.resolvedArtifacts }
 
-    fun spec(runtime: TaskProvider<CustomiseRuntime>): EcosystemSpec = EcosystemSpec(
+    fun spec(jlink: TaskProvider<JlinkRuntime>, runtime: TaskProvider<CustomiseRuntime>): EcosystemSpec = EcosystemSpec(
         runtimeName = JdkSources.from(project.providers).distribution.id,
         runtimeVersion = jdkVersion,
         launchers = Launchers.StartScripts(project.tasks.named("startScripts")),
@@ -34,10 +35,24 @@ internal class JavaEcosystem(private val project: Project, private val jdkVersio
             mavenComponents.set(resolvedArtifacts.map { artifacts -> artifacts.mapNotNull(::coordinates) })
             mavenFiles.from(resolvedArtifacts.map { artifacts -> artifacts.map { it.file } })
         },
+        fingerprint = {
+            entries.put("modules", jlink.flatMap { it.modules }.map { it.joinToString(",") })
+            entries.put("jlinkOptions", jlink.flatMap { it.options }.map { it.joinToString(" ") })
+            entries.put("linkedOnWindows", jlink.flatMap { it.windowsHost }.map(Boolean::toString))
+            // The JDK itself, so one re-released under the same version is a new runtime, not a duplicate.
+            sources.from(project.fileTree(jlink.flatMap { it.targetJdk }) { include(JDK_CONTENTS) })
+            sources.from(jlink.flatMap { it.targetJmods }.map { listOf(it) }.orElse(emptyList()))
+            sources.from(runtime.flatMap { it.outputDir.file(CustomiseRuntime.RECORD) })
+            sources.from(runtime.flatMap { it.overlay }.map { listOf(it) }.orElse(emptyList()))
+        },
     )
 
     /** `group:module:version:fileName` for an artifact from a repository; null for a project or file. */
     private fun coordinates(artifact: ResolvedArtifactResult): String? =
         (artifact.id.componentIdentifier as? ModuleComponentIdentifier)
             ?.let { "${it.group}:${it.module}:${it.version}:${artifact.file.name}" }
+
+    private companion object {
+        val JDK_CONTENTS = listOf("**/jmods/*.jmod", "**/lib/modules")
+    }
 }

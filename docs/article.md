@@ -2,7 +2,7 @@
 
 Pippa Newbold · 25 October 2026
 
-The JDK or Node.js your service runs on in production should be the one your tests ran on. These Gradle plugins make that the default: they package each app with its own pinned, trimmed runtime, as two archives released together, the app and its runtime, that run the same on a laptop, a server or in a container.
+The JDK or Node.js your service runs on in production should be the one your tests ran on. These Gradle plugins make that the default: they package each app with its own pinned, trimmed runtime, as three archives released together, the app, its libraries and its runtime, that run the same on a laptop, a server or in a container.
 
 ## How Java used to reach production
 
@@ -26,7 +26,7 @@ The shared JRE ended in three steps over four years:
 | JDK 9 | 2017 | The module system arrives with [jlink (JEP 282)](https://openjdk.org/jeps/282), which links a runtime from only the modules an app needs |
 | JDK 8 | 2014 | `jdeps` ships, listing which JDK packages and, later, which modules a jar depends on |
 
-The two tools are meant to be used together: jdeps says which modules an app needs, and jlink builds a runtime of exactly those. For this project's sample service the difference is stark. The full Temurin 21 JDK is 353 MB unpacked, the runtime jlink makes for the service is 41 MB, and its archives, app and runtime together, are 21 MB to download (linux-x64; a megabyte here is a million bytes). That is small enough to ship with every release, and the shared install, with every problem above, goes away.
+The two tools are meant to be used together: jdeps says which modules an app needs, and jlink builds a runtime of exactly those. For this project's sample service the difference is stark. The full Temurin 21 JDK is 353 MB unpacked, the runtime jlink makes for the service is 41 MB, and its archives together are 21 MB to download (linux-x64; a megabyte here is a million bytes). That is small enough to ship with every release, and the shared install, with every problem above, goes away.
 
 The catch is in how jdeps works. It reads the class files and records every class they name, so it sees only what the code refers to directly. As the [OpenJDK wiki](https://wiki.openjdk.org/x/CAESAQ) puts it, dependencies loaded with `Class.forName` or as service providers are not reported. Some of Java's most important modules arrive exactly that way:
 
@@ -61,13 +61,76 @@ The usual fixes move the problem rather than remove it. A container image pins t
 
 These plugins do: the runtime travels with the app, as an archive of its own released with it, and unpacks inside the app's directory. A Java app gets a JDK trimmed to the modules it uses; a Node.js app gets the official Node binary. The app needs nothing on the machine but glibc and a shell, and the same files go to a server, into a container, or onto a laptop.
 
-## Shipped with every release, stored once
+## Do Not Repeat Yourself
 
-The shared install was an optimisation. A runtime was too big to copy for every app, so each host kept one, and teams reached it through symlinks and `JAVA_HOME`. The saving was real; the price was the list at the top of this article. Shipping the runtime with every release would bring the cost back if every copy were really a copy. It isn't. Every system between the build and the running process stores files by the SHA-256 of their contents, and a runtime built from the same inputs has the same digest every time.
+The shared install was an optimisation. A runtime was too big to copy for every app, so each host kept one, and teams reached it through symlinks and `JAVA_HOME`. The saving was real; the price was the list at the top of this article. There is also nothing left to link to in the old way: since [JDK 11](https://www.oracle.com/java/technologies/javase/11-relnote-issues.html) Oracle's JDK has come with no JRE, so a team linking one would first have to build it. Shipping the runtime with every release would bring the old cost back if every copy were really a copy. It isn't. Every system between the build and the running process stores files by the SHA-256 of their contents, and a runtime built from the same inputs has the same digest every time.
 
-**The runtime is published on its own.** Each release publishes two archives under one version: the app, a few megabytes, and its runtime. One archive holding both would be new bytes every release, however little changed, and a store that keeps whole files by checksum would keep every copy. Apart, the runtime archive names neither the app nor its version, and the version is the only link a deployment needs between the two.
+Trimming and sharing serve the same two ends. There is less to attack and patch, because a linked runtime has no compiler and UBI micro no package manager, and less to send and store, because what repeats is sent and stored once.
+
+The idea has a well-known precedent in compression. [Brotli (RFC 7932)](https://www.rfc-editor.org/rfc/rfc7932) builds a static dictionary of about 120 KB into every decoder, so a stream can refer to common words instead of carrying them, and [Shared Brotli (RFC 9841)](https://www.rfc-editor.org/rfc/rfc9841) lets two parties agree a dictionary of their own. Nothing is sent that the other side already holds. The analogy is one of principle rather than mechanism, as these archives and layers are tar and gzip: the base and the runtime are the dictionary, and a release is the short message that refers to them.
+
+**One pattern, in and out of containers.** Docker made a discipline familiar: an ordered stack of layers, from what changes least to what changes most, each reproducible from its inputs. Nothing about that discipline needs a container. The plugins apply it to physical and virtual machines too, with the same four parts, and the only difference is what holds them together:
+
+```mermaid
+flowchart TB
+    subgraph image["In a container: image layers"]
+        direction TB
+        i4["App layer<br/>launcher and own jar"]
+        i3["Libs layer<br/>third-party jars"]
+        i2["JRE layer<br/>jlinked runtime"]
+        i1["UBI micro layers<br/>plus zlib and its RPM record"]
+        i4 --- i3 --- i2 --- i1
+    end
+    subgraph server["On a server: archives unpacked into one directory"]
+        direction TB
+        s4["App archive<br/>launcher and own jar"]
+        s3["Libs archive<br/>third-party jars"]
+        s2["Runtime archive<br/>jlinked runtime"]
+        s1["The host's own OS"]
+        s4 --- s3 --- s2 --- s1
+    end
+    image -- "each layer named by its digest" --> store[("Stored once, by checksum<br/>registry · Artifactory · node")]
+    server -- "each archive named by its checksum" --> store
+```
+
+| Part | Changes when | In an image | On a server |
+|---|---|---|---|
+| Operating system | The base's pin moves | UBI micro, by digest | The host's own, outside the release |
+| Runtime | The JDK patch or module set moves, quarterly | A layer | `<app>-runtime` |
+| Libraries | A dependency moves | A layer | `<app>-libs` |
+| App | Every release | A layer | `<app>` |
+
+One archive holding everything would be new bytes every release, however little changed, and a store that keeps whole files by checksum would keep every copy. Apart, the runtime and libraries archives name neither the app nor its version, and the version is the only link a deployment needs between the three. A server unpacks them into one directory; an image copies each to the root as a layer. They are the same files.
+
+The split pays because the parts differ so much in size. These are the Spring Boot sample's archives for linux-x64 on Oracle's Java 25, measured on 2 November 2026:
+
+| Archive | Size | SHA-256, compared |
+|---|---|---|
+| `<app>` | 8 KB | New every release |
+| `<app>-libs` | 19.6 MB | The same on `linux-x64` and `linux-aarch64` |
+| `<app>-runtime` | 40.1 MB | Differs by CPU, as it must |
+
+A release that changes only the service's own code therefore adds 8 KB of new binary out of 59.7 MB, about 0.01%. The libraries, being Java's platform-independent jars, are stored once across CPUs as well as across releases. A real service will have a larger jar than this one, but the proportions are the point.
+
+**Saving the transmission as well as the storage.** Artifactory holds each binary once and every path with those bytes refers to that copy, which is what the symlink was, kept by the store. A [checksum deploy](https://docs.jfrog.com/artifactory/reference/deployartifactbychecksum) goes further: the client sends the digest with no body, and if the repository already holds that binary it creates the path, and the release has transmitted a few hundred bytes for 60 MB. If it doesn't, it answers 404 and the file is uploaded in full. Gradle's own `publish` doesn't do this; JFrog's plugin and CLI do.
 
 **The same inputs build the same bytes.** The runtime is linked from a pinned JDK, a fixed module set that apps with similar needs share and the organisation's certificates and policy, then archived with fixed timestamps, file order and modes. Some of that took care. jlink's own output has been reproducible since OpenJDK fixed [JDK-8241602](https://bugs.openjdk.org/browse/JDK-8241602), but `--strip-debug` runs the build machine's `objcopy` over the native libraries, whose output depends on that machine's binutils. A trust store saved with a password gets a MAC and encryption with random salts, and Java 17's older format dates every entry. The plugin strips Java's debug attributes alone and writes `cacerts` with no password, as the JDK itself does. A rebuild, and a new release of the app, give the same SHA-256 for the runtime archive, even on another day or under another time zone and umask. Gradle's build cache reuses the linked runtime while those inputs are unchanged, so most builds don't link it again at all.
+
+**Nothing fails when it stops being true.** Storage just grows, so sameness has to be an assertion. The sample's tests build an image twice, the second time with no cache, and compare layer digests; the plugin's own tests rebuild the libraries archive at a new version and compare its checksum, and a new release is refused if its runtime's bytes changed when its inputs didn't.
+
+**Split by how often a part can be reused.** One changed file makes a whole layer or archive new, so each should hold things reused about equally often. The app's code is reused by nothing; the libraries by this app's releases until a dependency moves; the runtime by every app on the same patch and module set; the base by everything. Order matters on a node too: a registry stores a layer by its own digest, but a node's image store shares one only when everything beneath it matches, so the most reused parts go at the bottom.
+
+**A ladder of runtimes.** Linking each app exactly the modules it needs gives the smallest runtime and the least sharing. The plugins instead link the smallest of a few fixed sets that holds them, so apps on one rung, patch and target share a byte-identical runtime. The rungs start with what most services use and widen:
+
+| Rung | Holds | Size |
+|---|---|---|
+| `base` | `java.base`, the JDK's HTTP server | 30 MB |
+| `service` | HTTP, XML, JDBC, JNDI, TLS | 38 MB |
+| `framework` | What Spring Boot, Quarkus and Micronaut use | 54 MB |
+| `server` | Locales, Kerberos, PKCS#11, XML signatures | 66 MB |
+| A top rung of your own | Everything else that runs in production | 66 MB (40 of the JDK's 69 modules) |
+
+The top rung stops short of "all", and deliberately. All would mean the compiler, `jshell` and the attach and debugging tools back in production, undoing the rule the old JRE enforced and the smaller surface that trimming bought. The first four sizes are of Java 21 runtimes; the last was linked on Java 25, without `jdk.compiler` or any other development tool, and has no `javac`. It costs little more than `server`, and an unusual app that takes it shares its runtime with others, where it would otherwise have one of its own.
 
 From there, each store keeps one copy:
 
@@ -77,7 +140,7 @@ From there, each store keeps one copy:
 | A container registry | Each layer, as a blob named by its digest | The push finds the layer already there and skips it |
 | An OpenShift node (CRI-O) | Each image layer, by digest, shared by every image that has it | The pull skips layers the node holds, and every pod on the runtime reads the same files on disk |
 
-These are the old symlinks, kept by the storage itself. Nobody creates them, so nobody can point one at the wrong runtime, and they can't drift: a different runtime has a different digest. An app that changes its runtime gets a new one, and every app whose runtime is unchanged goes on sharing it. Only a server deduplicates nothing by itself, and there a deployment step can keep each runtime once per host, in a directory named by its SHA-256, linked from the app's. That link is made from the digest of the runtime the release was tested with, so unlike the old ones it can't point anywhere else.
+These are the old symlinks, kept by the storage itself. Nobody creates them, so nobody can point one at the wrong runtime, and they can't drift: a different runtime has a different digest. An app that changes its runtime gets a new one, and every app whose runtime is unchanged goes on sharing it. Only a server deduplicates nothing by itself, and there a deployment step can keep each runtime once per host, in a directory named by its SHA-256, linked from the app's. That link is made from the digest of the runtime the release was tested with, so unlike the old ones it can't point anywhere else. [Do Not Repeat Yourself](caching.md#do-not-repeat-yourself) has the rest of the reasoning, and how to test it.
 
 ## Organisations still choose the runtime
 
@@ -185,7 +248,7 @@ jlink's habit of missing modules also put people off: a runtime trimmed by jdeps
 ```mermaid
 flowchart LR
     src["Source<br/>code + pinned JDK or Node.js"] --> link["Link and harden<br/>jlink, certificates, policy"]
-    link --> pack["Package<br/>app and runtime archives per target"]
+    link --> pack["Package<br/>app, libraries and runtime archives per target"]
     pack --> smoke["Smoke test<br/>start it, wait for healthy"]
     smoke --> repo[("Repository<br/>Artifactory")]
     repo --> server["Server<br/>tarball or RPM"]
@@ -249,15 +312,15 @@ the same day, in megabytes of a million bytes throughout):
 | Full Temurin 21 JDK | 207.5 MB | 353 MB |
 | Temurin 21 JRE alone | 52.1 MB | not measured |
 | The service's libraries (50 jars) | | 21.8 MB |
-| **Both archives: trimmed runtime plus the service** | **58.9 MB** | **85.7 MB** (63.9 MB runtime, 21.8 MB libraries) |
+| **All the archives: trimmed runtime, libraries and the service** | **58.9 MB** | **85.7 MB** (63.9 MB runtime, 21.8 MB libraries) |
 
-The two archives, application included, are about the size of the vendor's JRE download on its own,
+The archives, application included, are about the size of the vendor's JRE download on its own,
 and under a third of the JDK. The runtime and Spring split roughly two to one:
 
 | Archive | Compressed | Unpacked |
 |---|---|---|
 | The runtime archive: the trimmed runtime (the 13 modules jdeps found, 18 with what they need) | 39.3 MB | 63.9 MB |
-| The app archive: Spring Boot, Tomcat, Jackson and the service (50 jars, 29 of them Spring's) | 19.7 MB | 21.8 MB |
+| The libraries and app archives: Spring Boot, Tomcat, Jackson and the service (50 jars, 29 of them Spring's), now nearly all in the former | 19.7 MB | 21.8 MB |
 
 The trimmed runtime is about a quarter smaller than Temurin's 52.1 MB JRE, which carries the whole
 Java SE platform whether the service uses it or not. Spring's jars hardly shrink in the archive,
@@ -330,7 +393,7 @@ These plugins keep Gradle's tasks and change what goes into them:
 | Runtime options | `applicationDefaultJvmArgs`, then `JAVA_OPTS` and `<APP>_OPTS` | The build's JVM options, then `APP_JAVA_OPTS` and a `jvm.options` file, or nothing at all when options are locked |
 | Contents | `bin/`, `lib/`, `src/main/dist` | Also `runtime/`, `conf.defaults/`, `META-INF/app.json` and an SBOM |
 | Archives | `<app>-<version>.zip` and `.tar` | `<app>-<version>-<target>.tar.gz` (`.zip` for Windows), unpacking to a directory named for the target |
-| Publishing | Not published | The app and runtime archives published as two modules, under the target's classifier, described by module metadata |
+| Publishing | Not published | The app, libraries and runtime archives published as three modules, under the target's classifier, described by module metadata |
 | Testing | None | The archives are unpacked and started before they can be published |
 
 The familiar tasks still do what their names say. `installDist` lays out this machine's app with its runtime; `installLinuxX64Dist` and `linuxX64DistTar` do the same for another target. A project customises the launcher the usual way, through `startScripts` or its own generator, and adds files to a target's distribution the way it would to any Gradle distribution. The smoke test still has to pass, so a change that breaks the launcher fails the build instead of a deployment.
@@ -355,7 +418,7 @@ An archive for another machine cannot be started where it was built, so only thi
 
 Every app answers to one small contract: read the port from `APP_PORT`, and exit 0 when started with `--healthcheck` if the running instance is healthy. The generated launcher, `bin/<app>`, turns that into `run`, `healthcheck` and `version` commands that servers, containers and the build all use.
 
-`./gradlew build` then tests the archives themselves, not the build directories they came from. It extracts the finished app and runtime `.tar.gz` files to a scratch directory, the runtime inside the app as a deployment would, checks that `version` reports the right release, starts the app on a free port, and waits for the health check. A build that passes has started the exact files it will publish.
+`./gradlew build` then tests the archives themselves, not the build directories they came from. It extracts the finished `.tar.gz` files to a scratch directory, the runtime and libraries inside the app as a deployment would, checks that `version` reports the right release, starts the app on a free port, and waits for the health check. A build that passes has started the exact files it will publish.
 
 The same check is available to any other build. A deployment pipeline applies `io.github.fiftieshousewife.app-smoke-test`, declares `smokeTest("com.example:orders-service:1.4.2")`, and runs `appSmokeTest`. Gradle picks the archive built for the machine it runs on from the published metadata, and the task reads the app's name, version and target from the archive's own `META-INF/app.json`. Producer and consumer run the same code.
 

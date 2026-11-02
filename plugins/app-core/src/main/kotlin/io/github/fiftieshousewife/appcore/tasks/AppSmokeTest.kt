@@ -1,5 +1,6 @@
 package io.github.fiftieshousewife.appcore.tasks
 
+import io.github.fiftieshousewife.appcore.LibsArchive
 import io.github.fiftieshousewife.appcore.RuntimeArchive
 import io.github.fiftieshousewife.appcore.RuntimePolicyCheck
 import io.github.fiftieshousewife.appcore.RuntimePolicySource
@@ -32,8 +33,9 @@ import javax.inject.Inject
  * Proves an archive itself works, not the build directories it came from: extracts each of
  * [archiveFiles] afresh and starts it once with [SmokeRun]. An app archive without `runtime/` runs on
  * its runtime archive (`<app>-runtime-<version>-<target>`, a single `runtime/` directory), which must be
- * among [archiveFiles] too, unpacked into the app as a deployment would. Each app archive describes itself in
- * `META-INF/app.json` (name, version, target), so the same task tests the archive a build has just
+ * among [archiveFiles] too, and its libraries archive (`<app>-libs-<version>-<target>`), each unpacked into the
+ * app as a deployment would; an app published before that archive existed holds its own. Each app archive
+ * describes itself in `META-INF/app.json` (name, version, target), so the same task tests the archive a build has just
  * made and one a consuming build has resolved from a repository.
  *
  * Only an archive for this machine can be started; archives for other targets are never started
@@ -96,16 +98,24 @@ constructor(
         signer.orNull?.let(::verifySignatures)
         val extracted = archiveFiles.files.sortedBy { it.name }
             .mapIndexed { index, file -> file to extractTopDirectory(file, temporaryDir.resolve("extract-$index")) }
-        val (runtimes, apps) = extracted.partition { (_, home) -> home.name == RuntimeArchive.DIRECTORY }
-        val runtimeHomes = runtimes.associate { (file, home) -> file.name to home }
-        val results = apps.mapIndexed { index, (file, home) -> test(index, file, home, runtimeHomes) }
+        val (libraries, others) = extracted.partition { (_, home) -> LibsArchive.holds(home.name) }
+        val (runtimes, apps) = others.partition { (_, home) -> home.name == RuntimeArchive.DIRECTORY }
+        val unpacked = Unpacked(
+            runtimes.associate { (file, home) -> file.name to home },
+            libraries.associate { (file, home) -> file.name to home },
+        )
+        val results = apps.mapIndexed { index, (file, home) -> test(index, file, home, unpacked) }
         resultFile.get().asFile.writeText(results.joinToString("\n") + "\n")
     }
 
-    private fun test(index: Int, archiveFile: File, home: File, runtimes: Map<String, File>): String {
+    /** The extracted top-level directories of the runtime and libraries archives, by archive file name. */
+    private class Unpacked(val runtimes: Map<String, File>, val libraries: Map<String, File>)
+
+    private fun test(index: Int, archiveFile: File, home: File, unpacked: Unpacked): String {
         val host = Target.host()
         val manifest = AppManifest.read(home)
-        installRuntime(home, manifest, runtimes)
+        installRuntime(home, manifest, unpacked.runtimes)
+        installLibraries(home, manifest, unpacked.libraries)
         requirePolicy(home)
         val work = temporaryDir.resolve("run-$index").apply { mkdirs() }
         val launcher = launcher(home, manifest, host)
@@ -161,6 +171,15 @@ constructor(
                     "and no $prefix* archive was given to start it with",
             )
         Files.move(runtime.toPath(), installed.toPath())
+    }
+
+    private fun installLibraries(home: File, manifest: AppManifest, libraries: Map<String, File>) {
+        val prefix = "${manifest.name}${LibsArchive.SUFFIX}-${manifest.version}-${manifest.target}."
+        val top = libraries.entries.firstOrNull { it.key.startsWith(prefix) }?.value ?: return
+        fs.copy {
+            from(top.parentFile)
+            into(home)
+        }
     }
 
     private fun requirePolicy(home: File) {

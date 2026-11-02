@@ -8,13 +8,14 @@ import org.gradle.api.Project
 import org.gradle.api.file.ArchiveOperations
 import org.gradle.api.file.CopySpec
 import org.gradle.api.file.RelativePath
+import org.gradle.api.provider.Provider
 import org.gradle.api.tasks.Sync
 import org.gradle.api.tasks.TaskProvider
 
 /**
  * `appDockerContext`: the project's Dockerfiles, filled in with this build, beside every Linux target's
- * runtime and app archives, unpacked as `runtime/<cpu>/` and `app/<cpu>/`, so an image keeps the runtime in
- * a layer of its own that a new release of the app leaves alone.
+ * archives, unpacked as `runtime/<cpu>/` and `app/<cpu>/` (the app with its libraries), and as one tree per image
+ * layer in `layers/<cpu>/`, so an image keeps each archive in a layer that a new release leaves alone if it can.
  */
 internal class DockerContext(
     private val project: Project,
@@ -34,8 +35,11 @@ internal class DockerContext(
     /** Named as container platforms name CPUs (`amd64`, `arm64`), so one context builds an image for each. */
     fun useLinuxArchives(built: List<TargetTasks>) {
         val linux = built.filter { it.target.os == Os.LINUX }
-        val archiveOps = archives
+        wiring.imagePackages.registerLock(linux.map { it.target })
+        val packages = linux.associate { it.target to wiring.imagePackages.download(it.target) }
+        val generated = wiring.generatedImages.register(variants.mapNotNull { it.name }, identity(), buildArguments())
         task.configure {
+            from(generated)
             if (linux.isEmpty()) {
                 val targets = "${wiring.ecosystem.extensionName}.targets"
                 val message = "appDockerContext needs a Linux archive; add a linux target to $targets"
@@ -43,16 +47,30 @@ internal class DockerContext(
                 return@configure
             }
             linux.forEach { tasks ->
-                val runtime = tasks.runtimeArchive.flatMap { it.archiveFile }.map { archiveOps.archiveTree(it.asFile) }
-                val app = tasks.archive.flatMap { it.archiveFile }.map { archiveOps.archiveTree(it.asFile) }
                 val cpu = tasks.target.arch.container
-                from(runtime) { layer(this, into = "$RUNTIME/$cpu") }
-                from(app) { layer(this, into = "app/$cpu") }
-                from(runtime) { layer(this, into = "$LAYERS/$cpu/$RUNTIME/app/$RUNTIME") }
-                from(app) { layer(this, into = "$LAYERS/$cpu/app/app") }
+                addLayers(this, tasks)
+                from(packages.getValue(tasks.target)) { into("$PACKAGES/$cpu") }
             }
             doLast { ContextTimes.fix(destinationDir.toPath()) }
         }
+    }
+
+    private fun addLayers(spec: CopySpec, tasks: TargetTasks) {
+        val archiveOps = archives
+        val runtime = tasks.runtimeArchive.flatMap { it.archiveFile }.map { archiveOps.archiveTree(it.asFile) }
+        val libs = tasks.libsArchive.flatMap { it.archiveFile }.map { archiveOps.archiveTree(it.asFile) }
+        val app = tasks.archive.flatMap { it.archiveFile }.map { archiveOps.archiveTree(it.asFile) }
+        val cpu = tasks.target.arch.container
+        spec.from(runtime) { layer(this, into = "$RUNTIME/$cpu") }
+        spec.from(runtime) { layer(this, into = "$LAYERS/$cpu/$RUNTIME/app/$RUNTIME") }
+        // What Dockerfiles written before copy: the app and its libraries together.
+        spec.from(app) { layer(this, into = "app/$cpu") }
+        spec.from(libs) { into("app/$cpu") }
+        spec.from(app) { layer(this, into = "$LAYERS/$cpu/app/app") }
+        spec.from(libs) { into("$LAYERS/$cpu/app/app") }
+        // Each archive its own layer: libs/ holds them under their own top directory, in place.
+        spec.from(libs) { into("$LAYERS/$cpu/$LIBS/app") }
+        spec.from(app) { layer(this, into = "$LAYERS/$cpu/$CODE/app") }
     }
 
     /**
@@ -100,9 +118,16 @@ internal class DockerContext(
             outputFile.set(wiring.workDir.map { it.file("docker/${variant.dockerfile}") })
         }
 
-    private fun identity() = extension.appName
-        .zip(extension.license) { name, license -> ImageIdentity(name, license) }
-        .zip(wiring.facts.sourceUrl.orElse("")) { identity, url -> identity.copy(source = url.ifEmpty { null }) }
+    /** The group and description through providers, read once the build script has set them, not by the lambdas. */
+    private fun identity(): Provider<ImageIdentity> {
+        val vendor = project.provider { project.group.toString() }
+        val summary = project.provider { project.description.orEmpty() }
+        return extension.appName
+            .zip(extension.license) { name, license -> ImageIdentity(name, license) }
+            .zip(vendor) { identity, group -> identity.copy(vendor = group) }
+            .zip(summary) { identity, text -> identity.copy(summary = text) }
+            .zip(wiring.facts.sourceUrl.orElse("")) { identity, url -> identity.copy(source = url.ifEmpty { null }) }
+    }
 
     private fun buildArguments() = wiring.version
         .zip(wiring.gitCommit) { version, commit -> mapOf("APP_VERSION" to version, "GIT_COMMIT" to commit) }
@@ -115,5 +140,10 @@ internal class DockerContext(
 
         /** Each image layer's files under the path they take in the image, copied to `/` by one `COPY`. */
         const val LAYERS = "layers"
+        const val LIBS = "libs"
+        const val CODE = "code"
+
+        /** The image's locked RPMs for each CPU, for the Dockerfile to install with `rpm`. */
+        const val PACKAGES = "packages"
     }
 }

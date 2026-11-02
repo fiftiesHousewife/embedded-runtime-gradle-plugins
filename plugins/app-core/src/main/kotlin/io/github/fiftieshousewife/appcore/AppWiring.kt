@@ -51,6 +51,8 @@ class AppWiring(
     val gitCommit: Provider<String> = facts.gitCommit
 
     private val rpmPackages by lazy { RpmPackages(project, this) }
+    internal val imagePackages by lazy { ImagePackagesTasks(project, this) }
+    internal val generatedImages by lazy { GeneratedImages(project, this) }
 
     val runtimePolicy: FileCollection =
         RuntimePolicySource.files(project, facts.property("securityPolicy").orElse(extension.securityPolicy))
@@ -63,6 +65,8 @@ class AppWiring(
         )
         extension.license.convention("LicenseRef-Proprietary")
         rpmPackages.applyConventions()
+        imagePackages.applyConventions()
+        generatedImages.applyConventions()
         extension.smokeTestEnabled.convention(true)
     }
 
@@ -121,7 +125,7 @@ class AppWiring(
         val allArchives =
             tasks.register("appArchive") {
                 group = taskGroup
-                description = "Builds the app and runtime archives for every target"
+                description = "Builds the app, libraries and runtime archives for every target"
             }
         val hostTasks = HostTasks(project, this)
         val smoke = hostTasks.smoke
@@ -150,7 +154,8 @@ class AppWiring(
         val pipeline = TargetPipeline(project, this)
         val built = targets.map { pipeline.register(it, contribute(it)) }
         lifecycle.allArchives.configure {
-            dependsOn(built.map { it.archive } + built.map { it.runtimeArchive } + built.map { it.runtimeFingerprint })
+            dependsOn(built.map { it.archive } + built.map { it.runtimeArchive } + built.map { it.libsArchive })
+            dependsOn(built.map { it.runtimeFingerprint })
         }
         built.firstOrNull { it.target == host }?.let(lifecycle.hostTasks::use)
         lifecycle.dockerContext.useLinuxArchives(built)

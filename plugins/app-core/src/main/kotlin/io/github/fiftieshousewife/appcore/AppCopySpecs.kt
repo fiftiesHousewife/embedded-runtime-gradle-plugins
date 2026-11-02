@@ -40,6 +40,19 @@ object AppCopySpecs {
         }
     }
 
+    /** 0755 or 0644 by the owner's exec bit alone, so a umask or a Gradle cache's own modes can't reach the bytes. */
+    fun fixedModes(spec: CopySpec) {
+        spec.eachFile {
+            val mode = fixed(permissions.toUnixNumeric())
+            permissions { unix(mode) }
+        }
+    }
+
+    internal fun fixed(mode: Int): Int = if (mode and OWNER_EXECUTE != 0) EXECUTABLE else REGULAR
+
+    private const val EXECUTABLE = 0b111_101_101
+    private const val REGULAR = 0b110_100_100
+
     internal fun readable(mode: Int): Int = mode or READ_ALL or if (mode and OWNER_EXECUTE != 0) EXECUTE_ALL else 0
 
     private const val OWNER_WRITE = 0b010_000_000

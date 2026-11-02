@@ -44,10 +44,11 @@ smoke test fails on a missing JDK class, use the `embedded-runtime-jlink-modules
 ## 4. Targets, packaging and the corporate network
 
 - Every OS/CPU deployed to: `targets("linux-x64", "linux-aarch64", "windows-x64")`.
-- Each target gets two archives, zip for Windows targets and tar.gz for Linux and macOS: the app
-  (`<app>-<version>-<target>`) and its runtime (`<app>-runtime-<version>-<target>`, one `runtime/`
-  directory, unpacked inside the app's). `publish` uploads them as two modules, `<app>` and
-  `<app>-runtime`, at one version; an unchanged runtime is the same bytes every release, so
+- Each target gets three archives, zip for Windows targets and tar.gz for Linux and macOS: the app
+  (`<app>-<version>-<target>`), its libraries (`<app>-libs-<version>-<target>`) and its runtime
+  (`<app>-runtime-<version>-<target>`, one `runtime/` directory), the last two unpacked inside the app's.
+  `publish` uploads them as three modules, `<app>`, `<app>-libs` and `<app>-runtime`, at one version;
+  an unchanged runtime or set of libraries is the same bytes every release, so
   Artifactory stores it once (`artifactoryPublish` from JFrog's plugin also skips the upload).
   `-PjavaApp.previousRelease=latest.release` on `publish` fails when a runtime's inputs (its
   `-inputs.txt` fingerprint, published beside it) equal that release's but its bytes don't. A

@@ -1,6 +1,7 @@
 package io.github.fiftieshousewife.appcore
 
 import org.gradle.api.Action
+import org.gradle.api.NamedDomainObjectContainer
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.file.RegularFileProperty
 import org.gradle.api.provider.Property
@@ -36,6 +37,15 @@ abstract class AppExtension {
     abstract val rpm: RpmPackaging
 
     fun rpm(action: Action<RpmPackaging>) = action.execute(rpm)
+
+    /** RPMs the container image adds to its base, locked per CPU; see [ImagePackages]. None by default. */
+    @get:Nested
+    abstract val image: ImagePackages
+
+    fun image(action: Action<ImagePackages>) = action.execute(image)
+
+    /** Container images the plugin writes the whole Dockerfile for, one `Dockerfile.<name>` each; see [ImageSpec]. */
+    abstract val images: NamedDomainObjectContainer<ImageSpec>
 
     /**
      * A CycloneDX JSON SBOM of the project's own making, used in every target's archive (as

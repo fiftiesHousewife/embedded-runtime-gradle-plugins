@@ -158,7 +158,8 @@ class JavaAppPluginTest {
         Files.write(jar, EMPTY_ZIP)
         Files.setPosixFilePermissions(jar, PosixFilePermissions.fromString("rw-------"))
         project.build("appArchive")
-        val entries = TestProject.run("tar", "-tvzf", archive(project).absolutePath)
+        val libs = project.project.resolve("build/distributions/svc-libs-2.0.0-${TestProject.hostTarget()}.tar.gz")
+        val entries = TestProject.run("tar", "-tvzf", libs.absolutePath)
         assertTrue(entries.lines().any { it.startsWith("-rw-r--r--") && it.endsWith("lib/private.jar") }, entries)
     }
 

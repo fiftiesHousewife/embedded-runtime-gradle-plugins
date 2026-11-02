@@ -57,5 +57,7 @@ timelines.
 | Slow startup, class loading at the top | A class-data sharing archive built on the target: `-XX:+AutoCreateSharedArchive -XX:SharedArchiveFile=/var/lib/orders-service/app.jsa` (JDK 19+; a full path, because `jvmArgs` are not expanded). On JDK 25, an ahead-of-time cache with `-XX:AOTCacheOutput` goes further. Both are built by running on the target itself |
 | Allocation dominated by a few classes | Fix the code; no flag helps |
 
+[Sizing pods from measurements](capacity.md) covers the pod's memory and CPU around these.
+
 Change one thing at a time and record again. `./gradlew build` still runs the smoke test, so a flag
 that stops the app starting fails the build.

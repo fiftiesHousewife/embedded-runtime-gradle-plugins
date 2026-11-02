@@ -39,8 +39,10 @@ data class EcosystemSpec(
     val runtimeVersion: Provider<String>,
     val launchers: Launchers,
     val runtime: Any,
-    /** The rest: `lib/` or `app/`. */
     val contents: CopySpec.() -> Unit,
+    val librariesDirectory: String,
+    /** What goes in [librariesDirectory], in the libraries archive rather than the app's ([LibsArchive]). */
+    val libraries: CopySpec.() -> Unit,
     val sbom: GenerateSbom.() -> Unit,
     /** What else the runtime is built from, beyond its name, version and target ([RuntimeFingerprint]). */
     val fingerprint: WriteRuntimeFingerprint.() -> Unit,
@@ -55,6 +57,7 @@ data class TargetTasks(
     val assemble: TaskProvider<Sync>,
     val archive: TaskProvider<out AbstractArchiveTask>,
     val runtimeArchive: TaskProvider<out AbstractArchiveTask>,
+    val libsArchive: TaskProvider<out AbstractArchiveTask>,
     val runtimeFingerprint: TaskProvider<WriteRuntimeFingerprint>,
     /** The built-in SBOM, or the project's own ([AppExtension.sbom]). */
     val sbom: Provider<RegularFile>,

@@ -129,3 +129,5 @@ source-file:
       - '**/JavaRuntimeDefaults.kt'
       - '**/RpmPackaging.kt'
       - '**/EmbeddedRuntimeSettings.kt'
+      - '**/ImageSpec.kt'
+      - '**/ImagePackages.kt'

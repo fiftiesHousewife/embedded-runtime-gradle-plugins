@@ -56,6 +56,11 @@ val versionResource =
             "registry.access.redhat.com/ubi9/ubi-minimal:${libs.versions.ubi.minimal.tag.get()}",
         )
         property("dockerBaseDigest", libs.versions.ubi.minimal.digest.get())
+        property(
+            "ubiMicro",
+            "registry.access.redhat.com/ubi9/ubi-micro:${libs.versions.ubi.micro.tag.get()}@" +
+                libs.versions.ubi.micro.digest.get(),
+        )
         property("sigstoreJava", libs.versions.sigstore.get())
         property("bouncycastle", libs.versions.bouncycastle.get())
     }

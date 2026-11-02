@@ -25,6 +25,9 @@ object PluginVersion {
     /** The digest [dockerBaseImage] is pinned to: its multi-arch index, so it holds for every CPU. */
     val dockerBaseDigest: String get() = properties.getProperty("dockerBaseDigest")
 
+    /** UBI micro by tag and digest, for images whose base is `ubiMicro`. */
+    val ubiMicro: String get() = properties.getProperty("ubiMicro")
+
     /** sigstore-java, which `app-smoke-test` resolves to verify Sigstore bundles. */
     val sigstoreJava: String get() = properties.getProperty("sigstoreJava")
 

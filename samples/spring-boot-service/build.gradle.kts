@@ -22,6 +22,9 @@ dependencies {
 javaApp {
     javaVersion = 25
     targets(Target.host().id, "linux-x64", "linux-aarch64")
+    // The Dockerfile.micro below by hand needs zlib locked (rpms.lock.yaml) and named; this image needs neither said.
+    image { packages("zlib") }
+    images { register("ubi-micro") { from(ubiMicro) } }
 }
 
 val colima = tasks.register<StartColima>("colima")

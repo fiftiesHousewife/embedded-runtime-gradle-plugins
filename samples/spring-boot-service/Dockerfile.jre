@@ -1,0 +1,83 @@
+# A Java runtime on UBI micro, with no app: a base for images of apps the plugins don't build, and the
+# reference for what a Java runtime needs on micro. Its runtime layer is the same bytes as the runtime
+# layer of every app image built from this context, so a registry stores it once.
+ARG BASE_IMAGE=registry.access.redhat.com/ubi9/ubi-micro:9.8-1791895366@sha256:5be877a2a280ae36eb9ab80ca4efb28bbf77c57abbba38137cdc37a03b8465e6
+ARG BUILD_IMAGE=registry.access.redhat.com/ubi9/ubi-minimal:9.8-1793050346@sha256:6f3a78179e0b30b930a186e7f68a4af52e51bb82406c9653be10bddd624e40f5
+# BuildKit sets BUILDPLATFORM; other builders take it as --build-arg BUILDPLATFORM=linux/<cpu>.
+ARG BUILDPLATFORM
+FROM ${BASE_IMAGE} AS micro
+
+# Everything the image adds besides the runtime and the app, made here and copied in as one layer.
+# The java launcher loads libz.so.1, which micro lacks. The build put the RPMs rpms.lock.yaml pins in
+# packages/<cpu>/, so this stage reaches no repository. It runs on the build machine's own CPU and
+# installs the target's RPMs with rpm into a copy of micro's root, so micro's RPM database records
+# them for scanners and certification, and building another CPU's image needs no emulation. Red Hat's
+# signatures are checked first, and a package with scriptlets is refused, as they can't run here.
+# The app writes under /var/lib/app when nothing is mounted there: owned by 1001 and group 0, as
+# writable for the group, for OpenShift's arbitrary user.
+FROM --platform=${BUILDPLATFORM} ${BUILD_IMAGE} AS files
+ARG TARGETARCH
+COPY --from=micro / /mnt/rootfs/
+COPY packages/${TARGETARCH}/ /tmp/packages/
+RUN rpm --checksig /tmp/packages/*.rpm && \
+    for rpm in /tmp/packages/*.rpm; do \
+      if [ -n "$(rpm -qp --scripts --triggers "$rpm")" ]; then echo "$rpm has scriptlets" >&2; exit 1; fi; \
+    done && \
+    set -- /tmp/packages/*.rpm && SOURCE_DATE_EPOCH=$(stat -c %Y "$1") rpm --root /mnt/rootfs --install --ignorearch \
+      --noscripts --notriggers --excludedocs /tmp/packages/*.rpm && \
+    mkdir -p /out/var/lib/rpm /out/var/lib/app/data /out/var/lib/app/logs && \
+    rpm -qlp /tmp/packages/*.rpm | while read -r path; do \
+      if [ -f "/mnt/rootfs$path" ] || [ -L "/mnt/rootfs$path" ]; then \
+        mkdir -p "/out${path%/*}" && cp -a "/mnt/rootfs$path" "/out$path"; \
+      fi; \
+    done && \
+    cp -a /mnt/rootfs/var/lib/rpm/. /out/var/lib/rpm/ && \
+    chown -R 1001:0 /out/var/lib/app && chmod -R g=u /out/var/lib/app
+# The terms the runtime ships under, as regular files: Red Hat's certification skips links.
+COPY runtime/${TARGETARCH}/legal/ /out/licenses/java-runtime/
+
+FROM micro
+
+ARG TARGETARCH
+ARG BASE_IMAGE
+ARG GIT_COMMIT
+# The runtime's own version, from JAVA_VERSION in runtime/<cpu>/release; see docs/container-testing.md.
+ARG JAVA_VERSION
+ARG RELEASE=1
+
+# UBI's labels would describe UBI, and Red Hat's certification rejects Red Hat's name in them.
+LABEL org.opencontainers.image.title="java-runtime" \
+      org.opencontainers.image.description="A Java runtime linked by jlink, on UBI micro" \
+      org.opencontainers.image.source="https://github.com/fiftiesHousewife/embedded-runtime-gradle-plugins.git" \
+      org.opencontainers.image.licenses="LicenseRef-Proprietary" \
+      org.opencontainers.image.version="${JAVA_VERSION}" \
+      org.opencontainers.image.revision="${GIT_COMMIT}" \
+      org.opencontainers.image.base.name="${BASE_IMAGE}" \
+      name="java-runtime" \
+      vendor="fiftiesHousewife" \
+      maintainer="fiftiesHousewife" \
+      version="${JAVA_VERSION}" \
+      release="${RELEASE}" \
+      summary="Java runtime on UBI micro" \
+      description="A Java runtime linked by jlink, on UBI micro, for apps that bring only their own files" \
+      url="https://github.com/fiftiesHousewife/embedded-runtime-gradle-plugins" \
+      vcs-ref="${GIT_COMMIT}" \
+      io.k8s.display-name="java-runtime" \
+      io.k8s.description="A Java runtime linked by jlink, on UBI micro"
+
+# Two layers on micro's own, each copied whole so this stage runs nothing and needs no emulation for
+# another CPU. The runtime goes where the plugins' app images have it, /app/runtime, owned as theirs is.
+COPY --from=files /out/ /
+COPY --chown=1001:0 layers/${TARGETARCH}/runtime/ /
+
+# User 1001 has no passwd entry, so HOME would be /, which it can't write; without LANG, Java names
+# files in ASCII alone. Micro carries C.UTF-8 (glibc-minimal-langpack).
+ENV JAVA_HOME=/app/runtime \
+    PATH=/app/runtime/bin:/usr/bin:/bin \
+    HOME=/var/lib/app \
+    LANG=C.UTF-8
+
+USER 1001
+WORKDIR /var/lib/app
+ENTRYPOINT ["java"]
+CMD ["-version"]

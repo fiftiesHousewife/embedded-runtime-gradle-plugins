@@ -5,6 +5,7 @@ import io.github.fiftieshousewife.appcore.tasks.GenerateLaunchers
 import io.github.fiftieshousewife.appcore.tasks.VerifyRuntimePolicy
 import org.gradle.api.Project
 import org.gradle.api.distribution.DistributionContainer
+import org.gradle.api.file.CopySpec
 import org.gradle.api.file.DuplicatesStrategy
 import org.gradle.api.file.RegularFile
 import org.gradle.api.provider.Provider
@@ -23,6 +24,8 @@ internal class TargetPipeline(private val project: Project, private val wiring: 
     private val workDir = wiring.workDir
     private val taskGroup = wiring.taskGroup
 
+    private val libsArchives by lazy { LibsArchive(project, wiring) }
+
     private val appName: Provider<String> get() = extension.appName
     private val versionString: Provider<String> = wiring.version
 
@@ -33,7 +36,8 @@ internal class TargetPipeline(private val project: Project, private val wiring: 
         val metadata = TargetMetadata(project, wiring)
         val builtIn = metadata.registerSbom(target, spec)
         val sbom = extension.sbom.orElse(builtIn.flatMap { it.outputFile })
-        val parts = Parts(registerLaunchers(target, spec), metadata.registerManifest(target, spec), sbom)
+        val libs = LibsArchive.installed(project, spec)
+        val parts = Parts(registerLaunchers(target, spec), metadata.registerManifest(target, spec), sbom, libs)
         val name = distributionName(target)
         registerDistribution(name, target, spec, parts)
         val runtime = RuntimeArchive.installed(project, spec.runtime)
@@ -42,6 +46,7 @@ internal class TargetPipeline(private val project: Project, private val wiring: 
             description = "Installs the self-contained ${target.id} app into build/app/${target.id}"
             destinationDir = layout.buildDirectory.dir("app/${target.id}").get().asFile.resolve(topDirectory.get())
             with(runtime)
+            with(libs)
         }
         if (target == wiring.host) tasks.named("installDist", Sync::class.java) { with(runtime) }
         val verified = registerPolicyCheck(target, install)
@@ -49,8 +54,11 @@ internal class TargetPipeline(private val project: Project, private val wiring: 
         val runtimeArchive = RuntimeArchive.register(project, wiring, target, spec.runtime).apply {
             configure { dependsOn(verified) }
         }
+        val libsArchive = libsArchives.register(target, spec).apply {
+            configure { dependsOn(verified) }
+        }
         val fingerprint = RuntimeFingerprints(project, wiring).register(target, spec)
-        return TargetTasks(target, install, archive, runtimeArchive, fingerprint, parts.sbom)
+        return TargetTasks(target, install, archive, runtimeArchive, libsArchive, fingerprint, parts.sbom)
     }
 
     /** The generated pieces every target's directory holds besides the ecosystem's own content. */
@@ -59,13 +67,15 @@ internal class TargetPipeline(private val project: Project, private val wiring: 
         val launchers: Any,
         val manifest: TaskProvider<GenerateAppManifest>,
         val sbom: Provider<RegularFile>,
+        /** What the `main` distribution and the install tasks add, and a target's archive leaves out. */
+        val libs: CopySpec,
     )
 
     /**
      * One Gradle distribution per target, named after it (`linuxX64`, `macAarch64`), so each gets the
      * distribution plugin's `install…Dist`, `…DistTar` and `…DistZip`. Its contents are the app without
-     * the runtime, which only the install tasks add. This machine's contents also go into the `main`
-     * distribution, so plain `installDist` installs this machine's app with its runtime.
+     * the runtime or the libraries, which only the install tasks add. This machine's contents also go into the
+     * `main` distribution, so plain `installDist` installs this machine's whole app.
      */
     private fun registerDistribution(name: String, target: Target, spec: EcosystemSpec, parts: Parts) {
         val app = appName
@@ -84,6 +94,7 @@ internal class TargetPipeline(private val project: Project, private val wiring: 
                 contents {
                     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
                     with(contents)
+                    with(parts.libs)
                 }
             }
         }

@@ -42,6 +42,7 @@ internal class HostTasks(private val project: Project, wiring: AppWiring) {
         smoke.configure {
             archiveFiles.from(hostTasks.archive.flatMap { it.archiveFile })
             archiveFiles.from(hostTasks.runtimeArchive.flatMap { it.archiveFile })
+            archiveFiles.from(hostTasks.libsArchive.flatMap { it.archiveFile })
         }
         runApp.configure {
             dependsOn(hostTasks.assemble)

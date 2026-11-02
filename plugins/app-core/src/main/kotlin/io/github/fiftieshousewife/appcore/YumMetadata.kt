@@ -19,8 +19,14 @@ data class YumPackage(
     /** `sha256` (or, from old repositories, `sha` / `sha1`), and the file's digest in hex. */
     val checksumType: String,
     val checksum: String,
+    val epoch: String = "0",
+    val size: Long = 0,
+    val sourceRpm: String = "",
 ) {
     val fileName: String get() = location.substringAfterLast('/')
+
+    /** `[epoch:]version-release`, as dnf and lockfiles write it. */
+    val evr: String get() = (if (epoch == "0" || epoch.isEmpty()) "" else "$epoch:") + "$version-$release"
     override fun toString() = "$name-$version-$release.$arch"
 }
 
@@ -87,6 +93,7 @@ object YumMetadata {
 
     /** One of the primary index's fields for the current package, if [xml] is at one. */
     private fun readField(xml: XMLStreamReader, fields: MutableMap<String, String>) {
+        if (xml.namespaceURI == RPM && xml.localName == SOURCE_RPM) fields[SOURCE_RPM] = xml.elementText.trim()
         if (xml.namespaceURI != COMMON) return
         when (xml.localName) {
             NAME, ARCH -> fields[xml.localName] = xml.elementText.trim()
@@ -94,7 +101,10 @@ object YumMetadata {
             "version" -> {
                 fields[VER] = xml.getAttributeValue(null, VER)
                 fields[REL] = xml.getAttributeValue(null, REL)
+                fields[EPOCH] = xml.getAttributeValue(null, EPOCH).orEmpty()
             }
+
+            SIZE -> fields[SIZE] = xml.getAttributeValue(null, PACKAGE).orEmpty()
 
             CHECKSUM -> {
                 fields[CHECKSUM_TYPE] = xml.getAttributeValue(null, TYPE)
@@ -113,6 +123,9 @@ object YumMetadata {
         location = fields.getValue(HREF),
         checksumType = fields[CHECKSUM_TYPE].orEmpty(),
         checksum = fields[CHECKSUM].orEmpty().lowercase(),
+        epoch = fields[EPOCH].orEmpty().ifEmpty { "0" },
+        size = fields[SIZE]?.toLongOrNull() ?: 0,
+        sourceRpm = fields[SOURCE_RPM].orEmpty(),
     )
 
     /** gzip (Artifactory, Nexus), xz, bzip2 or zstd (createrepo_c on RHEL 9), or plain XML. */
@@ -144,6 +157,10 @@ object YumMetadata {
     private const val CHECKSUM = "checksum"
     private const val VER = "ver"
     private const val REL = "rel"
+    private const val EPOCH = "epoch"
+    private const val SIZE = "size"
+    private const val SOURCE_RPM = "sourcerpm"
+    private const val RPM = "http://linux.duke.edu/metadata/rpm"
 
     /** The namespace of the primary index's package fields (not `rpm:`'s, which reuse some names). */
     private const val COMMON = "http://linux.duke.edu/metadata/common"

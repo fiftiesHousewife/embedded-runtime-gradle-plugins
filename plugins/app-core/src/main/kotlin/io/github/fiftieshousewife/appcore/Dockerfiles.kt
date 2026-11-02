@@ -3,7 +3,13 @@ package io.github.fiftieshousewife.appcore
 import org.gradle.api.GradleException
 import java.io.File
 
-internal data class ImageIdentity(val name: String, val licenses: String, val source: String? = null)
+internal data class ImageIdentity(
+    val name: String,
+    val licenses: String,
+    val source: String? = null,
+    val vendor: String = "",
+    val summary: String = "",
+)
 
 internal object DockerfileTemplate {
     private const val PREFIX = "org.opencontainers.image"

@@ -25,6 +25,8 @@ data class BinaryRepository(
     val releasesRepo: String,
     val snapshotsRepo: String,
     val allowInsecureProtocol: Boolean,
+    /** A remote of Red Hat's UBI 9 RPM repositories, laid out as theirs: `<arch>/baseos/os/`. */
+    val ubiRepo: String = "ubi-9",
     val borrowedFrom: String? = null,
     private val borrowedLogin: RepositoryLogin? = null,
 ) {
@@ -33,6 +35,7 @@ data class BinaryRepository(
     val mavenUrl: URI get() = repo(mavenRepo)
     val gradlePluginsUrl: URI get() = repo(gradlePluginsRepo)
     val runtimesUrl: URI get() = repo(runtimesRepo)
+    val ubiUrl: URI get() = repo(ubiRepo)
 
     fun publishUrl(snapshot: Boolean): URI = repo(if (snapshot) snapshotsRepo else releasesRepo)
 
@@ -61,6 +64,7 @@ data class BinaryRepository(
         const val MAVEN_REPO = "binaryRepo.repo.maven"
         const val GRADLE_PLUGINS_REPO = "binaryRepo.repo.gradlePlugins"
         const val RUNTIMES_REPO = "binaryRepo.repo.runtimes"
+        const val UBI_REPO = "binaryRepo.repo.ubi"
         const val RELEASES_REPO = "binaryRepo.repo.releases"
         const val SNAPSHOTS_REPO = "binaryRepo.repo.snapshots"
         const val ALLOW_INSECURE = "binaryRepo.allowInsecureProtocol"
@@ -158,6 +162,7 @@ data class BinaryRepository(
             releasesRepo = providers.setting(RELEASES_REPO) ?: "libs-release-local",
             snapshotsRepo = providers.setting(SNAPSHOTS_REPO) ?: "libs-snapshot-local",
             allowInsecureProtocol = allowInsecureProtocol,
+            ubiRepo = providers.setting(UBI_REPO) ?: "ubi-9",
         )
     }
 }

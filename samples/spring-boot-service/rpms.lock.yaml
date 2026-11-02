@@ -1,0 +1,26 @@
+---
+lockfileVersion: 1
+lockfileVendor: redhat
+arches:
+- arch: aarch64
+  packages:
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/aarch64/baseos/os/Packages/z/zlib-1.2.11-40.el9.aarch64.rpm
+    repoid: ubi-9-baseos-rpms
+    size: 94454
+    checksum: sha256:2e7f193e67235130c10f5579c2d2ec92e22e4098b6d12fb2855d93b1540c60f7
+    name: zlib
+    evr: 1.2.11-40.el9
+    sourcerpm: zlib-1.2.11-40.el9.src.rpm
+  source: []
+  module_metadata: []
+- arch: x86_64
+  packages:
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/x86_64/baseos/os/Packages/z/zlib-1.2.11-40.el9.x86_64.rpm
+    repoid: ubi-9-baseos-rpms
+    size: 95708
+    checksum: sha256:baf95ffbf40ee014135f16fe33e343faf7ff1ca06509fd97cd988e6afeabf670
+    name: zlib
+    evr: 1.2.11-40.el9
+    sourcerpm: zlib-1.2.11-40.el9.src.rpm
+  source: []
+  module_metadata: []

@@ -27,17 +27,12 @@ class KotlinAppTest {
         val result = project.build("build")
         val archive = project.project.resolve("build/distributions/ktsvc-1.0.0-${TestProject.hostTarget()}.tar.gz")
         val entries = TestProject.run("tar", "-tzf", archive.absolutePath)
+        val libs = project.project.resolve("build/distributions/ktsvc-libs-1.0.0-${TestProject.hostTarget()}.tar.gz")
+        val libraries = TestProject.run("tar", "-tzf", libs.absolutePath)
         assertAll(
             { assertEquals(TaskOutcome.SUCCESS, result.task(":appSmokeTest")?.outcome) },
             { assertTrue(entries.contains("ktsvc-1.0.0-${TestProject.hostTarget()}/lib/ktsvc-1.0.0.jar"), entries) },
-            {
-                assertTrue(
-                    entries.lines().any {
-                        it.startsWith("ktsvc-1.0.0-${TestProject.hostTarget()}/lib/kotlin-stdlib-")
-                    },
-                    entries,
-                )
-            },
+            { assertTrue(libraries.lines().any { it.startsWith("lib/kotlin-stdlib-") }, libraries) },
         )
     }
 

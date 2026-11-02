@@ -33,24 +33,24 @@ file. A Java build can ship such a directory too, with `configDefaults`; an RPM 
 
 ## Inside the archives
 
-Each target has two archives: the app, and its runtime, which unpacks as `runtime/` inside the app's
-directory. Installed, the app is laid out like this:
+Each target has three archives: the app, its libraries and its runtime, the last two unpacking inside the
+app's directory. Installed, the app is laid out like this:
 
 ```
 orders-service-1.4.2/
   bin/orders-service      # .bat on Windows targets
   runtime/                # the embedded JDK or Node.js: the runtime archive
-  lib/                    # Java: your jar and its dependencies
-  app/                    # Node: your code, package.json and production node_modules
+  lib/                    # Java: your jar, and its dependencies from the libraries archive
+  app/                    # Node: your code and package.json, and node_modules from the libraries archive
   security/               # Node: trusted-cas.pem, when nodeApp.security or the runtime policy names CAs
   conf.defaults/
   META-INF/app.json       # name, version, target, runtime, git commit
   META-INF/sbom.cdx.json  # CycloneDX SBOM, including the runtime
 ```
 
-Archives are reproducible: rebuilding the same commit gives byte-identical files. The runtime
-archive names neither the app nor its version, so a new release on the same runtime gives the same
-runtime archive again; see [Image layers and caching](caching.md#republishing-the-runtime).
+Archives are reproducible: rebuilding the same commit gives byte-identical files. The runtime and
+libraries archives name neither the app nor its version, so a new release that leaves them alone gives the
+same archives again; see [Image layers and caching](caching.md#republishing-the-runtime).
 
 The SBOM lists the embedded runtime and every library, with their hashes, in the CycloneDX format
 that vulnerability scanners such as Dependency-Track, Grype and Snyk read. It is also published next

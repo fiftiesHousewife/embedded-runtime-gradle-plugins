@@ -73,10 +73,15 @@ Where things are tested:
   Zip is only the Windows target's format, so no functional test builds one.
 - `AiSkillsTest`: the files for Copilot, Devin and Claude Code, written by `assemble` only when they
   differ, and nothing when turned off.
+- `LibsArchiveTest`: the libraries archive's contents, the same bytes for a rebuild and a new version, and an app with
+  none.
+- `ImageDockerfileTest`: what an image's Dockerfile says; `ImagePackagesTest`: locking and fetching its RPMs, and a new
+  version changing only its code layer.
 - The Spring Boot sample's `dockerTest` (`./gradlew -p samples/spring-boot-service dockerTest`, Linux
   CI only): `ContainerTest` builds and runs each `Dockerfile*`; `OpenShiftTest` runs the OpenShift
   image as a random user in group 0 with no capabilities; `MicroTest` runs the micro image read-only,
-  with no capabilities and 512 MiB. CI starts the x64 images only and builds the arm64 ones under QEMU.
+  with no capabilities and 512 MiB, by hand and from `images {}`; `UbiMicroTest` the `images {}` image's contents and layers;
+  `CapacityTest` CPU per request and memory against the limit. CI starts the x64 images only and builds the arm64 ones under QEMU.
   `.github/scripts/verify-rpm.sh` installs `java-service`'s RPM in Rocky Linux and under systemd.
   `.github/scripts/runtime-checksums.py` records every target's runtime archive at two versions on
   each OS leg, and the `runtime-reproducible` job checks that Linux and macOS built the same bytes
@@ -106,9 +111,10 @@ appManifest<T>, appSbom<T>                     ─┴─► distribution <target
                                                      (Gradle's plugin)      └─► install<Target>Dist (build/app/<target>)
 runtime/ (customiseRuntime<T> or Node) ───────────────────────────────────────┬─┘  adds runtime/
                                                                                 └─► appRuntimeArchive<T> ──► publish <app>-runtime
-                                                         appVerifyPolicy<T> (on install<Target>Dist) before either archive
+third-party libraries (EcosystemSpec.libraries) ─────► install<Target>Dist, and appLibsArchive<T> ──► publish <app>-libs
+                                                         appVerifyPolicy<T> (on install<Target>Dist) before any archive
                      install<Target>Dist ──► appRpm<T> (Linux, rpm enabled; not published)
-                     this machine's      ──► appSmokeTest (both archives), runApp (HostTasks), jlinkFindModules
+                     this machine's      ──► appSmokeTest (all three archives), runApp (HostTasks), jlinkFindModules
                      a Linux one's archives ──► appDockerContext (DockerContext)
 ```
 
@@ -184,8 +190,9 @@ plugin was not used: it pulls in a Docker plugin, and 13.x (the first with confi
 support) was days old. `docs/packaging-standards.md` records the conventions; change it with the
 code. RPMs are not published: a runtime republished inside one would never be the same bytes.
 
-**Two publications, `<app>` and `<app>-runtime`** (`AppPublishing`, `RuntimeArchive`), so that a
-release with an unchanged runtime publishes the same runtime bytes, which Artifactory stores once
+**Three publications, `<app>`, `<app>-libs` and `<app>-runtime`** (`AppPublishing`, `LibsArchive`,
+`RuntimeArchive`), the same pattern as an image's layers, so that a release with unchanged libraries or
+runtime publishes the same bytes, which Artifactory stores once
 (`docs/caching.md` lists every control). Each is a real software component whose Gradle Module
 Metadata carries the standard OS and architecture attributes, and each app variant depends on the
 runtime module at the same version (optional in the POM, which has no artifact for it). The
@@ -205,11 +212,25 @@ attributes, so the variant is chosen and the classifiers name the files), lenien
 target is new, and fails on any other resolution failure, told apart by exception name since Gradle's
 not-found types are internal. Anything new that reaches the runtime archive belongs in the fingerprint.
 
-**Container context** (`DockerContext`), unpacked from each Linux target's two archives: beside `runtime/<cpu>/` and `app/<cpu>/`, kept for
+**The libraries archive** (`LibsArchive`) holds third-party libraries under their paths in the app, so it unpacks
+over the app's directory; a marker file stops an app with none having no archive to publish. Modes come from a
+file's exec bit alone (`AppCopySpecs.fixedModes`). A project dependency's jar goes with the app's, as its name holds its
+version, and `AppSmokeTest` tells the archive by its top directory (`lib`, `app`), which no app archive's can be.
+
+**Container context** (`DockerContext`), unpacked from each Linux target's archives: beside `runtime/<cpu>/` and `app/<cpu>/`, kept for
 Dockerfiles written before, each layer is a tree in `layers/<cpu>/` holding the paths it takes in the
 image, and every file in the context gets one fixed time (`ContextTimes`). `COPY` records times, and
 copying into `/app/runtime/` creates `/app` with the build's own, so only a tree copied to `/` gives a
 runtime layer that is byte-identical across builds and images (`ContainerTest` checks it).
+
+**Generated images** (`ImageSpec`, `GeneratedImages`, `ImageDockerfile`, `ImageLabels`): `images { register("<name>") }`
+writes `Dockerfile.<name>`, with the RPMs locked by `ImagePackagesTasks` (`rpms.lock.yaml`, Konflux's layout) and installed
+by `rpm` in a stage on the build's own CPU. `ImageNeeds` is what a base lacks and the ecosystem can't start without, so nobody
+names it (zlib, for Java on micro). Its layers are the archives: `layers/<cpu>/libs` and `layers/<cpu>/code`;
+`layers/<cpu>/app` and `app/<cpu>` hold both, whole, for Dockerfiles written before. Keep the DSL a thin facade: it is here
+because nothing open source installs RPMs into a pinned micro base with its RPM database intact (compared in
+`research_notes/Dockerfile DSL design/builders.md`). Don't grow it into a general Dockerfile language; a build that needs one
+writes `Dockerfile.<name>` itself.
 
 **Configuration cache:** lambdas stored in tasks (`onlyIf`, providers resolved at execution) must
 not capture `AppWiring` or anything else holding the `Project`; copy what they need into locals.

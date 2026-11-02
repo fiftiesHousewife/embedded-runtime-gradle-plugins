@@ -1,8 +1,8 @@
 # Testing the container image
 
 `appDockerContext` gives you a build context: the project's `Dockerfile`, each `Dockerfile.<name>`
-beside it, and every Linux target's runtime archive and app archive, unpacked as image trees under
-`layers/<cpu>/runtime/` and `layers/<cpu>/app/` (and, as before, under `runtime/<cpu>/` and `app/<cpu>/`). The plugins construct the Dockerfiles and the context; building images and running
+beside it, and every Linux target's archives, unpacked as image trees under
+`layers/<cpu>/runtime/` and `layers/<cpu>/app/`, or its two halves `libs/` and `code/` (and, as before, under `runtime/<cpu>/` and `app/<cpu>/`). The plugins construct the Dockerfiles and the context; building images and running
 them is left to your build or CI, since how and where images are built (Docker, Buildah, a CI
 service) differs from one organisation to the next. The
 [Spring Boot sample](../samples/spring-boot-service) shows a complete setup with
@@ -50,7 +50,7 @@ checks that the app answers over HTTP and logs to stdout, that this user can rea
 everything under `/app` but write nothing there, and can write the data, log and home directories,
 that the runtime is Oracle's Java 25 on Red Hat Enterprise Linux 9, that `/licenses` holds Oracle's
 terms as a regular file, that the image has no `USER`, and that its labels name the app, not UBI.
-A third, `MicroTest`, is described [below](#on-ubi-micro).
+`MicroTest` and `UbiMicroTest` are described [below](#on-ubi-micro).
 
 Testcontainers builds with Docker's own builder, which sets `TARGETARCH` only under BuildKit, so the
 test passes it as a build argument, the engine's CPU as container platforms name it. The tests
@@ -96,16 +96,51 @@ what an app with its own runtime needs to start. Its packages are `bash`, `coreu
 `libpthread`, `librt`) and the runtime carries its own trusted certificates, but the `java`
 launcher's `libjli.so` and the runtime's `libzip.so` load the system `libz.so.1`. Without it, `java`
 stops at once with `libz.so.1: cannot open shared object file` (exit code 127). The sample's
-`Dockerfile.micro` installs the `zlib` RPM into a copy of micro's root with UBI minimal's `microdnf`
+image installs the `zlib` RPM into a copy of micro's root with `rpm`
 and copies in the library and micro's updated RPM database, so the package is recorded as installed
-and micro's own layers stay as they are. The launcher needs a shell and `dirname`, `basename`,
+for scanners and micro's own layers stay as they are. The launcher needs a shell and `dirname`, `basename`,
 `readlink` and `cat`, all in micro.
 
 **Node.js apps don't, as they are.** The official Node.js builds for Linux need `libstdc++`, which
 micro leaves out. Stay on UBI minimal for Node.js.
 
+### Without writing a Dockerfile
+
+`images {}` writes the Dockerfile, and takes care of all of the above and the table below. You describe
+the image in the Dockerfile's own words and never meet the package tooling:
+
+```kotlin
+javaApp {
+    images {
+        register("ubi-micro") {
+            from(ubiMicro)                     // default ubiMinimal; or your mirror's image, by digest
+            install("libstdc++")               // only what your app needs beyond the runtime; zlib for Java is added for you
+            env("TZ", "Europe/London")
+            label("summary", "Order service")
+            expose(8080)
+            user("1001")                       // the default; "" for none, as OpenShift assigns one
+        }
+    }
+}
+```
+
+`register("<name>")` gives `Dockerfile.<name>` in the context, and `runtimeOnly()` makes an image of the
+runtime with no app. To add or update a package, run `./gradlew appImagePackagesLock` and commit
+`rpms.lock.yaml`, which pins the file and its SHA-256 for each CPU. The packages come from the binary
+repository's `binaryRepo.repo.ubi` remote, and a package with install scripts is refused, as they can't
+run for another CPU. Point the Dockerfile's images at your own registry with `--build-arg BASE_IMAGE=…
+--build-arg BUILD_IMAGE=…`, or with `from(…)`.
+
+The sample's [`UbiMicroTest`](../samples/spring-boot-service/src/dockerTest/java/io/github/fiftieshousewife/samples/spring/UbiMicroTest.java)
+starts the image and checks that it is Oracle's Java 25, linked, on Red Hat Enterprise Linux 9, with zlib
+in the RPM database, no package manager in the image, and layers that are micro's untouched followed by
+the files, the runtime, the libraries and the app. A rebuild without the cache gives the same digests.
+
+### What is in the image
+
 The sample's [`Dockerfile.micro`](../samples/spring-boot-service/Dockerfile.micro) (117 MB, against
-195 MB on minimal) also does what a Java image on micro needs beyond zlib:
+195 MB on minimal) is the same image by hand. Either way, it does what a Java image on micro needs
+beyond zlib:
 
 | In the image | Because |
 |---|---|
@@ -118,12 +153,12 @@ The sample's [`Dockerfile.micro`](../samples/spring-boot-service/Dockerfile.micr
 | A `HEALTHCHECK` command with its own `APP_JAVA_OPTS` | Each probe starts a second JVM inside the container's limits; small options keep it quick and light, and the server's own options (an agent, a debug port) don't break every probe |
 
 The sample's [`MicroTest`](../samples/spring-boot-service/src/dockerTest/java/io/github/fiftieshousewife/samples/spring/MicroTest.java)
-starts the image as a hardened pod: its own user, every capability dropped, no privilege
+starts both images as a hardened pod: its own user, every capability dropped, no privilege
 escalation, a read-only root filesystem with `/tmp` and `/var/lib/app` as empty volumes, and a
 512 MiB memory limit. It checks each row above, that the JVM sees the limit, that the image's own
 `HEALTHCHECK` command passes, and that SIGTERM ends it with exit code 143 within ten seconds.
 
-Its `BUILD_IMAGE` is the UBI minimal image that installs zlib. To move the base to a newer rebuild:
+Its `BUILD_IMAGE` is the UBI minimal image that installs the RPMs. To move the base to a newer rebuild:
 
 1. **Find the current rebuild.** Red Hat tags each rebuild `9.<minor>-<build>` and moves the plain
    `9.<minor>` tag along with it. Red Hat's catalog API gives the newest rebuild's tags and the

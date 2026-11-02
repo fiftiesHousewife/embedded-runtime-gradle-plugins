@@ -15,12 +15,13 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.testcontainers.containers.Container.ExecResult;
 import org.testcontainers.containers.GenericContainer;
 
 /**
- * {@code Dockerfile.micro}'s image started as a hardened Kubernetes pod runs it: the image's own
+ * The micro images, by hand and written from {@code images {}}, each started as a hardened Kubernetes pod runs it: the image's own
  * user, every capability dropped, no privilege escalation, a read-only root filesystem with
  * {@code /tmp} and {@code /var/lib/app} as empty volumes, and a 512 MiB memory limit.
  */
@@ -35,9 +36,10 @@ class MicroTest {
         f=/licenses/java-runtime/java.base/LICENSE
         [ -f "$f" ] && [ ! -L "$f" ] && [[ $(< "$f") == *'No-Fee Terms'* ]]""";
 
-    @Test
-    void runsHardenedOnItsOwnUserReadOnlyAndWithinAMemoryLimit() throws Exception {
-        try (GenericContainer<?> container = new GenericContainer<>(ContainerTest.image("Dockerfile.micro"))
+    @ParameterizedTest
+    @ValueSource(strings = {"Dockerfile.micro", UbiMicroTest.DOCKERFILE})
+    void runsHardenedOnItsOwnUserReadOnlyAndWithinAMemoryLimit(String dockerfile) throws Exception {
+        try (GenericContainer<?> container = new GenericContainer<>(ContainerTest.image(dockerfile))
             .withExposedPorts(8080)
             .withTmpFs(Map.of("/tmp", "rw,size=64m", "/var/lib/app", "rw,mode=1777,size=64m"))
             .withCreateContainerCmdModifier(command -> command.getHostConfig().withReadonlyRootfs(true)

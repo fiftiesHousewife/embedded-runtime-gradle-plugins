@@ -1,0 +1,9 @@
+val library = tasks.register<Jar>("libraryJar") {
+    archiveBaseName = "library"
+    archiveVersion = "1"
+    destinationDirectory = layout.buildDirectory.dir("library")
+    from("src/deploy")
+    isPreserveFileTimestamps = false
+    isReproducibleFileOrder = true
+}
+dependencies { implementation(files(library)) }

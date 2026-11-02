@@ -1,32 +1,33 @@
 # Publishing
 
-`./gradlew publish` uploads two modules to your Maven repository, under one version, with the
-target as the classifier: the app, with each target's app archive and SBOM, and its runtime, with
-each target's runtime archive:
+`./gradlew publish` uploads three modules to your Maven repository, under one version, with the
+target as the classifier: the app, with each target's app archive and SBOM, its libraries, with each
+target's libraries archive, and its runtime, with each target's runtime archive:
 
 ```
 com/example/orders-service/1.4.2/orders-service-1.4.2-linux-x64.tar.gz
 com/example/orders-service/1.4.2/orders-service-1.4.2-linux-x64-cyclonedx.json
 com/example/orders-service/1.4.2/orders-service-1.4.2-windows-x64.zip      # zip for Windows
+com/example/orders-service-libs/1.4.2/orders-service-libs-1.4.2-linux-x64.tar.gz
 com/example/orders-service-runtime/1.4.2/orders-service-runtime-1.4.2-linux-x64.tar.gz
 com/example/orders-service-runtime/1.4.2/orders-service-runtime-1.4.2-linux-x64-inputs.txt
 com/example/orders-service-runtime/1.4.2/orders-service-runtime-1.4.2-windows-x64.zip
 …
 ```
 
-The version is the link between them: a deployment fetches the app and then the runtime at the same
-version, with nothing else to keep in step. In Gradle Module Metadata each app variant also depends
-on the runtime module, so a Gradle build resolving the app gets the runtime for the same machine; in
-the POM that dependency is optional, so a Maven build asks for nothing it can't find. A Gradle
-project that depended on the app's project directly would see two publications and couldn't choose
+The version is the link between them: a deployment fetches the app, the libraries and the runtime at the
+same version, with nothing else to keep in step. In Gradle Module Metadata each app variant also depends
+on the other two modules, so a Gradle build resolving the app gets them for the same machine; in
+the POM those dependencies are optional, so a Maven build asks for nothing it can't find. A Gradle
+project that depended on the app's project directly would see three publications and couldn't choose
 between them, but nothing builds against a deployable app.
 
 ## Publishing the same runtime again
 
 Most releases don't change the runtime, so most publish the same runtime archive again under a new
 version. Artifactory stores a binary once, by its checksum, and every path holding it refers to that
-copy, so a republished runtime costs no storage; the app archive, a few megabytes, is the only new
-binary. The repository's Storage Summary compares artifacts' size with binaries' size, which is
+copy, so a republished runtime costs no storage. The same goes for the libraries archive until a
+dependency moves; the app archive, as little as a few kilobytes, is then the only new binary. The repository's Storage Summary compares artifacts' size with binaries' size, which is
 the saving. Deleting old releases is safe: a binary is removed only when no path refers to it. A
 runtime changes when the JDK or Node.js pin, the module set, the trusted certificates, the security
 policy or the overlay does, and is then stored once for every release after it.
@@ -142,8 +143,8 @@ repositories { maven("https://repo.example.com/libs-release-local") }
 dependencies { smokeTest("com.example:orders-service:1.4.2") }
 ```
 
-`./gradlew appSmokeTest` downloads the app archive built for the machine it runs on and its runtime
-archive, unpacks the runtime into the app as a deployment does, starts it and waits for its health
+`./gradlew appSmokeTest` downloads the app archive built for the machine it runs on, and its runtime and
+libraries archives, unpacks them into the app as a deployment does, starts it and waits for its health
 check. Run it on each target you publish for.
 
 ### Only archives your release workflow signed

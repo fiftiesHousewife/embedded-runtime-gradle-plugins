@@ -1,6 +1,6 @@
 # Packaging and deploying
 
-Every build makes two archives per target, the app and its runtime. Linux targets can also be
+Every build makes three archives per target, the app, its libraries and its runtime. Linux targets can also be
 packaged as RPMs, and any Linux target can become a container image. Which conventions each format follows, and why, is in
 [Packaging standards](packaging-standards.md).
 
@@ -14,29 +14,31 @@ packaged as RPMs, and any Linux target can become a container image. Which conve
 ## Archives
 
 Each target gets the format its own OS opens without a separate tool: `zip` for Windows, `tar.gz`
-for Linux and macOS. Whatever the format, each target has two archives, both keeping Unix
+for Linux and macOS. Whatever the format, each target has three archives, all keeping Unix
 permissions (every file readable by everyone, so an account that doesn't own the files can still
 run the app):
 
 | Archive | Holds | Published as |
 |---|---|---|
-| `<app>-<version>-<target>.tar.gz` | One directory, `<app>-<version>-<target>/`: the launchers, libraries, metadata and SBOM | `<group>:<app>:<version>` |
+| `<app>-<version>-<target>.tar.gz` | One directory, `<app>-<version>-<target>/`: the launchers, your own jars, metadata and SBOM | `<group>:<app>:<version>` |
+| `<app>-libs-<version>-<target>.tar.gz` | One directory, `lib/` (Node: `app/`, holding `node_modules/`): third-party libraries | `<group>:<app>-libs:<version>` |
 | `<app>-runtime-<version>-<target>.tar.gz` | One directory, `runtime/`: the linked JDK, or Node.js | `<group>:<app>-runtime:<version>` |
 
-The runtime archive names neither the app nor its version, and its times, order and modes are
-fixed, so every release whose runtime is unchanged publishes the same bytes. A repository that stores
+The runtime and libraries archives name neither the app nor its version, and their times, order and modes
+are fixed, so every release that leaves them unchanged publishes the same bytes. A repository that stores
 by checksum, as Artifactory does, keeps them once; see
 [Image layers and caching](caching.md#republishing-the-runtime). The app is installed by unpacking
-both, the runtime inside the app's directory:
+all three, the runtime and the libraries inside the app's directory:
 
 ```bash
 tar -xzf orders-service-1.4.2-linux-x64.tar.gz
 tar -xzf orders-service-runtime-1.4.2-linux-x64.tar.gz -C orders-service-1.4.2-linux-x64
+tar -xzf orders-service-libs-1.4.2-linux-x64.tar.gz -C orders-service-1.4.2-linux-x64
 ```
 
 The smoke test starts the app installed exactly that way, and a consuming build that resolves the
-app by Gradle Module Metadata (`app-smoke-test`, for one) gets the runtime archive for the same
-machine with it.
+app by Gradle Module Metadata (`app-smoke-test`, for one) gets the runtime and libraries archives for the
+same machine with it.
 
 A Mac target's archive is the macOS deliverable. A signed, notarized `.pkg` installer can be made
 from it on a Mac; see [Packaging standards](packaging-standards.md#the-macos-archive).
@@ -98,6 +100,7 @@ named after it, so it has the distribution plugin's usual tasks:
 | `install<Target>Dist`, e.g. `installLinuxX64Dist` | Lays the app out in `build/app/<target>/<app>-<version>/` |
 | `<target>DistTar` / `<target>DistZip` | The app archive, `build/distributions/<app>-<version>-<target>.tar.gz` (`.zip` for Windows); only the one for the target's OS is enabled |
 | `appRuntimeArchive<Target>` | The runtime archive, `build/distributions/<app>-runtime-<version>-<target>.tar.gz` |
+| `appLibsArchive<Target>` | The libraries archive, `build/distributions/<app>-libs-<version>-<target>.tar.gz` |
 | `appArchive` | Every target's archives |
 | `installDist` | Gradle's usual task: this machine's app with its runtime, in `build/install/<app>` |
 
@@ -180,7 +183,7 @@ Commit it. Nothing in it changes from one build to the next: the release, its co
 commit's time are `ARG`s (`APP_VERSION`, `GIT_COMMIT`, `CREATED`), which `appDockerContext` fills in
 for each build in the copy it writes to `build/docker-context/`, beside every Linux target's
 runtime and app archives, unpacked, one per CPU (`amd64`, `arm64`, the names container platforms
-use), so the runtime is a layer of its own: `layers/<cpu>/runtime/` and `layers/<cpu>/app/`, each holding the paths it takes in the
+use), so the runtime is a layer of its own: `layers/<cpu>/runtime/` and `layers/<cpu>/app/` (or `libs/` and `code/`, the two halves of `app/`, as `images {}` uses them), each holding the paths it takes in the
 image, with fixed times, so each layer is the same in every build and every image of the app
 ([Image layers and caching](caching.md)). The same files are also under `runtime/<cpu>/` and
 `app/<cpu>/`, for Dockerfiles written before. A Dockerfile without the markers is entirely yours
@@ -200,7 +203,8 @@ Other images of the same app, such as one for OpenShift or one on UBI micro, go 
 `appDockerContext` copies each into the context with this build's values filled in, so
 `docker build --file build/docker-context/Dockerfile.openshift build/docker-context` builds one.
 UBI micro needs more than a different base image, since the Java runtime loads the system zlib;
-[On UBI micro](container-testing.md#on-ubi-micro) has a complete `Dockerfile.micro`.
+[On UBI micro](container-testing.md#on-ubi-micro) has a complete `Dockerfile.micro`, and `images {}`, which
+writes such a file for you.
 
 What the plugin's block holds:
 

@@ -3,7 +3,7 @@
 Work that has been asked for and not yet done, newest decisions first. Move an item to the commit
 log, not to a "done" list, when it lands.
 
-Last updated 2026-10-30.
+Last updated 2026-11-02.
 
 ## The runtime published apart from the app
 
@@ -39,11 +39,25 @@ under the configuration cache.
 | **Volume contract** | The image creates `/var/lib/app/data` and `/logs` writable by user 1001 and group 0; document the volume and env-var contract with a sample `Deployment` |
 | **Variants from the engine** | `Dockerfile.openshift` and `Dockerfile.micro` are hand-written in the Spring Boot sample; the engine's `openshift` and `redhat-certified` standards should write them, so they follow plugin releases as the managed block does |
 | **Status 2026-11-02** | Not started past the spike. `rewrite-docker` is still at 8.90.4 (2026-08-24); two parser fixes are on main, unreleased (whitespace before commas in JSON arrays, `=` in `COPY` paths). None of the spike's problems (CRLF, `AddUserInstruction` placement, label merging, inline markers) has an upstream issue, and none of the recipes we need exists upstream: ours to write, or to contribute |
-| **Packages for UBI micro** | Jib can't run dnf. The declarative form found is a lockfile: Konflux's `rpm-lockfile-prototype` (`rpms.in.yaml` to `rpms.lock.yaml`: NEVRA, URL, SHA-256 per arch), with dnf still installing so the rpmdb lists the package for scanners. A `micro { packages("zlib") }` DSL would write the lock and render the build stage from it. Unpacking RPMs into a layer in Java (Redline) avoids emulation but leaves zlib out of the rpmdb, so scanners miss its CVEs. Unverified: gathered from memory, check each tool before building on it |
+| **Packages for UBI micro** | Done in the working tree: `images {}` locks and installs them (`docs/container-testing.md`). Open-source alternatives checked 2026-11-02 (`research_notes/Dockerfile DSL design/builders.md`): none installs RPMs on a pinned micro base with its rpmdb intact, so the DSL stays, thin |
+
+## Images from `images {}`
+
+Asked for 2026-11-02.
+
+| Item | Notes |
+|---|---|
+| **CPU's client** | `CapacityTest` passes with curl in a container of its own: 47-48 µs measured by hand across fresh containers, 26-29 µs beside busy ones. A client in the test's JVM through the port forward gave 54, 80, 60 µs |
+| **Detect a busy agent** | Agreeing rounds don't reveal load (see above). `nr_throttled` and a calibration loop might; unexplored |
+| **Base images from the binary repository** | `ubiMicro` and `ubiMinimal` name `registry.access.redhat.com`, which a corporate network can't reach. Today it takes `from(…)` and `--build-arg BUILD_IMAGE=…`; a `binaryRepo.repo.docker` setting should rewrite both |
+| **Retire the hand-written micro files** | Once `UbiMicroTest` has passed: drop `Dockerfile.micro` and `Dockerfile.jre` from the sample for `images {}`. `runtimeOnly()` still labels with the app's version, where `Dockerfile.jre` uses Java's |
+| **A fingerprint for the libraries archive** | `appVerifyRuntimeFingerprint` guards the runtime only. Libraries' bytes can't change while their jars don't, short of a change to the plugin, so this is lower value |
+| **A `production` rung by default** | `docs/caching.md` shows how to add a compiler-free top module set. Making it a default set needs the list checked on every release from 11 to 27 |
+| **A framework's libraries in their own layer** | Below the app's other libraries, when many apps share one BOM |
 
 ## Next: sizing CPU and memory
 
-Asked for 2026-11-02. A research pass (partly from memory, to verify) suggests:
+Asked for 2026-11-02. `docs/capacity.md` and the sample's `CapacityTest` show how by hand; the task below is still to build. A research pass (partly from memory, to verify) suggests:
 
 | Item | Notes |
 |---|---|

@@ -24,6 +24,7 @@ javaApp {                                       // nodeApp {} has the same first
     security { … }                              // see Hardening the runtime
     runtimeDefaults = true                      // -XX:MaxRAMPercentage=75, exit and heap dump in $APP_LOG_DIR on OutOfMemoryError
     jvmArgs = listOf("-Xss512k")                // after runtimeDefaults, before $APP_JAVA_OPTS
+    images { register("ubi-micro") { from(ubiMicro) } } // writes Dockerfile.ubi-micro; see On UBI micro in Testing the container image
 }
 
 nodeApp {
@@ -95,7 +96,7 @@ Each defaults to the `-PappSmokeTest.<name>` property of the same name.
 
 | Task | Does |
 |---|---|
-| `appArchive` | Builds every target's app and runtime archives; part of `assemble` |
+| `appArchive` | Builds every target's app, libraries and runtime archives; part of `assemble` |
 | `appRuntimeArchive<Target>` | The runtime alone, `build/distributions/<app>-runtime-<version>-<target>.tar.gz` (`.zip` for Windows), with `runtime/` at its root |
 | `appRuntimeFingerprint<Target>` | `build/distributions/<app>-runtime-<version>-<target>-inputs.txt`: what the runtime archive is built from, published beside it; see [Publishing](publishing.md#a-check-that-it-still-is) |
 | `appVerifyRuntimeFingerprint` | With `previousRelease` set, compares each runtime with that release's and fails when the inputs are the same but the archive is not; `publish` depends on it |
@@ -103,11 +104,11 @@ Each defaults to the `-PappSmokeTest.<name>` property of the same name.
 | `installDist` | Installs this machine's app with its runtime into `build/install/<app>` |
 | `startScripts` | Gradle's own task; writes the Java launchers with the embedded-runtime script generator |
 | `appRpm` | Builds each Linux target's RPM (`appRpmLinuxX64`, …), when enabled; part of `assemble`. RPMs are not published |
-| `appSmokeTest` | Unpacks this machine's app archive with its runtime archive, starts it and waits for its health check; part of `check` |
+| `appSmokeTest` | Unpacks this machine's app archive with its runtime and libraries archives, starts it and waits for its health check; part of `check` |
 | `runApp` | Runs this machine's packaged app; pass arguments with `-Pargs="…"` |
 | `appVerifyPolicyLinuxX64`, … | Checks an assembled app against the runtime policy; every archive depends on it |
 | `appDockerfile` | Creates the project's `Dockerfile` if missing and keeps its embedded-runtime block up to date; one without the block is left as written |
-| `appDockerContext` | Writes a container build context: the Dockerfile and each `Dockerfile.<name>`, plus each Linux target's runtime archive and app archive, unpacked as image trees under `layers/<cpu>/runtime/` and `layers/<cpu>/app/` (and, for older Dockerfiles, under `runtime/<cpu>/` and `app/<cpu>/`), with fixed file times |
+| `appDockerContext` | Writes a container build context: the Dockerfile and each `Dockerfile.<name>`, plus each Linux target's archives, unpacked as image trees under `layers/<cpu>/runtime/`, `layers/<cpu>/app/` and its two halves `libs/` and `code/` (and, for older Dockerfiles, under `runtime/<cpu>/` and `app/<cpu>/`), with fixed file times |
 | `checkRuntimeSupport` | Fails if the embedded runtime's release line has reached end of life; warns if it will within 90 days or a newer patch is out. Not part of `check`; see [Keeping the runtime patched](runtime-updates.md) |
 | `downloadJdk<Target>` | Java, with `javaApp.jdk.source=yum:…`: the JDK package from the YUM repository, found in its metadata and checked against its SHA-256 |
 | `jlinkFindModules` | Java: finds the modules jdeps can't see, by running the app |

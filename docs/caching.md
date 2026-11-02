@@ -6,9 +6,180 @@ way, once per checksum. So the more of a release that is byte-identical to somet
 stored, the less every release costs. This page is about what the plugins make identical, and how
 to choose settings that keep it that way.
 
+## Do Not Repeat Yourself
+
+A runtime and a base operating system are the same bytes in thousands of releases. Sending and storing
+them every time is repetition, and removing it is why these plugins care about micro, jlink and
+byte-identical archives. It pays twice: **a smaller surface** to patch and attack, and **less to transmit
+and store**.
+
+**Brotli got there first.** [Brotli (RFC 7932)](https://www.rfc-editor.org/rfc/rfc7932) ships a static
+dictionary of about 120 KB of common words inside every decoder, so a stream refers to them and never
+carries them, and [Shared Brotli (RFC 9841)](https://www.rfc-editor.org/rfc/rfc9841) lets the two sides
+agree a dictionary of their own. Don't send what the other side already holds. This is the same idea at
+a different scale, not the same mechanism (image layers here are tar and gzip): the base and the runtime
+are the dictionary, and a release is the short message that refers to them.
+
+**We used to do this with symlinks.** A JRE went on each host, or on a shared mount, and apps reached it
+through a symlink or `JAVA_HOME`. It saved real disk and bandwidth, but nothing tied the link to what had
+been tested, and an upgrade made by one team reached everyone's app. There is also nothing left to link
+to in the old way: [Oracle's JDK has had no separate JRE since Java 11](https://www.oracle.com/java/technologies/javase/11-relnote-issues.html),
+and its release notes point to jlink instead. So every app has a runtime of its own, and without care
+that is a copy of it per release.
+
+**The same saving, without the link.** Artifactory
+[stores each binary once, by checksum](publishing.md#publishing-the-same-runtime-again), and every path
+holding those bytes refers to that copy. That makes each path the old symlink, kept by the store, and it
+can't point at the wrong runtime because the name is the content. A
+[checksum deploy](https://docs.jfrog.com/artifactory/reference/deployartifactbychecksum) goes one better,
+creating the path with no body at all:
+
+```bash
+curl -u "$USER:$TOKEN" -X PUT "$REPO/com/example/orders-service-runtime/1.4.2/orders-service-runtime-1.4.2-linux-x64.tar.gz" \
+  -H 'X-Checksum-Deploy: true' -H "X-Checksum-Sha256: $(shasum -a 256 runtime.tar.gz | cut -d' ' -f1)"
+```
+
+A release then transmits a digest for what the repository already holds. A 404 means it holds no such
+binary, and the file has to be uploaded in full. [Publishing](publishing.md#publishing-the-same-runtime-again)
+shows JFrog's Gradle plugin doing this for you.
+
+**The discipline comes from Docker, and it works off Docker too.** None of that helps unless the bytes
+really repeat, so physical machines take the discipline containers already have: an ordered stack,
+from what changes least to what changes most, each part reproducible from its inputs. It is one
+pattern, and the only difference is what holds the parts together:
+
+```mermaid
+flowchart TB
+    subgraph image["In a container: image layers"]
+        direction TB
+        i4["App layer<br/>launcher and own jar"]
+        i3["Libs layer<br/>third-party jars"]
+        i2["JRE layer<br/>jlinked runtime"]
+        i1["UBI micro layers<br/>plus zlib and its RPM record"]
+        i4 --- i3 --- i2 --- i1
+    end
+    subgraph server["On a server: archives unpacked into one directory"]
+        direction TB
+        s4["App archive<br/>launcher and own jar"]
+        s3["Libs archive<br/>third-party jars"]
+        s2["Runtime archive<br/>jlinked runtime"]
+        s1["The host's own OS"]
+        s4 --- s3 --- s2 --- s1
+    end
+    image -- "each layer named by its digest" --> store[("Stored once, by checksum<br/>registry · Artifactory · node")]
+    server -- "each archive named by its checksum" --> store
+```
+
+| Part | Holds | In an image | On a server |
+|---|---|---|---|
+| UBI | The operating system | `from(ubiMicro)`, pinned by digest | The host's own OS; no archive is built |
+| JRE | The linked runtime | Its own layer | `<app>-runtime`, its own archive |
+| Libs | Third-party jars | Its own layer (`images {}`) | `<app>-libs`, its own archive |
+| App | The launcher and your code | Its own layer | `<app>`, the app archive |
+
+The Spring Boot sample on Java 25 shows why: its app archive is 8 KB, its libraries 19.6 MB and its
+runtime 40.1 MB for linux-x64, so a release changing only its code adds about 0.01% of new binary. The
+libraries archive is also the same bytes on `linux-x64` and `linux-aarch64`. Default `Dockerfile`s and
+others you wrote yourself keep the app and its libraries in one layer; `images {}` splits them.
+
+### Without knowing about RPMs
+
+UBI micro has no package manager, and needs one RPM added before Java will start. That shouldn't be
+something every team learns, so the plugin takes it on. This is the whole of an image of a Spring Boot
+app on micro, with an Oracle Java 25 runtime linked by jlink:
+
+```kotlin
+javaApp {
+    javaVersion = 25
+    images { register("ubi-micro") { from(ubiMicro) } }
+}
+```
+
+There is no Dockerfile to write and no package named. `./gradlew appImagePackagesLock` pins what the
+image needs in `rpms.lock.yaml`, which you commit; `appDockerContext` then writes
+`Dockerfile.ubi-micro` and fetches those files from your binary repository, so the image build reaches
+no repository. [On UBI micro](container-testing.md#on-ubi-micro) has the rest of the language.
+
+### Tips for caching more
+
+**Prove it with a test.** Nothing fails when two layers stop being the same; storage just grows. So make
+"the same bytes" an assertion, on what you actually ship. The sample's
+[`UbiMicroTest`](../samples/spring-boot-service/src/dockerTest/java/io/github/fiftieshousewife/samples/spring/UbiMicroTest.java)
+builds an image twice, the second time with no cache, and compares digests:
+
+```java
+List<String> layers = ContainerTest.layers(ContainerTest.image(DOCKERFILE));
+List<String> rebuilt = ContainerTest.layers(ContainerTest.image(DOCKERFILE, "ubi-micro-rebuilt", true));
+assertEquals(tail(layers), tail(rebuilt), "rebuilt without the cache");
+```
+
+Test the other direction too: a new release must change only what it should. No container engine is
+needed for this one. Build the context at two versions and compare each layer's tree, times included,
+since `COPY` records them:
+
+```kotlin
+project.build("appDockerContext")
+val first = LAYERS.associateWith { tree(context.resolve("layers/amd64/$it")) }
+project.build("appDockerContext", "-PappVersion=2.0.1")
+val second = LAYERS.associateWith { tree(context.resolve("layers/amd64/$it")) }
+assertEquals(first["runtime"], second["runtime"])
+assertEquals(first["libs"], second["libs"])
+```
+
+Published files get the same treatment from `appVerifyRuntimeFingerprint`, which
+[fails a release](publishing.md#a-check-that-it-still-is) whose runtime changed when its inputs didn't.
+
+**Split layers by how often they can be reused.** Each layer should hold things that are reused about
+as often as each other, because one changed file makes the whole layer new. Count the reuses a layer
+could get:
+
+| Layer | Reused by | Changes |
+|---|---|---|
+| Base | Every app, on every node | When the pin moves |
+| zlib, RPM database, `/licenses` | Every image on that base and runtime | With the base's packages |
+| Runtime | Every app on the same JDK patch and module set | Quarterly, with the JDK |
+| Libraries | Every release of this app until a dependency moves, on every CPU | Several times a quarter, perhaps |
+| The app's own code | Nothing | Every release |
+
+A split is worth making when a part's reuses differ a lot from its neighbours'. If many apps share a
+framework, that framework's jars would earn a layer of their own below the app's other libraries; the
+plugin doesn't make that split today.
+
+**Keep the most reused at the bottom.** A registry stores a layer by its own digest, but a node's image
+store shares a layer only when everything beneath it matches too. So one layer that differs low down
+costs every layer above it on the node, however identical they are.
+
+**Compress in one way.** The digests above are of the uncompressed contents; what a registry stores is
+the compressed blob. Different gzip output for the same files is a different blob, so build images
+with one version of one builder, as runtime archives are published [from one JDK](#republishing-the-runtime).
+
+**Build a ladder of runtimes.** Shared [module sets](#shared-module-sets) work best as rungs, starting
+with the modules most apps use and widening: a plain service takes a low rung, and an unusual app takes
+the top one and shares it, where it would otherwise get a runtime of its own that nothing shares. The
+plugin's rungs stop at `server`. Add a last one yourself if your apps call for it, generated from the
+JDK, and **stop short of all the modules, as all means the compiler back in production**. Leave out every
+development and debugging tool, and whatever your policy forbids (a set holding a forbidden module is never
+chosen):
+
+```bash
+java --list-modules | sed 's/@.*//' | grep -v -E \
+  '^(jdk\.compiler|jdk\.javadoc|jdk\.jshell|jdk\.jdeps|jdk\.jlink|jdk\.jartool|jdk\.jdi|jdk\.jdwp\.agent|jdk\.attach|jdk\.hotspot\.agent|jdk\.jcmd|jdk\.jconsole|jdk\.jpackage|jdk\.jstatd|jdk\.management\.agent|jdk\.editpad|jdk\.incubator\..*|jdk\.internal\..*|jdk\.graal.*|jdk\.jsobject|java\.smartcardio|jdk\.unsupported\.desktop|jdk\.accessibility)$' \
+  > production-modules.txt
+```
+
+```kotlin
+javaApp { moduleSets.put("production", file("production-modules.txt").readLines()) }
+```
+
+On Oracle's Java 25 that leaves 40 of 69 modules, in 66 MB, with no `javac`. `java.compiler` stays: it is the
+annotation-processing API that frameworks use, not a compiler. Each rung is another runtime a node may hold, so
+count your [`MODULES=` lines](#shared-module-sets) to see whether it would be used at all. A list generated from
+one JDK may name modules another release lacks; generate it per release.
+
 ## What an image is made of
 
-The Dockerfile the plugins write has three layers that matter:
+The default Dockerfile has three layers that matter (an image from `images {}` splits the last in two,
+the libraries and the app's own files):
 
 | Layer | Contents | Changes when |
 |---|---|---|
@@ -35,6 +206,9 @@ every app on the same runtime and [module set](#shared-module-sets).
   runtime.
 - **Runtime archives** are byte-identical across builds and across releases of the app, as long as
   the runtime's inputs are unchanged; see [below](#republishing-the-runtime).
+- **Libraries archives** are byte-identical across builds, releases of the app and CPUs, as long as the
+  libraries are unchanged: they name neither the app nor its version, and modes depend only on a file's
+  exec bit. A project dependency's jar goes in the app archive instead, as its name holds its version.
 - **RPMs** are not byte-identical (see [Packaging standards](packaging-standards.md)), so they are
   not published; they don't affect images.
 

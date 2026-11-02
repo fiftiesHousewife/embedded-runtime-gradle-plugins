@@ -64,6 +64,7 @@ abstract class BinaryRepositorySettings {
     abstract val mavenRepo: Property<String>
     abstract val gradlePluginsRepo: Property<String>
     abstract val runtimesRepo: Property<String>
+    abstract val ubiRepo: Property<String>
     abstract val releasesRepo: Property<String>
     abstract val snapshotsRepo: Property<String>
     abstract val npmRepo: Property<String>
@@ -75,6 +76,7 @@ abstract class BinaryRepositorySettings {
         BinaryRepository.MAVEN_REPO to mavenRepo,
         BinaryRepository.GRADLE_PLUGINS_REPO to gradlePluginsRepo,
         BinaryRepository.RUNTIMES_REPO to runtimesRepo,
+        BinaryRepository.UBI_REPO to ubiRepo,
         BinaryRepository.RELEASES_REPO to releasesRepo,
         BinaryRepository.SNAPSHOTS_REPO to snapshotsRepo,
         "binaryRepo.repo.npm" to npmRepo,

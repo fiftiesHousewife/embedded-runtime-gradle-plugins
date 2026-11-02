@@ -6,9 +6,10 @@
 [![Gradle](https://img.shields.io/badge/Gradle-9.8%2B-02303A.svg)](https://gradle.org)
 
 Package a Java or Node.js application **with its own runtime**: your code, its libraries, and a
-pinned JDK or Node.js, as an app archive and a runtime archive per target, or as an RPM. Servers and
-containers need nothing installed, and what passes CI is what runs in production. The runtime archive
-is the same bytes in every release that doesn't change it, so a repository that stores by checksum keeps it once.
+pinned JDK or Node.js, as app, libraries and runtime archives per target, or as an RPM. Servers and
+containers need nothing installed, and what passes CI is what runs in production. The runtime and libraries
+archives are the same bytes in every release that doesn't change them, so a repository that stores by checksum
+keeps them once.
 
 | Plugin | For | Embeds |
 |---|---|---|
@@ -88,7 +89,7 @@ application {
 javaApp {
     appName = "orders-service"                 // launcher, archive and RPM name; default: the project name
 
-    // Target platforms: an app and a runtime archive each, zip for Windows and tar.gz for Linux. A Mac or Windows
+    // Target platforms: app, libraries and runtime archives each, zip for Windows and tar.gz for Linux. A Mac or Windows
     // machine builds the Linux ones directly, with no containers. Only this machine's archive can be
     // started, so only it is smoke-tested.
     targets("linux-x64", "linux-aarch64", "windows-x64")
@@ -150,9 +151,9 @@ javaApp.allowUntestedPublish=true
 javaApp.smokeTestTimeout=90
 ```
 
-`./gradlew build` then gives an app archive and a runtime archive for each of the three targets in
-`build/distributions/`, and two RPMs. `publish` uploads the archives as two modules under one version,
-`<app>` and `<app>-runtime`, with the target as the classifier; the RPMs are not published. The
+`./gradlew build` then gives app, libraries and runtime archives for each of the three targets in
+`build/distributions/`, and two RPMs. `publish` uploads the archives as three modules under one version,
+`<app>`, `<app>-libs` and `<app>-runtime`, with the target as the classifier; the RPMs are not published. The
 runtime policy is checked before any archive is built. See [Building for Linux, Mac and
 Windows](docs/targets.md), [Java: modules, hardening and JDKs](docs/java.md) and [Packaging and
 deploying](docs/packaging.md).
@@ -205,10 +206,10 @@ bytes:
 |---|---|---|
 | Full Temurin 21 JDK, for comparison | 207.5 MB | 353 MB |
 | Temurin 21 JRE, for comparison | 52.1 MB | |
-| **Spring Boot 4.1 web service with Actuator: both archives** | **58.9 MB** | **85.7 MB** |
+| **Spring Boot 4.1 web service with Actuator: all its archives** | **58.9 MB** | **85.7 MB** |
 | of which the runtime archive (13 modules found by jdeps, 18 with what they need) | 39.3 MB | 63.9 MB |
-| of which the app archive: Spring Boot, Tomcat, Jackson and the service (50 jars) | 19.7 MB | 21.8 MB |
-| **Plain HTTP service on the JDK's own server: both archives** | **21.0 MB** | **40.9 MB** |
+| of which the libraries and app archives: Spring Boot, Tomcat, Jackson and the service (50 jars) | 19.7 MB | 21.8 MB |
+| **Plain HTTP service on the JDK's own server: all its archives** | **21.0 MB** | **40.9 MB** |
 | of which the runtime archive (`java.base`, `jdk.httpserver`; 26 MB of it is the JVM itself) | | 40.9 MB |
 
 A whole Spring Boot service, runtime included, is about the size of the vendor's JRE download
@@ -279,7 +280,7 @@ setting and its default is in the [reference](docs/reference.md).
 | `appRpm`, `appRpm<Target>` | Builds an RPM for each Linux target; part of `assemble` when enabled | `rpm { enabled, user, systemd }`, `appName`, `license`, the project's `description`; `-PjavaApp.rpm` |
 | `appDockerfile` | Creates the project's root `Dockerfile` if missing and keeps the plugin's block of it up to date | |
 | `appDockerContext` | Writes a container build context: the Dockerfile plus each Linux target's runtime and app, by CPU | `targets(…)`, `license` |
-| `publish` | Gradle's own: publishes every target's app archive as `<app>` and runtime archive as `<app>-runtime`, under one version, with the target as the classifier. Stops for archives never started on this machine | `-PbinaryRepo.repository` or `-PbinaryRepo.url`, `-PbinaryRepo.repo.releases`, `-PbinaryRepo.repo.snapshots`, `-PjavaApp.allowUntestedPublish` |
+| `publish` | Gradle's own: publishes every target's app archive as `<app>`, libraries archive as `<app>-libs` and runtime archive as `<app>-runtime`, under one version, with the target as the classifier. Stops for archives never started on this machine | `-PbinaryRepo.repository` or `-PbinaryRepo.url`, `-PbinaryRepo.repo.releases`, `-PbinaryRepo.repo.snapshots`, `-PjavaApp.allowUntestedPublish` |
 | `appVerifyRuntimeFingerprint` | Before `publish`: fails when a runtime's inputs equal the previous release's but its archive doesn't, so the repository would store it twice | `-PjavaApp.previousRelease` |
 | `aiSkills` | Writes the AI assistant skills and the build-check hook into the project, and adds the Claude Code plugin to `.claude/settings.json`; part of `assemble` | `-PjavaApp.aiSkills` |
 
@@ -297,9 +298,10 @@ archive that breaks the runtime policy.
 | [Java: modules, hardening and JDKs](docs/java.md) | jdeps and jlink, certificates and security policy, choosing a JDK distribution |
 | [Packaging and deploying](docs/packaging.md) | tar.gz, zip, RPM and container images; Gradle distributions and launchers |
 | [Performance tuning](docs/performance.md) | Java Flight Recorder on the embedded runtime, heap, GC and startup |
+| [Sizing pods from measurements](docs/capacity.md) | A Helm chart's memory aligned with the heap, CPU measured repeatably, and keeping both current |
 | [Keeping the runtime patched](docs/runtime-updates.md) | When runtime fixes come out, `checkRuntimeSupport` |
 | [Renovate presets](docs/renovate.md) | Pull requests for runtime pin overrides and a base image you pin yourself |
-| [Image layers and caching](docs/caching.md) | What makes images share layers, and how to choose module sets |
+| [Image layers and caching](docs/caching.md) | Do Not Repeat Yourself: why runtimes are stored once, what makes images share layers, how to test it and choose module sets |
 | [Testing the container image](docs/container-testing.md) | Testcontainers against the built image, and running on UBI micro |
 | [Publishing](docs/publishing.md) | Maven repositories, signing, smoke-testing a published app |
 | [Behind a corporate binary repository](docs/binary-repository.md) | One setting per machine; the repositories to create |

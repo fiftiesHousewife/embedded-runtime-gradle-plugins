@@ -19,7 +19,7 @@ import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.images.builder.ImageFromDockerfile;
 
 /**
- * Each Dockerfile in the build context {@code appDockerContext} wrote, built and run as Docker,
+ * Each app's Dockerfile in the build context {@code appDockerContext} wrote, built and run as Docker,
  * Kubernetes and OpenShift run it: both probe modes of its launcher pass, it carries the OCI labels,
  * and it stops on SIGTERM before the grace period runs out. The build passes the context's path as
  * the {@code context} system property.
@@ -34,7 +34,7 @@ class ContainerTest {
     static Stream<String> dockerfiles() throws IOException {
         try (Stream<Path> files = Files.list(CONTEXT)) {
             return files.map(file -> file.getFileName().toString()).filter(name -> name.startsWith("Dockerfile"))
-                .sorted().toList().stream();
+                .filter(name -> !name.equals(JreTest.DOCKERFILE)).sorted().toList().stream();
         }
     }
 
@@ -67,7 +67,8 @@ class ContainerTest {
      */
     @Test
     void everyImageAndARebuildShareTheRuntimeAndAppLayers() throws IOException {
-        List<List<String>> shared = dockerfiles().map(dockerfile -> lastTwoLayers(image(dockerfile))).toList();
+        List<List<String>> shared = dockerfiles().filter(dockerfile -> !dockerfile.equals(UbiMicroTest.DOCKERFILE))
+            .map(dockerfile -> lastTwoLayers(image(dockerfile))).toList();
         List<String> rebuilt = lastTwoLayers(image("Dockerfile", "rebuilt", true));
         assertAll(
             () -> assertEquals(1, shared.stream().distinct().count(), "runtime and app layers " + shared),
@@ -75,22 +76,29 @@ class ContainerTest {
     }
 
     private static List<String> lastTwoLayers(String image) {
-        List<String> layers = DockerClientFactory.instance().client().inspectImageCmd(image).exec()
-            .getRootFS().getLayers();
+        List<String> layers = layers(image);
         return layers.subList(layers.size() - 2, layers.size());
+    }
+
+    static List<String> layers(String image) {
+        return DockerClientFactory.instance().client().inspectImageCmd(image).exec().getRootFS().getLayers();
+    }
+
+    static String cpu() {
+        return DockerClientFactory.instance().getInfo().getArchitecture().equals("aarch64") ? "arm64" : "amd64";
     }
 
     static String image(String dockerfile) {
         return image(dockerfile, dockerfile.toLowerCase().replace('.', '-'), false);
     }
 
-    /** Docker's own builder sets TARGETARCH only with BuildKit, which Testcontainers doesn't use: give it. */
-    private static String image(String dockerfile, String name, boolean noCache) {
-        String cpu = DockerClientFactory.instance().getInfo().getArchitecture().equals("aarch64") ? "arm64" : "amd64";
+    /** Docker's own builder sets TARGETARCH and BUILDPLATFORM only with BuildKit, which Testcontainers doesn't use. */
+    static String image(String dockerfile, String name, boolean noCache) {
         return new ImageFromDockerfile("spring-boot-service-" + name, false)
             .withFileFromPath(".", CONTEXT)
             .withDockerfilePath(dockerfile)
-            .withBuildArg("TARGETARCH", cpu)
+            .withBuildArg("TARGETARCH", cpu())
+            .withBuildArg("BUILDPLATFORM", "linux/" + cpu())
             .withBuildImageCmdModifier(command -> command.withNoCache(noCache))
             .get();
     }

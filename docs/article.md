@@ -1,8 +1,31 @@
 # Ship the runtime with the app
 
-Pippa Newbold · 25 October 2026
+Pippa Newbold · 2 November 2026
 
-The JDK or Node.js your service runs on in production should be the one your tests ran on. These Gradle plugins make that the default: they package each app with its own pinned, trimmed runtime, as three archives released together, the app, its libraries and its runtime, that run the same on a laptop, a server or in a container.
+## Abstract
+
+The JDK or Node.js a service runs on in production should be the one its tests ran on. For most of Java's life it was not, because a runtime was too large to ship with every application, so hosts shared one and teams reached it by symlink and `JAVA_HOME`. Modular JDKs removed the size problem but not the copying: a runtime per app, per release, is a lot of repeated bytes. We describe Gradle plugins that package each app with its own pinned, trimmed runtime as three archives released together, app, libraries and runtime, and apply one layering discipline to images and to plain servers alike. On a Spring Boot sample, a code-only release adds 8 KB of new binary out of 59.7 MB, about 0.01%, because the runtime and libraries are byte-identical across releases and stored once by checksum. Running the result under hardened containers found failures that no build-time check would: a library the JVM cannot start without, probes that inherit the server's options, and CPU measurements that agree with themselves while being wrong by 40%. The recommendations below come from that work, and the limits of the evidence are stated at the end.
+
+## Summary of recommendations
+
+| # | Recommendation | Why, in the evidence here |
+|---|---|---|
+| 1 | Make the runtime part of the release, as app, libraries and runtime archives under one version | A shared runtime is never what CI tested, and every upgrade of it is everyone's upgrade |
+| 2 | Compile with the JDK you ship, from one exact pin | Gradle's JVM compatibility check then tests against the real runtime, and two builds of a commit can't differ |
+| 3 | Let a real start decide: smoke-test the finished archive, and refuse to publish one never started | jdeps can't see modules loaded by name. Two launcher bugs, one on each OS, sat unnoticed until the real path ran |
+| 4 | Reach nothing but your binary repository, base images included | Build agents in regulated organisations have no other route, and a resolver that chooses for you isn't change-controlled |
+| 5 | Describe images rather than write RPM stages; lock the RPMs, and build with no repository and no emulation | 117 MB against 196 MB, with micro's layers untouched and its RPM database correct. Nothing open source did this |
+| 6 | Test an image the way its judge reads it | Every serious container failure predicted here hid in a test reading something the platform wouldn't |
+| 7 | Stack parts from most reused to least, and split where reuse differs | App 8 KB, libraries 19.6 MB, runtime 40.1 MB, with very different rates of change |
+| 8 | Assert sameness | Nothing fails when bytes stop repeating; storage just grows |
+| 9 | Publish from Linux or macOS agents on one JDK, and deploy by checksum | Windows' jlink differs in three ways. Gradle's `publish` sends 60 MB for Artifactory to discard; a checksum deploy sends a digest |
+| 10 | Keep four to six module sets, and stop short of the compiler | 40 of 69 modules cost 66 MB, with no `javac`, and let an unusual app share a runtime |
+| 11 | Prefer `httpGet` probes | An exec probe is a second JVM inside the pod's limit, with the server's debug ports and agents |
+| 12 | Size memory from `memory.peak`, with the request equal to the limit | A kill by the kernel leaves no Java error and no log line |
+| 13 | Measure CPU time per request, warmed up, on a quiet machine of one type | Rounds went from 242 µs to 47 µs with warm-up, and a busy engine read 40% low with perfect agreement |
+| 14 | Keep it moving: patch within weeks, check support on a schedule, let measurements open pull requests | An embedded runtime gets a fix only when the app is released |
+| 15 | Check artefacts, not intentions, and enforce the wire at the boundary | Code in the JVM can step around every setting in `java.security` |
+| 16 | Sign in CI, and verify the signer's identity before starting | A checksum from the same server proves the download is intact, not who built it |
 
 ## How Java used to reach production
 
@@ -22,20 +45,20 @@ The shared JRE ended in three steps over four years:
 
 | Release | Year | What changed |
 | --- | --- | --- |
-| JDK 11 | 2018 | Oracle stops offering a JRE or Server JRE download; [its release notes](https://www.oracle.com/java/technologies/javase/11-relnote-issues.html) point to jlink for smaller custom runtimes |
-| JDK 9 | 2017 | The module system arrives with [jlink (JEP 282)](https://openjdk.org/jeps/282), which links a runtime from only the modules an app needs |
 | JDK 8 | 2014 | `jdeps` ships, listing which JDK packages and, later, which modules a jar depends on |
+| JDK 9 | 2017 | The module system arrives with [jlink (JEP 282)](https://openjdk.org/jeps/282), which links a runtime from only the modules an app needs |
+| JDK 11 | 2018 | Oracle stops offering a JRE or Server JRE download; [its release notes](https://www.oracle.com/java/technologies/javase/11-relnote-issues.html) point to jlink for smaller custom runtimes |
 
 The two tools are meant to be used together: jdeps says which modules an app needs, and jlink builds a runtime of exactly those. For this project's sample service the difference is stark. The full Temurin 21 JDK is 353 MB unpacked, the runtime jlink makes for the service is 41 MB, and its archives together are 21 MB to download (linux-x64; a megabyte here is a million bytes). That is small enough to ship with every release, and the shared install, with every problem above, goes away.
 
 The catch is in how jdeps works. It reads the class files and records every class they name, so it sees only what the code refers to directly. As the [OpenJDK wiki](https://wiki.openjdk.org/x/CAESAQ) puts it, dependencies loaded with `Class.forName` or as service providers are not reported. Some of Java's most important modules arrive exactly that way:
 
-- TLS cipher implementations and the elliptic-curve provider (`jdk.crypto.ec`), found through security-provider lookup;
+- security providers, found by lookup: PKCS#11 (`jdk.crypto.cryptoki`) and, before Java 22 moved it into `java.base`, the elliptic-curve provider (`jdk.crypto.ec`);
 - JNDI and LDAP (`java.naming`), loaded by name from configuration;
 - locale data beyond English (`jdk.localedata`), loaded on demand;
 - drivers and plugins that frameworks find with `ServiceLoader` or reflection.
 
-A runtime linked from jdeps's list alone starts, passes a quick test, and then fails in production the first time a request needs one of these, often on a code path no test reached. That makes a trimmed runtime safe only when something actually runs the app on it before release.
+A runtime linked from jdeps's list alone starts, passes a quick test, and then fails in production the first time a request needs one of these, often on a code path no test reached. Some don't even fail: without locale data, German dates come out in English with no error. That makes a trimmed runtime safe only when something actually runs the app on it before release, and asserts what it should do.
 
 ## Two ways to ship Java, with nothing in common
 
@@ -51,7 +74,7 @@ Other software, including most of what an organisation writes itself, expects to
 - **The fixes are outside the tested package.** Teams protect themselves with their own symlinks to a known Java, or with a `JAVA_HOME` injected into a startup script. Neither is part of what was built and tested, so neither is tested; both are found to be wrong only when the app fails to start.
 - **Nothing is shared between the two worlds.** An app that runs on OpenShift and on virtual machines is two deliveries: an image for one, an installation recipe for the other, each with its own way of finding Java, and nothing that proves they run the same thing.
 
-An app that carries its own trimmed runtime fits both. On a server its archives are unpacked and run with nothing else installed; in a container the same archives are copied into a base image that needs only glibc and a shell. The runtime, the certificates and the policy are identical in both, because they are the same file.
+An app that carries its own trimmed runtime fits both. On a server its archives are unpacked and run with nothing else installed but glibc, zlib and a shell; in a container the same archives are copied onto a base image that has those. The runtime, the certificates and the policy are identical in both, because they are the same file.
 
 ## The runtime is part of the release
 
@@ -59,7 +82,7 @@ Plenty of Java and Node.js services still work this way: built against one runti
 
 The usual fixes move the problem rather than remove it. A container image pins the runtime, but only for teams that deploy containers. A configuration-management rule pins it on servers, but it drifts from what CI used. Neither makes the runtime part of the artifact that was tested.
 
-These plugins do: the runtime travels with the app, as an archive of its own released with it, and unpacks inside the app's directory. A Java app gets a JDK trimmed to the modules it uses; a Node.js app gets the official Node binary. The app needs nothing on the machine but glibc and a shell, and the same files go to a server, into a container, or onto a laptop.
+These plugins do: the runtime travels with the app, as an archive of its own released with it, and unpacks inside the app's directory. A Java app gets a JDK trimmed to the modules it uses; a Node.js app gets the official Node binary. The same files go to a server, into a container, or onto a laptop.
 
 ## Do Not Repeat Yourself
 
@@ -114,7 +137,7 @@ A release that changes only the service's own code therefore adds 8 KB of new bi
 
 **Saving the transmission as well as the storage.** Artifactory holds each binary once and every path with those bytes refers to that copy, which is what the symlink was, kept by the store. A [checksum deploy](https://docs.jfrog.com/artifactory/reference/deployartifactbychecksum) goes further: the client sends the digest with no body, and if the repository already holds that binary it creates the path, and the release has transmitted a few hundred bytes for 60 MB. If it doesn't, it answers 404 and the file is uploaded in full. Gradle's own `publish` doesn't do this; JFrog's plugin and CLI do.
 
-**The same inputs build the same bytes.** The runtime is linked from a pinned JDK, a fixed module set that apps with similar needs share and the organisation's certificates and policy, then archived with fixed timestamps, file order and modes. Some of that took care. jlink's own output has been reproducible since OpenJDK fixed [JDK-8241602](https://bugs.openjdk.org/browse/JDK-8241602), but `--strip-debug` runs the build machine's `objcopy` over the native libraries, whose output depends on that machine's binutils. A trust store saved with a password gets a MAC and encryption with random salts, and Java 17's older format dates every entry. The plugin strips Java's debug attributes alone and writes `cacerts` with no password, as the JDK itself does. A rebuild, and a new release of the app, give the same SHA-256 for the runtime archive, even on another day or under another time zone and umask. Gradle's build cache reuses the linked runtime while those inputs are unchanged, so most builds don't link it again at all.
+**The same inputs build the same bytes.** The runtime is linked from a pinned JDK, a fixed module set that apps with similar needs share and the organisation's certificates and policy, then archived with fixed timestamps, file order and modes. Some of that took care. jlink's own output has been reproducible since OpenJDK fixed [JDK-8241602](https://bugs.openjdk.org/browse/JDK-8241602), but `--strip-debug` runs the build machine's `objcopy` over the native libraries, whose output depends on that machine's binutils. A trust store saved with a password gets a MAC and encryption with random salts, and Java 17's older format dates every entry. `COPY` records file times, and copying into `/app/runtime/` creates `/app` with the build's own, so only a tree with fixed times copied to `/` gives a layer that repeats. Windows' jlink differs from the others in its line endings, its legal notices and some generated classes, so its runtimes are never the same. The plugin strips Java's debug attributes alone and writes `cacerts` with no password, as the JDK itself does. A rebuild, and a new release of the app, give the same SHA-256 for the runtime archive, even on another day or under another time zone and umask, and Linux and macOS agents build the same bytes as each other, which CI checks. Gradle's build cache reuses the linked runtime while those inputs are unchanged, so most builds don't link it again at all.
 
 **Nothing fails when it stops being true.** Storage just grows, so sameness has to be an assertion. The sample's tests build an image twice, the second time with no cache, and compare layer digests; the plugin's own tests rebuild the libraries archive at a new version and compare its checksum, and a new release is refused if its runtime's bytes changed when its inputs didn't.
 
@@ -130,7 +153,7 @@ A release that changes only the service's own code therefore adds 8 KB of new bi
 | `server` | Locales, Kerberos, PKCS#11, XML signatures | 66 MB |
 | A top rung of your own | Everything else that runs in production | 66 MB (40 of the JDK's 69 modules) |
 
-The top rung stops short of "all", and deliberately. All would mean the compiler, `jshell` and the attach and debugging tools back in production, undoing the rule the old JRE enforced and the smaller surface that trimming bought. The first four sizes are of Java 21 runtimes; the last was linked on Java 25, without `jdk.compiler` or any other development tool, and has no `javac`. It costs little more than `server`, and an unusual app that takes it shares its runtime with others, where it would otherwise have one of its own.
+The top rung stops short of "all", and deliberately. All would mean the compiler, `jshell` and the attach and debugging tools back in production, undoing the rule the old JRE enforced and the smaller surface that trimming bought. The first four sizes are of Java 21 runtimes linked on macOS; the last was linked on Java 25, without `jdk.compiler` or any other development tool, and has no `javac`. It costs little more than `server`, and an unusual app that takes it shares its runtime with others, where it would otherwise have one of its own.
 
 From there, each store keeps one copy:
 
@@ -205,7 +228,7 @@ The tools each cover part of this:
 
 The last row is the gap these plugins close.
 
-**One coordinate for the runtime set.** A plugin release pins an exact JDK for each long-term-support Java release, the Node.js version and the container base image. All of them come from one version catalogue and are tested together on every target. To Renovate or Dependabot that is one version in `settings.gradle.kts`, so a quarterly Java security update arrives as a single pull request, and nobody hunts down a toolchain line, a Dockerfile and a server package.
+**One coordinate for the runtime set.** A plugin release pins an exact Temurin JDK for each long-term-support Java release, the Node.js version and the container base images. All of them come from one version catalogue and are tested together on every target. To Renovate or Dependabot that is one version in `settings.gradle.kts`, so a quarterly Java security update arrives as a single pull request, and nobody hunts down a toolchain line, a Dockerfile and a server package.
 
 **The compatibility check uses the real JDK.** The compile toolchain is the exact JDK that will be embedded, so Gradle's `org.gradle.jvm.version` check compares a library against the Java release the app will really run on, not whatever JDK the build agent has.
 
@@ -226,23 +249,6 @@ Renovate can group the rest so related versions move together, for example:
 
 There is still no ecosystem-wide standard for "this set of versions works together, upgrade it as one". A plugin that owns the runtime can at least make the most important set, the JDK and everything that depends on its exact build, behave like one, and prove each step before it ships.
 
-## Why this doesn't exist already
-
-It is fair to ask why something this useful isn't already a standard tool. Every piece of it exists somewhere; the combination doesn't.
-
-| Tool | What it covers | What it leaves out |
-|---|---|---|
-| [JReleaser](https://jreleaser.org/guide/latest/reference/assemble/jlink.html) | jlink images for several platforms from one machine, archives, packagers, signing, SBOMs, publishing | You install every target JDK yourself; it checks only that they share a major version; no test that the image runs |
-| [badass-runtime](https://badass-runtime-plugin.beryx.org/releases/latest/) | Cross-target jlink images from Gradle, a jdeps-based module suggestion, jpackage | Downloads JDKs from raw URLs, outside Gradle's cache and checksum verification; warns that its module suggestion can miss modules, and nothing runs the image to find out |
-| Nebula ospackage | RPM and DEB packages from Gradle | Packaging only; it doesn't touch the runtime |
-| Containers and buildpacks | The runtime inside the image, chosen when the image is built | Containers only; jlink is off by default in Paketo |
-
-Together JReleaser, badass-runtime and Nebula get perhaps 60% of the way (an estimate, not a measurement). The missing 40% is the part that matters most to a regulated organisation: runtimes fetched only from the corporate repository, at an exact pinned and checksummed version; one security policy applied to every runtime and checked before any archive exists; and a smoke test that runs the real archive.
-
-Two forces explain the gap. Containers absorbed the problem for most teams: once the runtime lives in the image, shipping it with the app is the default, and the [CNCF's 2024 survey](https://www.cncf.io/reports/cncf-annual-survey-2024/) found containers in production at about nine organisations in ten. What remains is the estate that still runs on servers and virtual machines, which is concentrated in exactly the banks, insurers and public bodies whose build machines can't reach the internet. They solve it in-house and never publish it. Elasticsearch, Jira and the JetBrains IDEs each bundle a JDK their own way.
-
-jlink's habit of missing modules also put people off: a runtime trimmed by jdeps alone starts, passes a quick test, and fails in production on the first code path that loads a module by name. A smoke test that runs the real archive is the fix, and it is this project's clearest difference from what came before.
-
 ## At a glance
 
 ```mermaid
@@ -252,17 +258,17 @@ flowchart LR
     pack --> smoke["Smoke test<br/>start it, wait for healthy"]
     smoke --> repo[("Repository<br/>Artifactory")]
     repo --> server["Server<br/>tarball or RPM"]
-    repo --> container["Container<br/>glibc + shell base image"]
+    repo --> container["Container<br/>image layers from the same archives"]
     repo --> pipeline["Deployment pipeline<br/>app-smoke-test"]
 ```
 
-The build tests the archives it is about to publish; servers, containers and a deployment pipeline then all receive those exact files.
+The build tests the archives it is about to publish; servers, containers and a deployment pipeline then all receive those exact files. The sections below take each step in turn.
 
 ## One JDK, compiled with and shipped
 
 A Gradle toolchain request names only a feature release, "21". The plugin answers it with an exact build, such as Temurin 21.0.12.1+1, and links the archive's runtime from that same build. The compiler and the runtime come from one pin, read in one place, so they cannot drift apart.
 
-Each plugin release carries a catalogue of tested pins, one per distribution and Java release from 11 to 27. Releasing the plugin is how a quarterly security update reaches every repository at once. A team that cannot wait overrides one line, `javaApp.jdk.21=21.0.13+9`, until the next release.
+Each plugin release carries tested pins of Temurin's long-term-support releases, and any other vendor or release takes its exact version from the build. Releasing the plugin is how a quarterly security update reaches every repository at once. A team that cannot wait overrides one line, `javaApp.jdk.21=21.0.13+9`, until the next release.
 
 Seven distributions are supported, and each spells its versions and file names its own way:
 
@@ -280,7 +286,7 @@ Each entry knows its own version format, so a pin in the wrong form fails before
 
 ## Small runtimes without guesswork
 
-A full JDK is around 300 MB. `jlink` builds a runtime holding only the modules an app uses; for an HTTP service that is often `java.base` and a handful more. The hard part has always been the list itself.
+A full JDK is around 350 MB unpacked. `jlink` builds a runtime holding only the modules an app uses; for an HTTP service that is often `java.base` and a handful more. The hard part has always been the list itself.
 
 By default the plugin asks `jdeps`, which reads the compiled classes of the app and its dependencies and names every JDK module they reference. For the sample service in the repository that is `java.base,jdk.httpserver`, and the build file names no modules at all.
 
@@ -297,36 +303,72 @@ javaApp { additionalModules.addAll("jdk.httpserver") }
 
 The class-to-module map comes from the JDK itself, via `jimage list`, so it is always right for the exact build being linked. The loop finds what fails at startup or on the health check; a code path neither reaches still needs a test of its own.
 
-## What it does to a Spring Boot service
+## Every target from one build
 
-The plain HTTP sample is small because it needs almost nothing. A realistic service is a better test,
-so the repository also packages a Spring Boot 4.1 web service with Actuator. Its build names no JDK
-modules: jdeps found all thirteen the service needs (`java.base`, `java.compiler`, `java.desktop`,
-`java.instrument`, `java.management`, `java.naming`, `java.net.http`, `java.prefs`, `java.scripting`,
-`java.security.jgss`, `java.sql`, `jdk.jfr`, `jdk.unsupported`), and the smoke test passed on the
-first build. Measured for linux-x64 against Temurin 21.0.12.1+1, on 25 October 2026 (re-measured
-the same day, in megabytes of a million bytes throughout):
+A team on Macs that deploys to Linux, with a few Windows customers, needs three sets of archives. One line asks for them:
 
-| What ships | Compressed | Unpacked |
-|---|---|---|
-| Full Temurin 21 JDK | 207.5 MB | 353 MB |
-| Temurin 21 JRE alone | 52.1 MB | not measured |
-| The service's libraries (50 jars) | | 21.8 MB |
-| **All the archives: trimmed runtime, libraries and the service** | **58.9 MB** | **85.7 MB** (63.9 MB runtime, 21.8 MB libraries) |
+```kotlin
+javaApp { targets("linux-x64", "linux-aarch64", "windows-x64") }
+```
 
-The archives, application included, are about the size of the vendor's JRE download on its own,
-and under a third of the JDK. The runtime and Spring split roughly two to one:
+Cross-linking makes this possible without containers or WSL. `jlink` runs from the build machine's JDK and reads the target JDK's `jmods`, so a Mac produces a Linux runtime directly. The same exact JDK release must sit on both sides; the plugin checks the two `release` files and refuses a mismatch with a message naming both versions.
 
-| Archive | Compressed | Unpacked |
-|---|---|---|
-| The runtime archive: the trimmed runtime (the 13 modules jdeps found, 18 with what they need) | 39.3 MB | 63.9 MB |
-| The libraries and app archives: Spring Boot, Tomcat, Jackson and the service (50 jars, 29 of them Spring's), now nearly all in the former | 19.7 MB | 21.8 MB |
+All the archives publish under one version, with the target as the Maven classifier. The publication is a real Gradle software component: its module metadata gives each archive the standard operating-system and architecture attributes, so another Gradle build can ask for "the archive for this machine" rather than spell out a classifier.
 
-The trimmed runtime is about a quarter smaller than Temurin's 52.1 MB JRE, which carries the whole
-Java SE platform whether the service uses it or not. Spring's jars hardly shrink in the archive,
-because a jar is already compressed. Spring needs more of the JDK than the plain sample: `java.desktop`,
-pulled in by `java.beans`, is the largest of its modules, which is why the runtime is 63.9 MB here
-rather than 40.9 MB. A megabyte in these tables is a million bytes.
+An archive for another machine cannot be started where it was built, so only this machine's archive is smoke-tested. `publish` refuses the others unless the build sets `-PjavaApp.allowUntestedPublish=true`. That default is deliberate: an untested archive should be a decision someone makes, not something that slips out of a laptop build.
+
+## How Gradle ships an application, and what changes
+
+Gradle already has a standard way to ship a Java application, and these plugins build on it rather than beside it.
+
+The [`application` plugin](https://docs.gradle.org/current/userguide/application_plugin.html) adds a `run` task and `startScripts`, which writes two launchers: `bin/<app>` for POSIX shells and `bin/<app>.bat` for Windows. It also applies the [`distribution` plugin](https://docs.gradle.org/current/userguide/distribution_plugin.html), which defines one distribution, `main`: the launchers in `bin/`, the app's jar and its runtime classpath in `lib/`, and anything under `src/main/dist`. `distZip` and `distTar` archive it as `<app>-<version>.zip` and `.tar`, and `installDist` copies it to `build/install/<app>`.
+
+What that distribution leaves out is Java. The generated launcher looks for a runtime when it starts, in `JAVA_HOME` or else on the `PATH`. So the archive works only where someone has already installed a suitable Java, which brings back every problem of the shared install. Gradle has no task to link a runtime and no notion of a target operating system, and it neither publishes nor tests the distribution unless the build adds that itself.
+
+These plugins keep Gradle's tasks and change what goes into them:
+
+| | Gradle's `application` and `distribution` plugins | With these plugins |
+| --- | --- | --- |
+| Distributions | One, `main` | One per target (`linuxX64`, `windowsX64`, …); `main` is this machine's |
+| Java | Found when the app starts: `JAVA_HOME`, else `PATH` | `runtime/` inside the app's directory, from its runtime archive; `JAVA_HOME` is ignored |
+| Launcher | `startScripts` with Gradle's template | The same task with a script generator that starts the embedded runtime, plus `run`, `healthcheck` and `version` |
+| Runtime options | `applicationDefaultJvmArgs`, then `JAVA_OPTS` and `<APP>_OPTS` | The build's JVM options, then `APP_JAVA_OPTS` and a `jvm.options` file, or nothing at all when options are locked |
+| Contents | `bin/`, `lib/`, `src/main/dist` | Also `runtime/`, `conf.defaults/`, `META-INF/app.json` and an SBOM |
+| Archives | `<app>-<version>.zip` and `.tar` | `<app>-<version>-<target>.tar.gz` (`.zip` for Windows), unpacking to a directory named for the target |
+| Publishing | Not published | The app, libraries and runtime archives published as three modules, under the target's classifier, described by module metadata |
+| Testing | None | The archives are unpacked and started before they can be published |
+
+The familiar tasks still do what their names say. `installDist` lays out this machine's app with its runtime; `installLinuxX64Dist` and `linuxX64DistTar` do the same for another target. A project customises the launcher the usual way, through `startScripts` or its own generator, and adds files to a target's distribution the way it would to any Gradle distribution. The smoke test still has to pass, so a change that breaks the launcher fails the build instead of a deployment.
+
+Gradle has no application plugin for Node.js, so the Node plugin creates the same distributions itself. A Node archive has the same layout, with `app/` in place of `lib/`, and the same tasks build it. A deployment pipeline handles both ecosystems in the same way.
+
+## Images without a package manager
+
+UBI micro is the smallest base Red Hat supports, and has no package manager. A team that wants it for Java meets one problem at once and several later: the JDK links the system zlib, which micro lacks, and the obvious fix, a `microdnf` stage, is a piece of tooling nobody should have to learn, which reaches Red Hat's repositories during the build and runs the target CPU's binaries under emulation.
+
+We looked first for something to adapt. [gradle-oci](https://github.com/sgtsilvio/gradle-oci) is the closest, with a Kotlin DSL and reproducible layers, but no package step and no Dockerfile, which OpenShift builds need. Jib has no package step. apko has the right model for apk packages only. bazeldnf has the same design for Bazel. mkosi builds whole operating system trees on a host with dnf. Nothing open source installs RPMs on a digest-pinned micro base with its RPM database intact, which scanners and certification need. So the plugins keep a deliberately thin facade, about 300 lines over Gradle's own copy and a Dockerfile:
+
+```kotlin
+javaApp {
+    javaVersion = 25
+    images { register("ubi-micro") { from(ubiMicro) } }
+}
+```
+
+The ecosystem knows what the base lacks, so nobody names zlib. `appImagePackagesLock` pins each CPU's RPMs and checksums in `rpms.lock.yaml`, in Konflux's format so that moving to their tooling stays open. The build fetches those files from the binary repository. A stage on the build machine's own CPU checks Red Hat's signatures, refuses scriptlets, and installs them with `rpm` into a copy of the base's root; the final stage copies the result and runs nothing. The image build therefore reaches no repository and emulates nothing, and micro's own layers stay as Red Hat built them. The result is 117 MB against 196 MB on UBI minimal.
+
+## Proving the archive works
+
+Every app answers to one small contract: read the port from `APP_PORT`, and exit 0 when started with `--healthcheck` if the running instance is healthy. The generated launcher, `bin/<app>`, turns that into `run`, `healthcheck` and `version` commands that servers, containers and the build all use.
+
+`./gradlew build` then tests the archives themselves, not the build directories they came from. It extracts the finished `.tar.gz` files to a scratch directory, the runtime and libraries inside the app as a deployment would, checks that `version` reports the right release, starts the app on a free port, and waits for the health check. A build that passes has started the exact files it will publish.
+
+The same check is available to any other build. A deployment pipeline applies `io.github.fiftieshousewife.app-smoke-test`, declares `smokeTest("com.example:orders-service:1.4.2")`, and runs `appSmokeTest`. Gradle picks the archive built for the machine it runs on from the published metadata, and the task reads the app's name, version and target from the archive's own `META-INF/app.json`. Producer and consumer run the same code.
+
+Testing the real deployment path paid off quickly. Two bugs had sat unnoticed:
+
+- The server installer pruned old releases with `head -n -3`, which macOS's `head` rejects. Every install on a Mac failed after the app was already healthy. A new test that installs, upgrades and rolls back an archive found it on the first run. The lesson stuck: that installer has since been replaced by an RPM, where dnf does the work, and a handful of documented commands.
+- The Windows launcher added `--healthcheck` without the leading space every other argument had, so it ran `Main--healthcheck`. The health check could never pass on Windows. CI's Windows job, the first place that launcher ever ran, caught it; a unit test now checks the rule on every OS.
 
 ## Hardening every runtime
 
@@ -336,8 +378,8 @@ The organisation's changes to the vendor's JDK are configuration in the build, a
 javaApp {
     security {
         trustedCertificates.from("security/certs")          // approved CAs, added to cacerts
-        propertiesFiles.from("security/java.security")     // the organisation's policy
-        disabledTlsAlgorithms.addAll("TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA384", "TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA384")
+        properties.put("networkaddress.cache.ttl", "30")    // the organisation's policy
+        disableAlgorithms("tls", "TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA384", "TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA384")
         lockProperties = true                               // no -Djava.security.properties at runtime
     }
 }
@@ -375,58 +417,6 @@ What can be made binding is narrower and more useful:
 
 That is a better deal than repackaging: the policy lives in one versioned place, every runtime records which version it carries, and the checks look at what is really there.
 
-## How Gradle ships an application, and what changes
-
-Gradle already has a standard way to ship a Java application, and these plugins build on it rather than beside it.
-
-The [`application` plugin](https://docs.gradle.org/current/userguide/application_plugin.html) adds a `run` task and `startScripts`, which writes two launchers: `bin/<app>` for POSIX shells and `bin/<app>.bat` for Windows. It also applies the [`distribution` plugin](https://docs.gradle.org/current/userguide/distribution_plugin.html), which defines one distribution, `main`: the launchers in `bin/`, the app's jar and its runtime classpath in `lib/`, and anything under `src/main/dist`. `distZip` and `distTar` archive it as `<app>-<version>.zip` and `.tar`, and `installDist` copies it to `build/install/<app>`.
-
-What that distribution leaves out is Java. The generated launcher looks for a runtime when it starts, in `JAVA_HOME` or else on the `PATH`. So the archive works only where someone has already installed a suitable Java, which brings back every problem of the shared install. Gradle has no task to link a runtime and no notion of a target operating system, and it neither publishes nor tests the distribution unless the build adds that itself.
-
-These plugins keep Gradle's tasks and change what goes into them:
-
-| | Gradle's `application` and `distribution` plugins | With these plugins |
-| --- | --- | --- |
-| Distributions | One, `main` | One per target (`linuxX64`, `windowsX64`, …); `main` is this machine's |
-| Java | Found when the app starts: `JAVA_HOME`, else `PATH` | `runtime/` inside the app's directory, from its runtime archive; `JAVA_HOME` is ignored |
-| Launcher | `startScripts` with Gradle's template | The same task with a script generator that starts the embedded runtime, plus `run`, `healthcheck` and `version` |
-| Runtime options | `applicationDefaultJvmArgs`, then `JAVA_OPTS` and `<APP>_OPTS` | The build's JVM options, then `APP_JAVA_OPTS` and a `jvm.options` file, or nothing at all when options are locked |
-| Contents | `bin/`, `lib/`, `src/main/dist` | Also `runtime/`, `conf.defaults/`, `META-INF/app.json` and an SBOM |
-| Archives | `<app>-<version>.zip` and `.tar` | `<app>-<version>-<target>.tar.gz` (`.zip` for Windows), unpacking to a directory named for the target |
-| Publishing | Not published | The app, libraries and runtime archives published as three modules, under the target's classifier, described by module metadata |
-| Testing | None | The archives are unpacked and started before they can be published |
-
-The familiar tasks still do what their names say. `installDist` lays out this machine's app with its runtime; `installLinuxX64Dist` and `linuxX64DistTar` do the same for another target. A project customises the launcher the usual way, through `startScripts` or its own generator, and adds files to a target's distribution the way it would to any Gradle distribution. The smoke test still has to pass, so a change that breaks the launcher fails the build instead of a deployment.
-
-Gradle has no application plugin for Node.js, so the Node plugin creates the same distributions itself. A Node archive has the same layout, with `app/` in place of `lib/`, and the same tasks build it. A deployment pipeline handles both ecosystems in the same way.
-
-## Every target from one build
-
-A team on Macs that deploys to Linux, with a few Windows customers, needs three archives. One line asks for them:
-
-```kotlin
-javaApp { targets("linux-x64", "linux-aarch64", "windows-x64") }
-```
-
-Cross-linking makes this possible without containers or WSL. `jlink` runs from the build machine's JDK and reads the target JDK's `jmods`, so a Mac produces a Linux runtime directly. The same exact JDK release must sit on both sides; the plugin checks the two `release` files and refuses a mismatch with a message naming both versions.
-
-All the archives publish under one version, with the target as the Maven classifier. The publication is a real Gradle software component: its module metadata gives each archive the standard operating-system and architecture attributes, so another Gradle build can ask for "the archive for this machine" rather than spell out a classifier.
-
-An archive for another machine cannot be started where it was built, so only this machine's archive is smoke-tested. `publish` refuses the others unless the build says `allowUntestedPublish = true`. That default is deliberate: an untested archive should be a decision someone makes, not something that slips out of a laptop build.
-
-## Proving the archive works
-
-Every app answers to one small contract: read the port from `APP_PORT`, and exit 0 when started with `--healthcheck` if the running instance is healthy. The generated launcher, `bin/<app>`, turns that into `run`, `healthcheck` and `version` commands that servers, containers and the build all use.
-
-`./gradlew build` then tests the archives themselves, not the build directories they came from. It extracts the finished `.tar.gz` files to a scratch directory, the runtime and libraries inside the app as a deployment would, checks that `version` reports the right release, starts the app on a free port, and waits for the health check. A build that passes has started the exact files it will publish.
-
-The same check is available to any other build. A deployment pipeline applies `io.github.fiftieshousewife.app-smoke-test`, declares `smokeTest("com.example:orders-service:1.4.2")`, and runs `appSmokeTest`. Gradle picks the archive built for the machine it runs on from the published metadata, and the task reads the app's name, version and target from the archive's own `META-INF/app.json`. Producer and consumer run the same code.
-
-Testing the real deployment path paid off quickly. Two bugs had sat unnoticed:
-
-- The server installer pruned old releases with `head -n -3`, which macOS's `head` rejects. Every install on a Mac failed after the app was already healthy. A new test that installs, upgrades and rolls back an archive found it on the first run. The lesson stuck: that installer has since been replaced by an RPM, where dnf does the work, and a handful of documented commands.
-- The Windows launcher added `--healthcheck` without the leading space every other argument had, so it ran `Main--healthcheck`. The health check could never pass on Windows. CI's Windows job, the first place that launcher ever ran, caught it; a unit test now checks the rule on every OS.
-
 ## Behind a corporate firewall
 
 Many build machines cannot reach GitHub or nodejs.org. One machine-level setting routes everything through Artifactory instead:
@@ -436,7 +426,7 @@ Many build machines cannot reach GitHub or nodejs.org. One machine-level setting
 binaryRepo.url=https://repo.example.com
 ```
 
-With it set, Maven libraries, Gradle plugins, JDKs, Node.js and npm packages all resolve from Artifactory, and projects change nothing. The same project builds on a laptop at home against the public internet and on a locked-down CI agent against Artifactory.
+With it set, Maven libraries, Gradle plugins, JDKs, Node.js, npm packages and an image's RPMs all resolve from Artifactory, and projects change nothing. The same project builds on a laptop at home against the public internet and on a locked-down CI agent against Artifactory. A build that already declares its repository needs even less, as the plugins find it and borrow its login.
 
 Runtime archives are ordinary Gradle dependencies, read from a plain file tree. That brings Gradle's cache, credentials, offline mode and checksum verification for free, and means any layout can be described by a pattern rather than by code. An approved JDK sits at a predictable path such as `runtimes/temurin/jdk/21.0.12.1_1/jdk-21.0.12.1_1-linux-x64.tar.gz`, whichever vendor it came from.
 
@@ -445,6 +435,68 @@ Some organisations already have JDKs on disk, unpacked from their own RPMs on ev
 ```properties
 javaApp.jdk.21.linux-x64.path=/usr/lib/jvm/jdk-21
 ```
+
+One gap remains. The default base images still name `registry.access.redhat.com`, so a build on such a network names its mirror's, by digest, until a setting rewrites them.
+
+## What it does to a Spring Boot service
+
+The plain HTTP sample is small because it needs almost nothing. A realistic service is a better test, so the repository also packages a Spring Boot 4.1 web service with Actuator. Its build names no JDK modules: jdeps found all thirteen the service needs (`java.base`, `java.compiler`, `java.desktop`, `java.instrument`, `java.management`, `java.naming`, `java.net.http`, `java.prefs`, `java.scripting`, `java.security.jgss`, `java.sql`, `jdk.jfr`, `jdk.unsupported`), and the smoke test passed on the first build. Those fall in the `framework` set of 25 modules, which is what it links. On Oracle's Java 25, for linux-x64 and measured on 2 November 2026:
+
+| What ships | Compressed | Unpacked |
+| --- | --- | --- |
+| Runtime archive: the `framework` module set | 40.1 MB | 63 MB |
+| Libraries archive: Spring Boot, Tomcat, Jackson (about 50 jars) | 19.6 MB | 21.8 MB |
+| App archive: launcher, the service's jar, SBOM | 8 KB | |
+| **All three** | **59.7 MB** | **85 MB** |
+| For comparison, on Temurin 21: the full JDK | 207.5 MB | 353 MB |
+| For comparison, on Temurin 21: the vendor's JRE | 52.1 MB | not measured |
+
+The whole service is about the size of the vendor's JRE download alone, and under a third of the JDK. The trimmed runtime is about a quarter smaller than that JRE, which carries the whole Java SE platform whether the service uses it or not. Spring's jars hardly shrink in the archive, because a jar is already compressed. Spring needs more of the JDK than the plain sample: `java.desktop`, pulled in by `java.beans`, is the largest of its modules, which is why the runtime is 63 MB here rather than 41 MB.
+
+## What running it taught us
+
+Build-time checks said nothing about most of what follows. We reviewed what a Spring Boot service on a jlinked runtime would meet in a container, ranked each failure, and then tested the image. The [full list](container-testing.md#what-goes-wrong-in-containers) has twenty-odd entries; four carry general lessons.
+
+**A prediction from the binaries.** `objdump -p` on the linked runtime shows `lib/libjli.so` and `lib/libzip.so` need `libz.so.1`, and Red Hat's manifest for UBI 9 micro has no zlib. This is not one vendor's quirk: OpenJDK has [used the system zlib on Linux since 2016](https://mail.openjdk.org/pipermail/build-dev/2016-March/016839.html). So `java` should die in the dynamic loader before any Java runs, and it does: `error while loading shared libraries: libz.so.1: cannot open shared object file`, exit code 127. Our own documentation had described the runtime as carrying its own zlib. A parameterised test over every Dockerfile had been reaching that image all along, and would have shown this to anyone who read its result, but nothing had made anyone read it.
+
+**Tests that read what the judge doesn't.** A licence check read through a symlink that Red Hat's preflight tool won't count. A test asserted the absence of a `USER`, which preflight fails. A stop test asserted "not 137", which a regression exiting 1 passes. Each was a real assertion, and passed, and said nothing about what the platform would decide. The fix each time was cheap: read the image's configuration, count regular files, assert 143. That is recommendation 6.
+
+**Options that travel.** The launcher's `healthcheck` runs the same command as the server, so every server option is also a probe option, and every exec probe is a second JVM in the pod's memory limit. A debug port in `APP_JAVA_OPTS` makes every probe fail to bind it. The generated image's `HEALTHCHECK` now passes small options of its own, but a Kubernetes exec probe doesn't, and we recommend `httpGet` there. This one is a finding about our own design, and it isn't fully fixed.
+
+**A measurement that agreed with itself and was wrong.** CPU time per request looked like the steady number that latency isn't, and within a run it is: fresh containers, warmed by 70,000 requests, read 47 to 48 µs, again and again. Beside two busy containers it read 26 to 29 µs, about 40% lower, with the same tight agreement. So agreement between rounds doesn't show a sound measurement, and the error under-sizes a pod. Warm-up mattered as much: after 5,000 requests the same endpoint read 143 to 269 µs. The method and its caveats are in [Sizing pods from measurements](capacity.md).
+
+## Why this doesn't exist already
+
+It is fair to ask why something this useful isn't already a standard tool. Every piece of it exists somewhere; the combination doesn't.
+
+| Tool | What it covers | What it leaves out |
+|---|---|---|
+| [JReleaser](https://jreleaser.org/guide/latest/reference/assemble/jlink.html) | jlink images for several platforms from one machine, archives, packagers, signing, SBOMs, publishing | You install every target JDK yourself; it checks only that they share a major version; no test that the image runs |
+| [badass-runtime](https://badass-runtime-plugin.beryx.org/releases/latest/) | Cross-target jlink images from Gradle, a jdeps-based module suggestion, jpackage | Downloads JDKs from raw URLs, outside Gradle's cache and checksum verification; warns that its module suggestion can miss modules, and nothing runs the image to find out |
+| Nebula ospackage | RPM and DEB packages from Gradle | Packaging only; it doesn't touch the runtime |
+| Containers and buildpacks | The runtime inside the image, chosen when the image is built | Containers only; jlink is off by default in Paketo |
+
+Together JReleaser, badass-runtime and Nebula get perhaps 60% of the way (an estimate, not a measurement). The missing 40% is the part that matters most to a regulated organisation: runtimes fetched only from the corporate repository, at an exact pinned and checksummed version; one security policy applied to every runtime and checked before any archive exists; and a smoke test that runs the real archive.
+
+Two forces explain the gap. Containers absorbed the problem for most teams: once the runtime lives in the image, shipping it with the app is the default, and the [CNCF's 2024 survey](https://www.cncf.io/reports/cncf-annual-survey-2024/) found containers in production at about nine organisations in ten. What remains is the estate that still runs on servers and virtual machines, which is concentrated in exactly the banks, insurers and public bodies whose build machines can't reach the internet. They solve it in-house and never publish it. Elasticsearch, Jira and the JetBrains IDEs each bundle a JDK their own way.
+
+jlink's habit of missing modules also put people off: a runtime trimmed by jdeps alone starts, passes a quick test, and fails in production on the first code path that loads a module by name. A smoke test that runs the real archive is the fix, and it is this project's clearest difference from what came before.
+
+## Limits of this evidence
+
+These numbers come from a small study, and should be read as such.
+
+- **One service.** The sizes and CPU figures are of the sample, whose endpoint does almost nothing. A real service's own jar is larger, so its share of each release will be well above 0.01%, and its cost per request is its own.
+- **One machine for CPU.** The CPU figures come from a two-CPU Colima VM on an Apple-silicon Mac. They show how the method behaves, not what a production agent will read, and we have no way yet of detecting a busy agent.
+- **No real repository.** The storage saving follows from how Artifactory stores binaries and from archives compared by checksum. We haven't measured it from a real repository's Storage Summary, across many apps and retained versions.
+- **The module sets are estimates.** They come from the samples and common stacks, have been linked in full only on Java 21, and await counting against real `MODULES=` lines.
+- **Sequential load.** The memory test sends one request at a time, so it doesn't show the 512 MiB limit holding under many concurrent requests.
+- **Tools read, not run.** What we say of Red Hat's preflight, Syft and Trivy comes from their source and documentation. Preflight hasn't yet been run against these images in CI.
+- **arm64 in CI.** CI builds arm64 images and starts only x64 ones. The arm64 images have been started on a developer's Mac.
+
+## Open questions
+
+Work still open, tracked in the repository's [backlog](../BACKLOG.md): base images taken from the binary repository by one setting; a CPU sizing task rather than a sample test; a libraries fingerprint; a framework's libraries as a layer of their own; byte-identical runtimes from Windows agents; and Dockerfiles parsed and rewritten through OpenRewrite in place of a managed block.
 
 ## Try it
 
@@ -462,6 +514,6 @@ application { mainClass = "com.example.Main" }
 javaApp { javaVersion = 21 }
 ```
 
-`./gradlew build` compiles with the pinned JDK, links a trimmed runtime, packages the archive and starts it once to prove it works. Node.js apps swap in `node-app` and an `entryPoint`. Kotlin/JVM apps add `kotlin("jvm")` and nothing else.
+`./gradlew build` compiles with the pinned JDK, links a trimmed runtime, packages the archives and starts them once to prove they work. Node.js apps swap in `node-app` and an `entryPoint`. Kotlin/JVM apps add `kotlin("jvm")` and nothing else.
 
-The code, both samples and the full documentation are at [github.com/fiftiesHousewife/embedded-runtime-gradle-plugins](https://github.com/fiftiesHousewife/embedded-runtime-gradle-plugins), under the Apache 2.0 licence.
+The code, the samples and the full documentation are at [github.com/fiftiesHousewife/embedded-runtime-gradle-plugins](https://github.com/fiftiesHousewife/embedded-runtime-gradle-plugins), under the Apache 2.0 licence.

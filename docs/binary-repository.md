@@ -3,6 +3,13 @@
 Artifactory, Nexus or any server with Maven-layout repositories. The examples use Artifactory's
 repository names; use your own with the `binaryRepo.repo.*` properties.
 
+**The aim is that a build reaches nothing else.** Vendors' sites are only the fallback when no binary repository is
+configured. With one, libraries, plugins, JDKs, Node.js, npm packages and an image's RPMs all come from it, and an image
+build from `images {}` reaches no repository at all. Three things are yours to point there: the Gradle wrapper
+([below](#no-repository-declared-one-setting-per-machine)), `checkRuntimeSupport`'s data
+([Keeping the runtime patched](runtime-updates.md#checkruntimesupport)), and the base images, whose defaults name
+`registry.access.redhat.com` ([On a corporate network](container-testing.md#without-writing-a-dockerfile)).
+
 There are two ways to point the plugins at it. Pick the first if your build already declares the
 repository, as most corporate builds do. Every property on this page can also be set in
 `settings.gradle.kts`, in an `embeddedRuntime {}` block ([Reference](reference.md)), which wins over
@@ -132,6 +139,9 @@ The JDK refuses Basic proxy authentication for HTTPS tunnels by default; to allo
 | `npm-virtual` | npm virtual | registry.npmjs.org |
 | `runtimes` | Generic local | Approved JDK and Node.js archives |
 | `libs-release-local`, `libs-snapshot-local` | Maven local | Your published apps |
+| `ubi-9` | RPM or generic remote | `https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/`, for an image's RPMs. Only if an image installs any |
+| A Docker remote, under your own name | Docker remote | `registry.access.redhat.com`, for the base images. Name it in `from(…)` and `BUILD_IMAGE` |
+| `gradle-distributions` | Generic remote | `https://services.gradle.org/distributions`, for the wrapper |
 
 JDK and Node.js archives are read from `runtimes` in this layout:
 

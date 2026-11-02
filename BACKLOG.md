@@ -39,7 +39,7 @@ under the configuration cache.
 | **Volume contract** | The image creates `/var/lib/app/data` and `/logs` writable by user 1001 and group 0; document the volume and env-var contract with a sample `Deployment` |
 | **Variants from the engine** | `Dockerfile.openshift` and `Dockerfile.micro` are hand-written in the Spring Boot sample; the engine's `openshift` and `redhat-certified` standards should write them, so they follow plugin releases as the managed block does |
 | **Status 2026-11-02** | Not started past the spike. `rewrite-docker` is still at 8.90.4 (2026-08-24); two parser fixes are on main, unreleased (whitespace before commas in JSON arrays, `=` in `COPY` paths). None of the spike's problems (CRLF, `AddUserInstruction` placement, label merging, inline markers) has an upstream issue, and none of the recipes we need exists upstream: ours to write, or to contribute |
-| **Packages for UBI micro** | Done in the working tree: `images {}` locks and installs them (`docs/container-testing.md`). Open-source alternatives checked 2026-11-02 (`research_notes/Dockerfile DSL design/builders.md`): none installs RPMs on a pinned micro base with its rpmdb intact, so the DSL stays, thin |
+| **Packages for UBI micro** | Done: `images {}` locks and installs them (`docs/container-testing.md`). Open-source alternatives checked 2026-11-02 (`research_notes/Dockerfile DSL design/builders.md`): none installs RPMs on a pinned micro base with its rpmdb intact, so the DSL stays, thin |
 
 ## Images from `images {}`
 
@@ -48,9 +48,14 @@ Asked for 2026-11-02.
 | Item | Notes |
 |---|---|
 | **CPU's client** | `CapacityTest` passes with curl in a container of its own: 47-48 µs measured by hand across fresh containers, 26-29 µs beside busy ones. A client in the test's JVM through the port forward gave 54, 80, 60 µs |
+| **`CapacityTest` is occasionally flaky** | 2026-11-02: one failure in six runs here, rounds 59.5, 49.5, 48.8 µs against the 10% spread, as the first class of a full `dockerTest` after a compile. 70,000 requests wasn't always enough warm-up. Warm up until rounds stop falling, rather than for a fixed count |
 | **Detect a busy agent** | Agreeing rounds don't reveal load (see above). `nr_throttled` and a calibration loop might; unexplored |
 | **Base images from the binary repository** | `ubiMicro` and `ubiMinimal` name `registry.access.redhat.com`, which a corporate network can't reach. Today it takes `from(…)` and `--build-arg BUILD_IMAGE=…`; a `binaryRepo.repo.docker` setting should rewrite both |
-| **Retire the hand-written micro files** | Once `UbiMicroTest` has passed: drop `Dockerfile.micro` and `Dockerfile.jre` from the sample for `images {}`. `runtimeOnly()` still labels with the app's version, where `Dockerfile.jre` uses Java's |
+| **Exec probes carry the server's options** | The launcher's `healthcheck` runs the server's exec line, so a debug port in `APP_JAVA_OPTS` fails every probe. `images {}` gives its `HEALTHCHECK` small options, and the docs steer Kubernetes to `httpGet`; the launcher's branch itself could drop `APP_JAVA_OPTS` and `jvm.options` |
+| **The default Dockerfile's gaps** | `images {}` sets `LANG`, `HOME`, the app's own labels and `/licenses`; the managed block doesn't (`docs/container-testing.md` says so). Its comment also still says the base needs only glibc and a shell, where the runtime needs zlib too |
+| **Run preflight and a scanner for real** | What the docs say of preflight, Syft and Trivy comes from their source. `preflight check container`, and a scanner asserting a JDK component, in CI |
+| **Memory under concurrency** | `CapacityTest` sends one request at a time, so it doesn't show 512 MiB holding at Tomcat's 200 threads |
+| **Retire the hand-written micro files** | `UbiMicroTest` has passed: drop `Dockerfile.micro` and `Dockerfile.jre` from the sample for `images {}`. `runtimeOnly()` still labels with the app's version, where `Dockerfile.jre` uses Java's |
 | **A fingerprint for the libraries archive** | `appVerifyRuntimeFingerprint` guards the runtime only. Libraries' bytes can't change while their jars don't, short of a change to the plugin, so this is lower value |
 | **A `production` rung by default** | `docs/caching.md` shows how to add a compiler-free top module set. Making it a default set needs the list checked on every release from 11 to 27 |
 | **A framework's libraries in their own layer** | Below the app's other libraries, when many apps share one BOM |

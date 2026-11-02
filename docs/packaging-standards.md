@@ -15,11 +15,15 @@ forgotten.
 | Checksums | A digest beside every published file | Gradle publishes `.sha256` and `.sha512` with each file; Gradle verifies them when it resolves an archive, e.g. for `app-smoke-test` |
 | [OpenPGP signatures](https://www.rfc-editor.org/rfc/rfc9580) | Detached `.asc` beside every file, for Maven Central | `-PsigningKey` and `-PsigningPassword` sign the whole publication |
 | [OCI image annotations](https://github.com/opencontainers/image-spec/blob/main/annotations.md) | `org.opencontainers.image.*` labels | The generated Dockerfile sets `title`, `version`, `revision`, `created`, `source`, `licenses` and `base.name` |
+| [Red Hat container certification](https://github.com/redhat-openshift-ecosystem/openshift-preflight) | The image's own labels, a non-root `USER`, licences in `/licenses` as regular files, base layers unmodified | An image from `images {}` meets these by construction, and the sample's tests assert them. Preflight itself isn't yet run in CI |
+| [Konflux's RPM lock](https://konflux-ci.dev/docs/building/prefetching-dependencies/) | Each CPU's RPMs, by URL and checksum | `rpms.lock.yaml`, written by `appImagePackagesLock` |
 
 ## Archives: tar.gz, tar and zip
 
 * **One top-level directory**, `<app>-<version>-<target>/`, so extracting never scatters files into
-  the current directory, and two versions or targets can sit side by side.
+  the current directory, and two versions or targets can sit side by side. The libraries and runtime archives are the
+  exception by design: their one directory is `lib/` (`app/` for Node.js) or `runtime/`, named for where they go inside the
+  app, so nothing in them changes with its name or version.
 * **Unix permissions are recorded** in tar and zip alike, so `bin/<app>` and the runtime's
   binaries stay executable. Every file is readable by everyone, and executable by everyone when
   its owner may run it, so a service account, or OpenShift's arbitrary user in group 0, can load a
@@ -113,4 +117,4 @@ is updated.
 | **DEB** (Debian, Ubuntu) | [Debian Policy](https://www.debian.org/doc/debian-policy/) | Named `<name>_<version>-<revision>_<arch>.deb` with `amd64`/`arm64`; configuration listed in `conffiles`; same FHS layout. The pure-Java `jdeb` library would build it the way Redline builds RPMs. Not built until someone needs it |
 | **jpackage** installers (`.msi`, `.pkg`, `.deb`, `.rpm`) | [JEP 392](https://openjdk.org/jeps/392) | Builds only for the OS it runs on, so it can't make a Linux package on a Mac; aimed at desktop apps; Java only |
 | **Windows MSI** | Windows Installer | Needs WiX on a Windows machine; a Windows service also needs a service wrapper (the launcher is a `.bat`) |
-| **Container images** | [OCI image spec](https://github.com/opencontainers/image-spec) | `appDockerContext` prepares the build context; building and pushing the image is left to `docker build`, Buildah or your CI's builder |
+| **Container images** | [OCI image spec](https://github.com/opencontainers/image-spec) | `appDockerContext` and `images {}` prepare the build context and Dockerfile; building and pushing the image is left to `docker build`, Buildah or your CI's builder |

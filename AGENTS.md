@@ -3,7 +3,9 @@
 Notes for anyone (human or agent) changing the plugins. What has been asked for and not yet done is in [BACKLOG.md](BACKLOG.md) (keep it current).
 The [README](README.md) and [`docs/`](docs)
 are for people *using* them and must stay free of anything below. Keep the README a short overview
-that links into `docs/`.
+that links into `docs/`: its recommendations first, then a quick start. Complete examples go in `docs/getting-started.md`,
+every task and setting in `docs/reference.md`. A new finding that changes what we'd advise belongs in the README's
+recommendations and the article's table, with its evidence and limits in the article.
 
 ## Layout
 
@@ -81,7 +83,7 @@ Where things are tested:
   CI only): `ContainerTest` builds and runs each `Dockerfile*`; `OpenShiftTest` runs the OpenShift
   image as a random user in group 0 with no capabilities; `MicroTest` runs the micro image read-only,
   with no capabilities and 512 MiB, by hand and from `images {}`; `UbiMicroTest` the `images {}` image's contents and layers;
-  `CapacityTest` CPU per request and memory against the limit. CI starts the x64 images only and builds the arm64 ones under QEMU.
+  `JreTest` an image of the runtime alone; `CapacityTest` CPU per request and memory against the limit. CI starts the x64 images only and builds the arm64 ones under QEMU.
   `.github/scripts/verify-rpm.sh` installs `java-service`'s RPM in Rocky Linux and under systemd.
   `.github/scripts/runtime-checksums.py` records every target's runtime archive at two versions on
   each OS leg, and the `runtime-reproducible` job checks that Linux and macOS built the same bytes
@@ -91,6 +93,8 @@ Where things are tested:
 
 Known test caveats:
 
+- `CapacityTest` needs a quiet machine, and has failed its 10% spread once in six runs, on a first round still warming up
+  (`BACKLOG.md`). Rerun it before believing it.
 - Fixtures use the system `tar`, so functional tests skip on Windows; CI's Windows leg still builds
   both samples natively.
 - `NodeFixture` repackages the `node` on PATH with its npm, found next to node (nodejs.org layout)

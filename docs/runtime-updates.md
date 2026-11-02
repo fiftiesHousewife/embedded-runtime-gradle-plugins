@@ -11,8 +11,9 @@ the app is rebuilt and released. This page covers when to do that and what remin
 | Java (every distribution) | The Critical Patch Update, on the third Tuesday of January, April, July and October; vendors' builds follow over a few days | Long-term-support releases (11, 17, 21, 25) for years, by vendor; others for six months |
 | Node.js | Security releases as announced on [nodejs.org](https://nodejs.org/en/blog/vulnerability), usually a few a year | Even-numbered majors for 30 months; odd-numbered ones for six |
 
-A plugin release moves every pin (each JDK distribution and Java release, Node.js and the
-container base image) to the newest patch present on every target. The usual cadence is:
+A plugin release moves every pin (Temurin's long-term-support releases, Node.js and the container
+base images) to the newest patch present on every target. Any other vendor or release is pinned in
+your own build, so moving it is yours. The usual cadence is:
 
 1. Within a week or two of each Java CPU or Node.js security release, upgrade the plugins and
    rebuild; the smoke test proves the app still starts.
@@ -20,6 +21,12 @@ container base image) to the newest patch present on every target. The usual cad
    (`javaApp.jdk.21=21.0.13+9`, `nodeApp.node.version=24.22.1`; see [Reference](reference.md)) and
    remove the override once a plugin release catches up.
 3. Move to a newer release line before the one you embed reaches end of life.
+
+A patch changes every runtime, so each app's first release after it stores and sends a new runtime archive once, and every
+release after that repeats it again. After moving a pin, check the licence as well as the build: Oracle's
+[FAQ](https://www.oracle.com/java/technologies/javase/jdk-faqs.html) has JDK 25 updates under the No-Fee Terms until September
+2028 and under the OTN licence after, and an OTN-licensed runtime can't be redistributed in your archive. The sample's
+`MicroTest` asserts what `/licenses` says, which catches that.
 
 ## `checkRuntimeSupport`
 

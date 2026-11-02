@@ -17,3 +17,10 @@ smoke-tested. `publish` refuses archives that were never started unless you pass
 `-PjavaApp.allowUntestedPublish=true` (`nodeApp.` for Node.js). The safest setup
 publishes each target from a CI job running on it; [smoke-testing the published app](publishing.md#smoke-testing-a-published-app)
 on each target afterwards is the alternative.
+
+Publish from Linux or macOS when you can, whichever target you are building: those agents build the same runtime bytes for
+every target, so a repository stores each once, while a Windows agent's jlink writes something different
+([Image layers and caching](caching.md#republishing-the-runtime)).
+
+Starting an image has the same limit. Building an arm64 image on x64 proves that it builds; to know it runs, start it on an
+arm64 machine.

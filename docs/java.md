@@ -4,8 +4,8 @@
 
 The embedded runtime holds only the JDK modules your app uses: what `jdeps` finds in your code and
 its dependencies, plus `additionalModules`. jdeps can't see modules loaded by name at runtime, such as
-`jdk.crypto.ec` for TLS, `java.naming` for JNDI or LDAP, or `jdk.localedata` for other locales.
-If one is missing, the smoke test fails and says so. Then run:
+`jdk.crypto.ec` for elliptic-curve TLS before Java 22, `java.naming` for JNDI or LDAP, or `jdk.localedata`
+for other locales. If one is missing and the app needs it to start, the smoke test fails and says so. Then run:
 
 ```bash
 ./gradlew jlinkFindModules
@@ -18,12 +18,26 @@ the app is healthy, then prints what to add:
 javaApp { additionalModules.addAll("jdk.crypto.ec") }
 ```
 
+**That finds what fails loudly, on the paths a start reaches.** These don't fail at the start, so decide about each and write
+a test that exercises it:
+
+| Missing | What happens | Module |
+|---|---|---|
+| Locale data | No error: German dates and numbers come out in US English | `jdk.localedata` |
+| PKCS#11, an HSM | The provider is skipped with no error, and the first use fails | `jdk.crypto.cryptoki` |
+| Kerberos, SASL GSSAPI | The first login fails | `jdk.security.auth`, `jdk.security.jgss` |
+| XML signatures, as SAML uses | The first signature check fails | `java.xml.crypto` |
+| A debug or JMX agent | The JVM won't start with those flags, which you find during an incident. Plan on JFR; see [Performance tuning](performance.md) | `jdk.jdwp.agent` (forbidden by default), `jdk.management.agent` |
+
+The `server` set holds all but the last.
+
 ### Shared module sets
 
 By default the runtime doesn't hold exactly those modules, but the smallest of a few fixed sets that
 holds them all. Apps on the same set, JDK and target then ship byte-identical runtimes, so a
 container registry stores that layer once and a node that already pulled it for one app pulls nothing
-for the next. The plugin's sets, measured as Java 21 runtimes:
+for the next. The plugin's sets, measured as Java 21 runtimes on macOS (a Spring Boot service's `framework` runtime for
+linux-x64 on Java 25 is 63 MB unpacked, 40 MB compressed):
 
 | Set | Holds | Size |
 |---|---|---|
@@ -174,7 +188,9 @@ readable by the app's user only, since they hold whatever was in memory: tokens,
 personal data. On `OutOfMemoryError` the app writes its dump and exits with code 3. The defaults
 leave the collector to the JVM, because an operator who chooses one in `APP_JAVA_OPTS` would stop
 the JVM from starting if the build had chosen one too (two collectors conflict). Choose one in
-`jvmArgs` (`-XX:+UseG1GC`) when operators won't, or when the runtime's options are locked.
+`jvmArgs` (`-XX:+UseG1GC`) when operators won't, or when the runtime's options are locked, which we recommend for anything
+sized from a measurement: the JVM picks Serial under 2 CPUs or about 1792 MB, so resizing a pod can otherwise change the
+collector. [Sizing pods from measurements](capacity.md#align-memory-with-the-heap) covers what 75% leaves over.
 
 ## Runtime options
 
@@ -223,8 +239,10 @@ on, but not for another one, which is why a cross build needs the jmods.
 
 > **Oracle licensing.** Whether you may redistribute an Oracle runtime inside your archive is
 > decided by Oracle's licence, not by these plugins. Recent releases under the NFTC allow it;
-> OTN-licensed releases do not. The other distributions are OpenJDK builds under GPLv2 with the
-> Classpath Exception.
+> OTN-licensed releases do not, and [Oracle's FAQ](https://www.oracle.com/java/technologies/javase/jdk-faqs.html) has JDK 25
+> updates moving from one to the other in September 2028. Whether a customised runtime (certificates, `java.security`) still
+> counts as the unmodified program the NFTC lets you redistribute is a question for your lawyers. The other distributions are
+> OpenJDK builds under GPLv2 with the Classpath Exception.
 
 To download from a mirror, a directory or your binary repository instead, set `javaApp.jdk.source`:
 see [Where JDKs and Node.js come from](binary-repository.md#where-jdks-and-nodejs-come-from).

@@ -1,6 +1,6 @@
 ---
 name: embedded-runtime-adopt
-description: Set up the java-app or node-app Gradle plugin in an existing project so it ships with its own JDK or Node.js runtime, as an app archive and a runtime archive per target - settings plugin, build configuration, the run/healthcheck contract, configuration defaults, targets and the corporate binary repository. Use when asked to add, adopt, or migrate to the embedded runtime plugins, or to package an app with its own runtime.
+description: Set up the java-app or node-app Gradle plugin in an existing project so it ships with its own JDK or Node.js runtime, as app, libraries and runtime archives per target - settings plugin, build configuration, the run/healthcheck contract, configuration defaults, targets and the corporate binary repository. Use when asked to add, adopt, or migrate to the embedded runtime plugins, or to package an app with its own runtime.
 ---
 
 # Adopt the embedded runtime plugins
@@ -38,7 +38,7 @@ The launcher `bin/<app>` runs `run`, `healthcheck` and `version`. Make the app:
 
 ## 3. Build and fix modules
 
-Run `./gradlew build`. It packages the archive, starts it and waits for the health check. If the
+Run `./gradlew build`. It packages the archives, starts them and waits for the health check. If the
 smoke test fails on a missing JDK class, use the `embedded-runtime-jlink-modules` skill.
 
 ## 4. Targets, packaging and the corporate network
@@ -52,9 +52,9 @@ smoke test fails on a missing JDK class, use the `embedded-runtime-jlink-modules
   Artifactory stores it once (`artifactoryPublish` from JFrog's plugin also skips the upload).
   `-PjavaApp.previousRelease=latest.release` on `publish` fails when a runtime's inputs (its
   `-inputs.txt` fingerprint, published beside it) equal that release's but its bytes don't. A
-  deployment unpacks the app, then the runtime into it. An RPM for Linux servers:
+  deployment unpacks the app, then the runtime and libraries into it. An RPM for Linux servers:
   `rpm { enabled = true }`; RPMs are built, not published.
-- Behind a corporate binary repository (Artifactory, Nexus): if `settings.gradle.kts` already
+- Behind a corporate binary repository (Artifactory, Nexus), which should be the only thing a build reaches: if `settings.gradle.kts` already
   declares the repository, set `binaryRepo.repository=<its name>` in the project's
   `gradle.properties`; its URL and credentials are reused, whatever the credential properties are
   called, so don't copy them anywhere. Otherwise set `binaryRepo.url` (and `binaryRepoUsername` /
@@ -62,15 +62,19 @@ smoke test fails on a missing JDK class, use the `embedded-runtime-jlink-modules
   JDKs and Node.js then come from the binary repository's runtimes repository. If they live
   elsewhere, set `javaApp.jdk.source` / `nodeApp.node.source` to a mirror URL, an absolute path or
   a repository name beside the binary repository's, with `javaApp.jdk.pattern` /
-  `nodeApp.node.pattern` when the file names differ from that layout.
+  `nodeApp.node.pattern` when the file names differ from that layout. Base images default to
+  `registry.access.redhat.com`, so name your mirror's, by digest.
 - `appDockerfile` creates the project's root `Dockerfile` and keeps the block between
   `# >>> embedded-runtime` and `# <<< embedded-runtime` up to date; commit it, and add instructions
   after the block, never inside it. A Dockerfile without the block is the project's own; it copies
   the CPU being built in two layers, `COPY --chown=1001:0 layers/${TARGETARCH}/runtime/ /`, then
   `COPY --chown=1001:0 layers/${TARGETARCH}/app/ /`, whose trees give the same layers in every build. Other images of the app go in `Dockerfile.<name>` beside it;
-  for a Java app on UBI micro, follow the `embedded-runtime-ubi-micro` skill (micro lacks zlib).
+  for a Java app on UBI micro, use `images { register("ubi-micro") { from(ubiMicro) } }` and the
+  `embedded-runtime-ubi-micro` skill (micro lacks zlib, which that handles).
+- On Kubernetes, prefer `httpGet` probes where the app has health endpoints: an exec probe of
+  `bin/<app> healthcheck` is a second runtime inside the pod's limit, with the server's options.
 
 ## 5. Done when
 
 `./gradlew build` passes, `./gradlew runApp` serves the app, and the README of the project says how
-to deploy the archive (see `docs/packaging.md` in the plugin repository).
+to deploy the archives (see `docs/packaging.md` in the plugin repository).

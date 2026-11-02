@@ -48,7 +48,7 @@ Report what dominates, with the numbers.
 |---|---|
 | Heap near its limit, frequent GC | `jvmArgs.add("-XX:MaxRAMPercentage=85")` (75 by default) |
 | Serial GC in use (under 2 CPUs or ~1.8 GB) | more CPUs for the container, or `jvmArgs.add("-XX:+UseG1GC")` / `"-XX:+UseParallelGC"` (throughput) / `"-XX:+UseZGC"` (latency) |
-| Startup dominated by class loading | `jvmArgs += listOf("-XX:+AutoCreateSharedArchive", "-XX:SharedArchiveFile=/var/lib/<app>/app.jsa")` (a full path: `jvmArgs` are not expanded) |
+| Startup dominated by class loading | `jvmArgs += listOf("-XX:+AutoCreateSharedArchive", "-XX:SharedArchiveFile=/var/lib/<app>/app.jsa")` (a full path, somewhere writable: `jvmArgs` are not expanded). A linked runtime has no default CDS archive |
 | A few classes dominate allocation, or one lock dominates contention | a code change, not a flag |
 
 `runtimeDefaults = true` (the default) sets `-XX:MaxRAMPercentage=75`, `-XX:+ExitOnOutOfMemoryError`
@@ -59,4 +59,6 @@ leaves the JVM's own defaults.
 
 `./gradlew build` (the smoke test must still pass), record again with the same traffic, and compare
 the same `jfr view`. Keep the change only if the numbers moved. See `docs/performance.md` in the
-plugin repository for the background.
+plugin repository for the background, and `docs/capacity.md` for a pod's memory and CPU: size memory from the cgroup's
+`memory.peak`, and compare CPU as time per request, warmed up, on a quiet machine of one type, since latency and even
+agreeing rounds can mislead.

@@ -1,7 +1,9 @@
 # Performance tuning
 
 Measure before changing anything. Java Flight Recorder (JFR) records what the JVM and the app spend
-their time on, at an overhead of a few percent, and the trimmed runtime can carry it.
+their time on, at an overhead of a few percent, and the trimmed runtime can carry it. It is also your main tool in an
+incident: the runtime has no `jcmd`, no remote debugger and no JMX agent, and asking for those stops the JVM starting. Put
+an always-on recording in before you need one.
 
 ## Recording
 
@@ -54,7 +56,7 @@ timelines.
 |---|---|
 | Frequent or long GC pauses, heap near its limit | Raise the heap share: `jvmArgs.add("-XX:MaxRAMPercentage=85")` (75% by default; the JVM's own default is 25%) |
 | Pauses from the Serial collector | The JVM picks Serial with fewer than 2 CPUs or under about 1792 MB. Give the container 2 CPUs, or choose a collector in `jvmArgs`: `-XX:+UseG1GC` (the usual default), `-XX:+UseParallelGC` for batch throughput, `-XX:+UseZGC` for low latency on large heaps |
-| Slow startup, class loading at the top | A class-data sharing archive built on the target: `-XX:+AutoCreateSharedArchive -XX:SharedArchiveFile=/var/lib/orders-service/app.jsa` (JDK 19+; a full path, because `jvmArgs` are not expanded). On JDK 25, an ahead-of-time cache with `-XX:AOTCacheOutput` goes further. Both are built by running on the target itself |
+| Slow startup, class loading at the top | A linked runtime has no default CDS archive, as `--generate-cds-archive` isn't deterministic and would change its bytes. Build one on the target: `-XX:+AutoCreateSharedArchive -XX:SharedArchiveFile=/var/lib/orders-service/app.jsa` (JDK 19+; a full path, because `jvmArgs` are not expanded; somewhere writable, so not a read-only root). On JDK 25, an ahead-of-time cache with `-XX:AOTCacheOutput` goes further. Both are built by running on the target itself |
 | Allocation dominated by a few classes | Fix the code; no flag helps |
 
 [Sizing pods from measurements](capacity.md) covers the pod's memory and CPU around these.

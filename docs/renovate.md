@@ -35,9 +35,9 @@ how those move: Renovate's own Gradle support already opens that pull request. T
 central configuration and adapt, rather than a preset to extend as it is. The Dockerfile's own base
 image comes from the plugin release; this is for teams that pass their own with
 `--build-arg BASE_IMAGE=…`, such as a registry mirror. UBI micro is not a drop-in `BASE_IMAGE`: the
-Java runtime needs zlib, which micro lacks, so it takes a Dockerfile of its own
-([On UBI micro](container-testing.md#on-ubi-micro)) with two pins, `BASE_IMAGE` and `BUILD_IMAGE`,
-to keep current together.
+Java runtime needs zlib, which micro lacks, so it takes `images {}` or a Dockerfile of its own
+([On UBI micro](container-testing.md#on-ubi-micro)), with two pins, `BASE_IMAGE` and `BUILD_IMAGE`,
+to keep current together. After moving them, run `appImagePackagesLock` again so the locked RPMs match.
 
 - **Pin a rebuild, not the floating tag.** Red Hat tags each rebuild of UBI 9 minimal and micro
   `9.<minor>-<build>` and moves `9.<minor>`, `latest` and a bare build number along with it. Pin

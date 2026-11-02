@@ -25,8 +25,10 @@ its health check: an upgrade is only done when that passes.
 
 ## 2. Upgrade in this order, building after each
 
-1. **The plugins** (one version for both settings plugins). This moves the JDK pins for every
-   vendor and Java release, the Node.js pin and the container base image together.
+1. **The plugins** (one version for both settings plugins). This moves the Temurin pins of the
+   long-term-support releases, the Node.js pin and the container base images together; any other vendor's or
+   release's pin is in the build, and yours to move. If the project has `rpms.lock.yaml`, run
+   `./gradlew appImagePackagesLock` and commit it.
 2. **Gradle itself** if the plugins need a newer one: `./gradlew wrapper --gradle-version <v>`, then
    run it again so the wrapper scripts update.
 3. **Libraries, grouped**: a framework with its plugins and BOM in one step (for example every
@@ -62,6 +64,7 @@ raising it, run `./gradlew build`; if the smoke test reports a missing JDK class
 
 ## 5. Finish
 
+- After moving an Oracle pin, check the licence as well: JDK 25 updates leave the No-Fee Terms in September 2028.
 - `./gradlew build` passes for this machine's target; for cross-target builds, CI on each target
   (or `app-smoke-test` on each target) has passed.
 - Summarise each change: old -> new version, why (security fix, feature, required by another upgrade),

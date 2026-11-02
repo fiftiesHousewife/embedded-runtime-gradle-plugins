@@ -16,9 +16,16 @@ and should not be restarted, `ready` (the default) that it can take requests now
 `/actuator/health/liveness` and `/actuator/health/readiness` answer exactly these; see the
 [Spring Boot sample](../samples/spring-boot-service).
 
+A `--healthcheck` run should be quick and small: it is a second process, inside the container's limits, with the server's own
+options, and should make one request to the running instance and exit, without starting your framework. On Kubernetes,
+prefer `httpGet` probes where the app has endpoints; see [Kubernetes probes](packaging.md#kubernetes-probes).
+
 Stop cleanly on SIGTERM, which is how systemd, `docker stop` and Kubernetes stop the app. A JVM does
 this on its own. A Node.js app in a container must handle SIGTERM itself; see
 [Stopping](packaging.md#stopping).
+
+In a hardened container the root is read-only, so write only under `$APP_DATA_DIR`, `$APP_LOG_DIR`, `$HOME` and `/tmp`, and have
+those mounted.
 
 The launcher also sets `APP_HOME`, `APP_ROOT`, `APP_CONF_DIR`, `APP_DATA_DIR` and `APP_LOG_DIR`,
 and adds `APP_JAVA_OPTS` / `APP_NODE_OPTS` to the runtime's options.
@@ -65,7 +72,10 @@ javaApp {                                                    // or nodeApp
 ```
 
 Listing the runtime matters: a JDK or Node.js inside an archive is invisible to a
-scanner that looks only at the operating system's packages.
+scanner that looks only at the operating system's packages. From their source and documentation (we haven't run them against
+these images): Syft reads `runtime/release` but reports a linked Oracle runtime as OpenJDK, as nothing else in it names the
+vendor, and Trivy lists no JDK coverage but does read a `*.cdx.json` it finds, so what the SBOM lists is what it sees. Run your own
+scanner on an image once, and check that the runtime is there.
 
 ## Node.js: trusted CAs and TLS
 

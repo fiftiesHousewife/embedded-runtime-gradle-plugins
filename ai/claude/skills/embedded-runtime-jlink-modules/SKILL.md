@@ -32,7 +32,9 @@ anywhere else.
    | `jdk.crypto.cryptoki` | PKCS#11 hardware security modules |
    | `java.naming` | JNDI, LDAP, some DNS lookups |
    | `jdk.naming.dns` | `dns:` JNDI lookups |
-   | `jdk.localedata` | Locales other than English |
+   | `jdk.localedata` | Locales other than English; missing, it gives no error, and German dates come out in English |
+   | `jdk.security.auth`, `jdk.security.jgss` | Kerberos and SASL GSSAPI logins |
+   | `java.xml.crypto` | XML signatures, as SAML uses |
    | `jdk.charsets` | Non-standard charsets such as EBCDIC or Shift_JIS |
    | `jdk.zipfs` | `FileSystems.newFileSystem` on a zip or jar |
    | `java.sql`, `java.sql.rowset` | JDBC drivers |
@@ -46,7 +48,7 @@ anywhere else.
 5. **Never add** `jdk.jdwp.agent` (remote debugging) to a production runtime. The plugin's
    `security { forbiddenModules }` fails the build if it appears.
 6. **Check the result.** `./gradlew build` passes, and the runtime archive in `build/distributions/`
-   (`<app>-runtime-<version>-<target>`) is still small; a runtime over about 60 MB usually means a broad module like `java.se` was added.
+   (`<app>-runtime-<version>-<target>`) is still small; a runtime well over the `server` set's 66 MB unpacked usually means a broad module like `java.se` was added.
 
 ## Notes
 

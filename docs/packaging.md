@@ -4,6 +4,14 @@ Every build makes three archives per target, the app, its libraries and its runt
 packaged as RPMs, and any Linux target can become a container image. Which conventions each format follows, and why, is in
 [Packaging standards](packaging-standards.md).
 
+**In short**
+
+- Containers: for Java, `images { register("ubi-micro") { from(ubiMicro) } }`, which splits the libraries from the app
+  and needs no emulation. For Node.js, or an image of your own, the managed `Dockerfile`.
+- Red Hat family servers: the RPM, where dnf installs, upgrades and rolls back.
+- Anything else: the archives, unpacked into one directory.
+- Kubernetes: `httpGet` probes, and a grace period longer than your app's drain.
+
 | Format | For | How |
 |---|---|---|
 | `.tar.gz` | Linux and macOS targets: the app, and its runtime | Always built |
@@ -174,9 +182,7 @@ FROM ${BASE_IMAGE}
 …
 ENTRYPOINT ["/app/bin/orders", "run"]
 # <<< embedded-runtime
-USER root
-RUN microdnf install -y fontconfig && microdnf clean all
-USER 1001
+ENV LANG=C.UTF-8 HOME=/var/lib/app
 ```
 
 Commit it. Nothing in it changes from one build to the next: the release, its commit and that
@@ -203,15 +209,14 @@ Other images of the same app, such as one for OpenShift or one on UBI micro, go 
 `appDockerContext` copies each into the context with this build's values filled in, so
 `docker build --file build/docker-context/Dockerfile.openshift build/docker-context` builds one.
 UBI micro needs more than a different base image, since the Java runtime loads the system zlib;
-[On UBI micro](container-testing.md#on-ubi-micro) has a complete `Dockerfile.micro`, and `images {}`, which
-writes such a file for you.
+`images {}` writes such a file for you, and [On UBI micro](container-testing.md#on-ubi-micro) has what goes in it.
 
 What the plugin's block holds:
 
-- **Base image by digest.** `registry.access.redhat.com/ubi9/ubi-minimal`, which needs only glibc
-  and a shell since the runtime comes with the app, pinned to one rebuild's tag (`9.8-<build>`) and
+- **Base image by digest.** `registry.access.redhat.com/ubi9/ubi-minimal`, which has the glibc, zlib
+  and shell the runtime needs, pinned to one rebuild's tag (`9.8-<build>`) and
   the digest of its multi-arch index, so every build of a plugin release starts from the same bytes.
-  A plugin release moves the pin. To use a registry mirror or another base image, pass the whole
+  A plugin release moves the pin. On a corporate network, or for another base image, pass the whole
   reference, digest included:
   `--build-arg BASE_IMAGE=mirror.example.com/ubi9/ubi-minimal:9.8-1793050346@sha256:…` (a mirror
   keeps the digest).
@@ -225,7 +230,10 @@ What the plugin's block holds:
 - **Runs as user 1001** in group 0, logs to standard output and reads its configuration from
   `/config`. It writes data and logs under `/var/lib/app/`, which the image creates writable by its
   user and by group 0, so it works with nothing mounted there, and when OpenShift runs it as an
-  arbitrary user in group 0. Mount volumes there to keep what it writes.
+  arbitrary user in group 0. Mount volumes there to keep what it writes, heap dumps above all.
+
+It leaves `LANG`, `HOME` and `/licenses` to you, and UBI's own `vendor` and `maintainer` labels stand. An image from
+`images {}` has all of them ([What is in the image](container-testing.md#what-is-in-the-image)).
 
 ```kotlin
 javaApp {                                    // or nodeApp
@@ -236,7 +244,8 @@ javaApp {                                    // or nodeApp
 
 ### Every CPU from one context
 
-`buildx` builds every CPU from the same context and pushes one multi-arch image. The Dockerfile's
+`buildx` builds every CPU from the same context and pushes one multi-arch image. An image from
+`images {}` runs nothing of the target CPU's, so it needs no emulation. The default Dockerfile's
 one `RUN`, which creates the app's data and log directories, runs the target CPU's shell, so a
 machine building another CPU's image needs QEMU registered (Docker Desktop has it; on Linux, and on
 GitHub's runners, `docker/setup-qemu-action`). Only that step is emulated; the archives are copied:
@@ -251,23 +260,34 @@ docker buildx build --platform linux/amd64,linux/arm64 \
 
 ### Kubernetes probes
 
-`bin/<app> healthcheck live` asks whether the process is working (if not, Kubernetes restarts it);
-`healthcheck ready` asks whether it can take requests now (if not, it gets no traffic). Your app
-receives `--healthcheck live` or `--healthcheck ready`; see [What your app needs to do](your-app.md).
+Point `httpGet` probes at the app's own health endpoints when it has them. Liveness asks whether the process is
+working (if not, Kubernetes restarts it); readiness asks whether it can take requests now (if not, it gets no traffic):
 
 ```yaml
 containers:
   - name: orders
     image: registry.example.com/orders:1.4.2
     ports: [{ containerPort: 8080 }]
-    startupProbe:   { exec: { command: [/app/bin/orders, healthcheck, live] }, periodSeconds: 2, failureThreshold: 60 }
-    livenessProbe:  { exec: { command: [/app/bin/orders, healthcheck, live] }, periodSeconds: 10, timeoutSeconds: 5 }
-    readinessProbe: { exec: { command: [/app/bin/orders, healthcheck, ready] }, periodSeconds: 5, timeoutSeconds: 5 }
+    startupProbe:   { httpGet: { path: /actuator/health/liveness, port: 8080 }, periodSeconds: 2, failureThreshold: 60 }
+    livenessProbe:  { httpGet: { path: /actuator/health/liveness, port: 8080 }, periodSeconds: 10, timeoutSeconds: 5 }
+    readinessProbe: { httpGet: { path: /actuator/health/readiness, port: 8080 }, periodSeconds: 5, timeoutSeconds: 5 }
 ```
 
-Each exec probe starts a second runtime inside the container. That is cheap for Node.js; a JVM takes
-a moment and some memory, so give Java probes a `timeoutSeconds` of 5 or more, or point an
-`httpGet` probe at the app's own health endpoint when it has one.
+The launcher's probes are for an app with no such endpoints, and for Docker: `bin/<app> healthcheck live` and
+`healthcheck ready` start your app with `--healthcheck live` or `--healthcheck ready`
+([What your app needs to do](your-app.md)). Each is **a second runtime inside the container**. That is cheap for Node.js.
+A JVM takes a moment and some memory, counted against the pod's limit, and runs with the server's own options, so a debug
+port or a JMX port in `APP_JAVA_OPTS` makes every probe fail to bind, and an agent runs in every probe. If you use them on
+Java, give the probe small options of its own, as an image from `images {}` does for its `HEALTHCHECK`, and a
+`timeoutSeconds` of 5 or more:
+
+```yaml
+    livenessProbe:
+      exec:
+        command: [env, "APP_JAVA_OPTS=-Xmx32m -Xss512k -XX:TieredStopAtLevel=1 -XX:+UseSerialGC", /app/bin/orders, healthcheck, live]
+      periodSeconds: 10
+      timeoutSeconds: 5
+```
 
 ### Stopping
 
@@ -283,8 +303,13 @@ for (const signal of ['SIGTERM', 'SIGINT']) {
 }
 ```
 
-Alternatively run the container with `docker run --init`. The
-[Spring Boot sample](../samples/spring-boot-service) builds an image from each of its Dockerfiles
+Alternatively run the container with `docker run --init`.
+
+A JVM stopped by SIGTERM exits with code 143 even after a clean shutdown, so that is the number to assert. Give the app long
+enough: Spring's graceful shutdown waits up to 30 seconds per phase, `docker stop` kills after 10, and Kubernetes' grace period,
+30 by default, also has to cover any `preStop`. Set `terminationGracePeriodSeconds` longer than the drain.
+
+The [Spring Boot sample](../samples/spring-boot-service) builds an image from each of its Dockerfiles
 and tests it with [Testcontainers](https://testcontainers.com) in CI: started, probed with both
 modes, checked for its labels and stopped with SIGTERM; see
 [Testing the container image](container-testing.md).

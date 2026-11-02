@@ -1,5 +1,9 @@
 # Publishing
 
+**In short:** publish from Linux or macOS agents, deploy by checksum, set `-PjavaApp.previousRelease=latest.release` so a
+changed runtime can't slip through unnoticed, sign in CI with Sigstore, and verify the signer before a deployment starts
+anything.
+
 `./gradlew publish` uploads three modules to your Maven repository, under one version, with the
 target as the classifier: the app, with each target's app archive and SBOM, its libraries, with each
 target's libraries archive, and its runtime, with each target's runtime archive:
@@ -44,7 +48,7 @@ artifactory {
     publish {
         contextUrl = "https://artifactory.example.com/artifactory"
         repository { repoKey = "libs-release-local" }
-        defaults { publications("ALL_PUBLICATIONS") }    // the app's and the runtime's
+        defaults { publications("ALL_PUBLICATIONS") }    // the app's, the libraries' and the runtime's
     }
     clientConfig.publisher.minChecksumDeploySizeKb = 10  // the default: files of 10 KB and over
 }
@@ -52,8 +56,8 @@ artifactory {
 
 The publishing account needs read access to a path that already holds the binary, or the checksum
 deploy falls back to a full upload. The JFrog CLI (`jf gradle`, `jf rt upload`) deploys by checksum
-too. JFrog's build-info record lists both modules, so promoting it moves a release's app and runtime
-between repositories together.
+too. JFrog's build-info record lists all three modules, so promoting it moves a release's app, libraries and
+runtime between repositories together.
 
 The saving holds only while the runtime archive really is the same bytes, and nothing fails when it
 stops being so: storage just grows. Publish from Linux or macOS agents, which give the same bytes for
